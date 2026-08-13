@@ -39,7 +39,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: { orde
       const res = await fetch(`/api/user/order/${order.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
-      setOrder((prev) => ({ ...(prev || {}), position: json }));
+      setOrder((prev: any) => ({ ...(prev || {}), position: json }));
       if (onUpdated) onUpdated();
     } catch (err) {
       setError(String(err));
