@@ -1,19 +1,19 @@
-const { parse } = require('url');
-const path = require('path');
+import { parse, pathToFileURL } from 'url';
+import path from 'path';
 
-module.exports = async (req, res) => {
-  const url = parse(req.url || '').pathname || '/';
-  const parts = url.split('/').filter(Boolean); // e.g. ['/api','ticker'] or ['ticker'] => ['api','ticker'] or ['ticker']
+export default async function handler(req, res) {
+  const urlPath = parse(req.url || '').pathname || '/';
+  const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['ticker']
 
-  // If Vercel passes the full path, the first segment may be 'api'. Remove it so we route by the handler name.
   if (parts[0] === 'api') parts.shift();
 
   const name = parts[0] || 'landing';
-  const handlerPath = path.join(__dirname, '..', 'api-handlers', `${name}.js`);
+  const handlerPath = path.join(process.cwd(), 'api-handlers', `${name}.js`);
 
   try {
-    const handlerModule = require(handlerPath);
-    const fn = handlerModule && (handlerModule.default || handlerModule.handler || handlerModule);
+    const moduleUrl = pathToFileURL(handlerPath).href;
+    const handlerModule = await import(moduleUrl);
+    const fn = handlerModule?.default || handlerModule?.handler || handlerModule;
     if (typeof fn === 'function') {
       return fn(req, res);
     }
@@ -21,14 +21,14 @@ module.exports = async (req, res) => {
     res.statusCode = 500;
     return res.end(`Handler for ${name} is not a function`);
   } catch (err) {
-    // If handler not found, return 404
-    if (err && err.code === 'MODULE_NOT_FOUND') {
+    // Module not found errors differ between Node versions; check message/code
+    const msg = String(err?.message || '');
+    if (err?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find module/.test(msg) || /not find/.test(msg)) {
       res.statusCode = 404;
       return res.end('Not found');
     }
-    // For other errors, log and return 500
     console.error(err);
     res.statusCode = 500;
     return res.end('Internal Server Error');
   }
-};
+}
