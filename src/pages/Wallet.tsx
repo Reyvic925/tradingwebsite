@@ -9,7 +9,8 @@ export default function Wallet() {
   const [txns, setTxns] = useState<Txn[]>([]);
   const [type, setType] = useState<'deposit' | 'withdrawal'>('deposit');
   const [amount, setAmount] = useState('500');
-  const [method, setMethod] = useState('card');
+  const [method, setMethod] = useState('USDT');
+  const topCryptos = ['BTC','ETH','USDT','USDC','BNB','SOL','XRP','ADA','DOGE','MATIC'];
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,9 +43,21 @@ export default function Wallet() {
     setError('');
     setMsg('');
     try {
-      await apiSend('/api/transactions', 'POST', { type, amount: amt, method });
-      setMsg(`${type === 'deposit' ? 'Deposit' : 'Withdrawal'} of ${formatMoney(amt)} completed.`);
-      load();
+      if (type === 'deposit') {
+        // Only crypto deposits are allowed — request a deposit address for selected currency
+        const res = await apiSend('/api/user/deposit/crypto', 'POST', { currency: method });
+        // apiSend returns parsed JSON on success
+        const address = res?.address || res?.data?.address;
+        if (!address) {
+          setError('Failed to generate deposit address');
+        } else {
+          setMsg(`Deposit address for ${method}: ${address}. Send ${method} to this address to fund your account.`);
+        }
+      } else {
+        await apiSend('/api/transactions', 'POST', { type, amount: amt, method });
+        setMsg(`${type === 'deposit' ? 'Deposit' : 'Withdrawal'} of ${formatMoney(amt)} completed.`);
+        load();
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Transfer failed');
     } finally {
@@ -80,14 +93,12 @@ export default function Wallet() {
           </div>
           <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount USD</label>
           <input value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono outline-none" />
-          <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Rail</label>
+          <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Currency</label>
           <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none">
             {type === 'deposit' ? (
-              <>
-                <option value="card">Visa / Mastercard</option>
-                <option value="wire">Bank wire</option>
-                <option value="crypto">USDC / USDT</option>
-              </>
+              topCryptos.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))
             ) : (
               <>
                 <option value="bank">Bank transfer</option>
