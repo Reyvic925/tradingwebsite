@@ -7,17 +7,29 @@ export default function LiveTicker() {
 
   useEffect(() => {
     let alive = true;
+    let stopped = false;
     const load = async () => {
       try {
         const res = await fetch('/api/ticker');
+        if (!res.ok) {
+          // Stop polling on non-OK responses to avoid repeated 404s in the network tab
+          console.warn('[ticker] /api/ticker returned', res.status);
+          stopped = true;
+          return;
+        }
         const data = await res.json();
         if (alive && Array.isArray(data)) setTrades(data);
-      } catch {
-        /* ignore */
+      } catch (err) {
+        // On network errors, stop polling after the first failure to avoid spam
+        console.warn('[ticker] fetch failed', err);
+        stopped = true;
       }
     };
     load();
-    const id = setInterval(load, 4000);
+    const id = setInterval(() => {
+      if (stopped) return;
+      load();
+    }, 4000);
     return () => {
       alive = false;
       clearInterval(id);

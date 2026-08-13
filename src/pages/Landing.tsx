@@ -154,24 +154,53 @@ export default function Landing() {
     (async () => {
       try {
         const [landRes, mktRes] = await Promise.all([
-          fetch('/api/landing'),
-          fetch('/api/markets?featured=1&limit=12'),
+          fetch('/api/landing').catch(() => null),
+          fetch('/api/markets?featured=1&limit=12').catch(() => null),
         ]);
-        const data = await landRes.json();
-        if (!landRes.ok) throw new Error(data.error || 'Failed to load');
+
         if (!alive) return;
-        if (data.features?.length) setFeatures(data.features);
-        if (data.partners?.length) setPartners(data.partners);
-        setStats(data.stats || []);
-        if (data.plans?.length) setPlans(data.plans);
-        if (data.testimonials?.length) setTestimonials(data.testimonials);
-        if (mktRes.ok) {
-          const mkts = await mktRes.json();
-          const items = Array.isArray(mkts) ? mkts : mkts.items;
-          if (Array.isArray(items)) setMarkets(items);
+
+        // Handle landing data if available
+        if (landRes && landRes.ok) {
+          try {
+            const data = await landRes.json();
+            if (!alive) return;
+            if (data.features?.length) setFeatures(data.features);
+            if (data.partners?.length) setPartners(data.partners);
+            setStats(data.stats || []);
+            if (data.plans?.length) setPlans(data.plans);
+            if (data.testimonials?.length) setTestimonials(data.testimonials);
+          } catch (err) {
+            console.warn('[landing] failed to parse /api/landing response', err);
+          }
+        } else if (landRes) {
+          // Non-OK response: log and continue using fallbacks
+          try {
+            const txt = await landRes.text();
+            console.warn('[landing] /api/landing failed', landRes.status, txt);
+          } catch {
+            console.warn('[landing] /api/landing failed', landRes.status);
+          }
+        } else {
+          console.warn('[landing] /api/landing unreachable');
+        }
+
+        // Handle markets data if available
+        if (mktRes && mktRes.ok) {
+          try {
+            const mkts = await mktRes.json();
+            const items = Array.isArray(mkts) ? mkts : mkts.items;
+            if (Array.isArray(items)) setMarkets(items);
+          } catch (err) {
+            console.warn('[landing] failed to parse /api/markets response', err);
+          }
+        } else if (mktRes) {
+          console.warn('[landing] /api/markets failed', mktRes.status);
+        } else {
+          console.warn('[landing] /api/markets unreachable');
         }
       } catch (e: unknown) {
-        if (alive) setError(e instanceof Error ? e.message : 'Unable to reach the desk');
+        console.warn('[landing] unexpected error', e);
       } finally {
         if (alive) setLoading(false);
       }
