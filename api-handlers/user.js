@@ -1,5 +1,7 @@
 import supabase from './db-client.js';
 import { first, requireUser as authUser } from './helpers.js';
+import cryptoKeys from './crypto-keys.js';
+import { logAdminAction } from './admin-helpers.js';
 
 async function requireUser(req) {
   return authUser(supabase, req);
@@ -136,6 +138,46 @@ export default async function handler(req, res) {
       const points = (data || []).map((r) => ({ ts: r.ts, price: Number(r.price) }));
       const out = downsample(points, 500);
       return res.status(200).json(out);
+    }
+
+    // GET /api/user/crypto-addresses
+    if (req.method === 'GET' && parts[1] === 'crypto-addresses' && !parts[2]) {
+      const { data: rows, error: aErr } = await supabase
+        .from('crypto_addresses')
+        .select('id, currency, address, created_at, last_used_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (aErr) throw aErr;
+      return res.status(200).json(rows || []);
+    }
+
+    // POST /api/user/withdraw/crypto
+    if (req.method === 'POST' && parts[1] === 'withdraw' && parts[2] === 'crypto') {
+      const { amount, currency, address: dest } = req.body || {};
+      const amt = Number(amount || 0);
+      if (!(amt > 0)) return res.status(400).json({ error: 'Invalid amount' });
+      if (!dest) return res.status(400).json({ error: 'Destination address required' });
+
+      const { data: wallets } = await supabase.from('wallets').select('*').eq('user_id', user.id).order('id', { ascending: true }).limit(1);
+      const wallet = (wallets && wallets[0]) || null;
+      if (!wallet || Number(wallet.available) < amt) return res.status(400).json({ error: 'Insufficient funds' });
+
+      // Deduct available and insert a withdrawal transaction
+      await supabase.from('wallets').update({ available: Number(wallet.available) - amt }).eq('id', wallet.id);
+      const tx = {
+        user_id: user.id,
+        amount: amt,
+        currency: currency || 'USDT',
+        tx_hash: null,
+        external_address: dest,
+        direction: 'withdrawal',
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      const { data: inserted, error: txErr } = await supabase.from('transactions').insert(tx).select();
+      if (txErr) throw txErr;
+      await logAdminAction(user.id, 'user.withdraw.initiated', 'transaction', inserted?.[0]?.id || null, { currency: tx.currency, amount: amt });
+      return res.status(200).json({ ok: true, tx: inserted?.[0] || null });
     }
 
     // GET /api/user/portfolio/chart
