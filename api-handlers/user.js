@@ -1,0 +1,226 @@
+import supabase from './db-client.js';
+import { first, requireUser as authUser } from './helpers.js';
+
+async function requireUser(req) {
+  return authUser(supabase, req);
+}
+
+function downsample(points, maxPoints = 500) {
+  if (!Array.isArray(points) || points.length <= maxPoints) return points;
+  const step = Math.ceil(points.length / maxPoints);
+  const out = [];
+  for (let i = 0; i < points.length; i += step) out.push(points[i]);
+  // ensure last point is included
+  if (out.length && out[out.length - 1] !== points[points.length - 1]) out.push(points[points.length - 1]);
+  return out;
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  try {
+    const user = await requireUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const url = new URL(req.url, `http://localhost`);
+    const parts = url.pathname.split('/').filter(Boolean); // e.g. ['api','user','order','123','chart']
+    // normalize: if first is 'api' drop it
+    if (parts[0] === 'api') parts.shift();
+    // after this parts[0] === 'user'
+
+    // GET /api/user/order/:id (details)
+    if (req.method === 'GET' && parts[1] === 'order' && parts[2] && !parts[3]) {
+      const id = Number(parts[2]);
+      if (!id) return res.status(400).json({ error: 'Missing order id' });
+      const { data: orders, error: oErr } = await supabase.from('orders').select('*').eq('id', id).eq('user_id', user.id).limit(1);
+      if (oErr) throw oErr;
+      const order = first(orders);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      const { data: posRows } = await supabase.from('positions').select('*').eq('user_id', user.id).eq('market_id', order.market_id).eq('status', 'open').limit(1);
+      const position = first(posRows);
+      return res.status(200).json({ ...order, position });
+    }
+
+    // POST /api/user/order/:id/close
+    if (req.method === 'POST' && parts[1] === 'order' && parts[2] && parts[3] === 'close') {
+      const id = Number(parts[2]);
+      if (!id) return res.status(400).json({ error: 'Missing order id' });
+      const { data: orders, error: oErr } = await supabase.from('orders').select('*').eq('id', id).eq('user_id', user.id).limit(1);
+      if (oErr) throw oErr;
+      const order = first(orders);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const { data: posRows } = await supabase.from('positions').select('*').eq('user_id', user.id).eq('market_id', order.market_id).eq('status', 'open').limit(1);
+      const pos = first(posRows);
+      if (!pos) return res.status(404).json({ error: 'Open position not found' });
+
+      const { data: marketRows } = await supabase.from('markets').select('*').eq('id', pos.market_id).limit(1);
+      const market = first(marketRows);
+      const price = market ? Number(market.price) : Number(pos.current_price || 0);
+      const dir = pos.side === 'long' || pos.side === 'buy' ? 1 : -1;
+      const pnl = (price - Number(pos.entry_price)) * Number(pos.quantity) * dir;
+
+      const { data: wallets } = await supabase.from('wallets').select('*').eq('user_id', user.id).order('id', { ascending: true });
+      const wallet = (wallets && wallets[0]) || null;
+      if (wallet) {
+        await supabase
+          .from('wallets')
+          .update({
+            available: Number(wallet.available) + Number(pos.margin) + pnl,
+            reserved: Math.max(0, Number(wallet.reserved) - Number(pos.margin)),
+          })
+          .eq('id', wallet.id);
+      }
+
+      const { data: updated, error: uErr } = await supabase
+        .from('positions')
+        .update({ status: 'closed', current_price: price, pnl, closed_at: new Date().toISOString() })
+        .eq('id', pos.id)
+        .select();
+      if (uErr) throw uErr;
+
+      await supabase.from('orders').insert({
+        user_id: user.id,
+        market_id: pos.market_id,
+        symbol: pos.symbol,
+        side: dir === 1 ? 'sell' : 'buy',
+        type: 'market',
+        quantity: pos.quantity,
+        price,
+        status: 'filled',
+        filled_price: price,
+      });
+
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        title: `Closed ${pos.symbol}`,
+        body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD at ${price}`,
+        read: false,
+      });
+
+      return res.status(200).json(first(updated));
+    }
+
+    // GET /api/user/order/:id/chart
+    if (req.method === 'GET' && parts[1] === 'order' && parts[3] === 'chart') {
+      const id = Number(parts[2]);
+      if (!id) return res.status(400).json({ error: 'Missing order id' });
+
+      // try orders
+      const { data: orders } = await supabase.from('orders').select('*').eq('id', id).eq('user_id', user.id).limit(1);
+      let row = first(orders);
+      let kind = 'order';
+      if (!row) {
+        // fall back to positions
+        const { data: pos } = await supabase.from('positions').select('*').eq('id', id).eq('user_id', user.id).limit(1);
+        row = first(pos);
+        kind = 'position';
+      }
+      if (!row) return res.status(404).json({ error: 'Order/Position not found' });
+
+      const marketId = row.market_id;
+      const startTs = row.created_at || row.entry_time || row.created || null;
+      // fetch up to 2000 points then downsample in JS
+      const q = supabase
+        .from('price_history')
+        .select('ts,price')
+        .eq('market_id', marketId)
+        .order('ts', { ascending: true })
+        .limit(2000);
+      if (startTs) q.gte('ts', startTs);
+      const { data, error } = await q;
+      if (error) throw error;
+      const points = (data || []).map((r) => ({ ts: r.ts, price: Number(r.price) }));
+      const out = downsample(points, 500);
+      return res.status(200).json(out);
+    }
+
+    // GET /api/user/portfolio/chart
+    if (req.method === 'GET' && parts[1] === 'portfolio' && parts[2] === 'chart') {
+      // get wallet
+      const { data: wallets } = await supabase.from('wallets').select('*').eq('user_id', user.id).order('id', { ascending: true });
+      const wallet = (wallets && wallets[0]) || { available: 0, reserved: 0 };
+      // get open positions
+      const { data: positions } = await supabase.from('positions').select('*').eq('user_id', user.id).order('id', { ascending: true });
+      const posArr = positions || [];
+      if (!posArr.length) {
+        const now = new Date().toISOString();
+        return res.status(200).json([{ ts: now, equity: Number(wallet.available || 0) + Number(wallet.reserved || 0) }]);
+      }
+
+      // determine markets and min start
+      const markets = {};
+      let minTs = null;
+      for (const p of posArr) {
+        markets[p.market_id] = true;
+        const ts = p.created_at || p.entry_time || p.created || null;
+        if (ts && (!minTs || new Date(ts) < new Date(minTs))) minTs = ts;
+      }
+      // if no start found, default to 7 days ago
+      if (!minTs) minTs = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+
+      // fetch price history for each market (parallel)
+      const marketIds = Object.keys(markets).map((m) => Number(m));
+      const perMarket = {};
+      for (const mid of marketIds) {
+        const { data, error } = await supabase
+          .from('price_history')
+          .select('ts,price')
+          .eq('market_id', mid)
+          .gte('ts', minTs)
+          .order('ts', { ascending: true })
+          .limit(2000);
+        if (error) throw error;
+        perMarket[mid] = (data || []).map((r) => ({ ts: r.ts, price: Number(r.price) }));
+      }
+
+      // build sorted unique timestamps (merge)
+      const tsSet = new Set();
+      for (const arr of Object.values(perMarket)) for (const p of arr) tsSet.add(p.ts);
+      const tsList = Array.from(tsSet).sort((a, b) => new Date(a) - new Date(b));
+      // limit to 2000 timestamps max then downsample to 500
+      let timestamps = tsList.slice(-2000);
+      if (timestamps.length === 0) timestamps = [new Date().toISOString()];
+
+      // helper to get latest price at or before ts for market (two-pointer)
+      function priceAt(arr, ts) {
+        if (!arr || !arr.length) return null;
+        // binary search for last <= ts
+        let lo = 0; let hi = arr.length - 1; let idx = -1;
+        const tMs = new Date(ts).getTime();
+        while (lo <= hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          const midMs = new Date(arr[mid].ts).getTime();
+          if (midMs <= tMs) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
+        }
+        if (idx === -1) return arr[0].price; // earliest
+        return arr[idx].price;
+      }
+
+      const series = [];
+      for (const ts of timestamps) {
+        let totalPnl = 0;
+        for (const p of posArr) {
+          const arr = perMarket[p.market_id] || [];
+          const price = priceAt(arr, ts);
+          if (price == null) continue;
+          const dir = p.side === 'long' || p.side === 'buy' ? 1 : -1;
+          totalPnl += (price - Number(p.entry_price)) * Number(p.quantity) * dir;
+        }
+        const equity = Number(wallet.available || 0) + Number(wallet.reserved || 0) + totalPnl;
+        series.push({ ts, equity });
+      }
+
+      const out = downsample(series, 500);
+      return res.status(200).json(out);
+    }
+
+    res.status(404).json({ error: 'Not found' });
+  } catch (err) {
+    console.error('API error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}

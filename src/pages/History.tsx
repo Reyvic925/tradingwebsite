@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AppShell from '../components/AppShell';
+import OrderDetailModal from '../components/OrderDetailModal';
 import { apiList, asList } from '../lib/api';
 import { formatMoney, formatPrice, timeAgo } from '../lib/format';
 import type { Order, Position, Txn } from '../types';
@@ -11,8 +12,11 @@ export default function History() {
   const [closed, setClosed] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<number | null>(null);
 
-  useEffect(() => {
+  const reload = () => {
+    setLoading(true);
+    setError('');
     Promise.all([
       apiList<Txn>('/api/transactions'),
       apiList<Order>('/api/orders'),
@@ -25,6 +29,10 @@ export default function History() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load history'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reload();
   }, []);
 
   return (
@@ -80,7 +88,7 @@ export default function History() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} className="border-t border-white/5">
+                <tr key={o.id} className="border-t border-white/5 hover:bg-white/2 cursor-pointer" onClick={() => setSelectedOrder(o.id)}>
                   <td className="px-5 py-3 font-mono">{o.symbol}</td>
                   <td className="px-3 py-3 uppercase">{o.side}</td>
                   <td className="px-3 py-3 font-mono">{o.quantity}</td>
@@ -116,6 +124,10 @@ export default function History() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {selectedOrder && (
+        <OrderDetailModal orderId={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdated={() => reload()} />
       )}
     </AppShell>
   );

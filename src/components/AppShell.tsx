@@ -31,6 +31,8 @@ const nav = [
   { to: '/app/social', label: 'Social', icon: Users },
   { to: '/app/referrals', label: 'Referrals', icon: Share2 },
   { to: '/app/history', label: 'History', icon: History },
+  { to: '/app/gains-losses', label: 'Gains/Losses', icon: LineChart },
+  { to: '/app/admin/crypto-keys', label: 'Admin Crypto Keys', icon: Wallet },
   { to: '/app/profile', label: 'Profile', icon: UserRound },
 ];
 

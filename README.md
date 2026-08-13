@@ -99,3 +99,31 @@ npm run pack    # rebuild public/downloads/apex-prime-broker.zip
 ## License
 
 MIT
+
+## Cron tick endpoint
+
+The server exposes a protected cron tick endpoint at /api/cron/tick that advances simulated market prices and writes OHLCV rows to the price_history table.
+
+Security
+- The endpoint requires a secret environment variable CRON_SECRET to be set for the server process. Example (Unix):
+
+  export CRON_SECRET="replace-with-a-random-string"
+
+Or on Windows (PowerShell):
+
+  $env:CRON_SECRET = 'replace-with-a-random-string'
+
+How to call
+- Call with the header X-Cron-Secret or the query parameter cron_secret. Example using curl:
+
+  curl -X POST "https://your-site.example.com/api/cron/tick" -H "X-Cron-Secret: replace-with-a-random-string"
+
+or with query string:
+
+  curl "https://your-site.example.com/api/cron/tick?cron_secret=replace-with-a-random-string"
+
+Notes
+- Per-market admin tunables supported: markets.hidden_drift and markets.volatility (decimal values). hidden_drift biases the expected drift per tick; volatility scales random shocks.
+- A convenience verification script is available at scripts/tick_once.js to run a single tick locally and confirm a price_history row is inserted (it requires SUPABASE credentials as documented in the Environment section).
+
+
