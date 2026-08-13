@@ -4,7 +4,8 @@ const isMobile = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 function buildGoogleUrl(appName: string) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const redirectUri = import.meta.env.VITE_GOOGLE_AUTH_PROXY;
+  // Allow falling back to the hosted proxy at /api/google-auth-proxy if not explicitly configured
+  const redirectUri = import.meta.env.VITE_GOOGLE_AUTH_PROXY || `${window.location.origin}/api/google-auth-proxy`;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   if (!clientId || !redirectUri) return null;
