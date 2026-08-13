@@ -339,9 +339,6 @@ export default function Landing() {
                   <div className={`text-xs ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>
                 </div>
               ))}
-              {!markets.length && (
-                <div className="col-span-full bg-[#080b11] p-8 text-center text-sm text-stone-500">Streaming the book…</div>
-              )}
             </div>
           </div>
         </div>
