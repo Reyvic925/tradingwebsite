@@ -52,7 +52,7 @@ export default function Wallet() {
     setMsg('');
     try {
       if (type === 'deposit') {
-        const res = await apiSend('/api/user/deposit/crypto', 'POST', { currency }) as any;
+        const res = await apiSend('/api/deposit-crypto', 'POST', { currency }) as any;
         const address = res?.address || res?.data?.address;
         if (!address) {
           setError('Failed to generate deposit address');
