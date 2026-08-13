@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
     {
       "source": "/((?!api/|videos/|images/|logos/|downloads/|favicon.svg|assets/).*)",
       "destination": "/index.html"
