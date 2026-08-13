@@ -1,0 +1,212 @@
+import supabase from './db-client.js';
+import { getUsdWallet, firstOpenPosition } from './helpers.js';
+import { UNIVERSE } from './universe-data.js';
+import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
+
+const MARGIN_RATE = 0.1;
+const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM', 'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD']);
+const BOOK = [...UNIVERSE, ...INTL_UNIVERSE];
+
+function orderSideOf(positionSide) {
+  return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
+}
+
+async function ensureUniverse() {
+  const { data: existing, error } = await supabase.from('markets').select('symbol');
+  if (error) throw error;
+  const have = new Set((existing || []).map((r) => r.symbol));
+  const missing = BOOK.filter((r) => !have.has(r.symbol) && !SKIP.has(r.symbol));
+  for (let i = 0; i < missing.length; i += 80) {
+    const chunk = missing.slice(i, i + 80);
+    const { error: iErr } = await supabase.from('markets').insert(chunk);
+    if (iErr) console.error('universe seed chunk failed', iErr.message);
+  }
+}
+
+async function fillPendingLimits(markets) {
+  const { data: pending } = await supabase.from('orders').select('*').eq('status', 'pending').eq('type', 'limit').limit(40);
+  if (!pending?.length) return;
+  const byId = Object.fromEntries((markets || []).map((m) => [m.id, m]));
+
+  for (const order of pending) {
+    const market = byId[order.market_id];
+    if (!market) continue;
+    const px = Number(market.price);
+    const limit = Number(order.price);
+    const fill = order.side === 'buy' ? px <= limit : px >= limit;
+    if (!fill) continue;
+
+    const qty = Number(order.quantity);
+    const fillPrice = limit;
+    const margin = qty * fillPrice * MARGIN_RATE;
+
+    const wallet = await getUsdWallet(supabase, order.user_id);
+    if (!wallet || Number(wallet.available) < margin) {
+      await supabase.from('orders').update({ status: 'rejected' }).eq('id', order.id);
+      continue;
+    }
+
+    await supabase.from('wallets').update({
+      available: Number(wallet.available) - margin,
+      reserved: Number(wallet.reserved) + margin,
+    }).eq('id', wallet.id);
+
+    await supabase.from('orders').update({ status: 'filled', filled_price: fillPrice }).eq('id', order.id);
+
+    const existing = await firstOpenPosition(supabase, order.user_id, order.market_id);
+
+    if (!existing) {
+      await supabase.from('positions').insert({
+        user_id: order.user_id,
+        market_id: order.market_id,
+        symbol: order.symbol,
+        side: order.side === 'buy' ? 'long' : 'short',
+        quantity: qty,
+        entry_price: fillPrice,
+        current_price: fillPrice,
+        stop_loss: order.stop_loss,
+        take_profit: order.take_profit,
+        pnl: 0,
+        margin,
+        status: 'open',
+      });
+    } else if (orderSideOf(existing.side) === order.side) {
+      const newQty = Number(existing.quantity) + qty;
+      const newEntry = (Number(existing.entry_price) * Number(existing.quantity) + fillPrice * qty) / newQty;
+      await supabase.from('positions').update({
+        quantity: newQty,
+        entry_price: newEntry,
+        current_price: fillPrice,
+        margin: Number(existing.margin) + margin,
+      }).eq('id', existing.id);
+    } else {
+      const dir = existing.side === 'long' || existing.side === 'buy' ? 1 : -1;
+      const closeQty = Math.min(Number(existing.quantity), qty);
+      const pnl = (fillPrice - Number(existing.entry_price)) * closeQty * dir;
+      const released = (Number(existing.margin) * closeQty) / Number(existing.quantity);
+      const w2 = await getUsdWallet(supabase, order.user_id);
+      if (w2) {
+        await supabase.from('wallets').update({
+          available: Number(w2.available) + released + pnl,
+          reserved: Math.max(0, Number(w2.reserved) - released),
+        }).eq('id', w2.id);
+      }
+      if (closeQty >= Number(existing.quantity)) {
+        await supabase.from('positions').update({
+          status: 'closed', current_price: fillPrice, pnl, closed_at: new Date().toISOString(),
+        }).eq('id', existing.id);
+      } else {
+        await supabase.from('positions').update({
+          quantity: Number(existing.quantity) - closeQty,
+          margin: Number(existing.margin) - released,
+          current_price: fillPrice,
+        }).eq('id', existing.id);
+      }
+    }
+
+    await supabase.from('notifications').insert({
+      user_id: order.user_id,
+      title: `Limit ${order.side.toUpperCase()} ${order.symbol} filled`,
+      body: `${qty} filled at ${fillPrice}`,
+      read: false,
+    });
+  }
+}
+
+function applyTick(m) {
+  const vol = m.asset_class === 'crypto' ? 0.004 : m.asset_class === 'forex' ? 0.0008 : 0.0016;
+  const change = (Math.random() - 0.48) * vol;
+  const price = Math.max(0.0001, Number(m.price) * (1 + change));
+  return {
+    id: m.id,
+    price,
+    change_24h: Number(m.change_24h) + change * 100 * 0.15,
+    high_24h: Math.max(Number(m.high_24h), price),
+    low_24h: Math.min(Number(m.low_24h), price),
+  };
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  try {
+    if (req.method === 'POST') {
+      await ensureUniverse();
+      const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
+      return res.status(200).json({ ok: true, count: count || 0 });
+    }
+
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+    await ensureUniverse();
+
+    const q = String(req.query.q || '').trim();
+    const assetClass = String(req.query.class || req.query.asset_class || 'all');
+    const featured = req.query.featured === '1';
+    const shouldTick = req.query.tick === '1';
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || (featured ? 12 : 120)));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const symbol = req.query.symbol ? String(req.query.symbol).toUpperCase() : '';
+
+    if (shouldTick) {
+      const { data: all } = await supabase.from('markets').select('id, asset_class, price, change_24h, high_24h, low_24h');
+      const pool = all || [];
+      const sample = [];
+      const n = Math.min(36, pool.length);
+      const used = new Set();
+      while (sample.length < n && used.size < pool.length) {
+        const i = Math.floor(Math.random() * pool.length);
+        if (used.has(i)) continue;
+        used.add(i);
+        sample.push(pool[i]);
+      }
+      if (symbol) {
+        const hit = pool.find((m) => m.id && false);
+        void hit;
+      }
+      await Promise.all(sample.map((m) => {
+        const u = applyTick(m);
+        return supabase.from('markets').update({
+          price: u.price,
+          change_24h: u.change_24h,
+          high_24h: u.high_24h,
+          low_24h: u.low_24h,
+        }).eq('id', u.id);
+      }));
+    }
+
+    let query = supabase.from('markets').select('*', { count: 'exact' });
+    if (assetClass && assetClass !== 'all') {
+      const mapped = CLASS_MAP[assetClass] || [assetClass];
+      if (mapped.length === 1) query = query.eq('asset_class', mapped[0]);
+      else query = query.in('asset_class', mapped);
+    }
+    if (q) {
+      query = query.or(`symbol.ilike.%${q}%,name.ilike.%${q}%`);
+    }
+    if (symbol) query = query.eq('symbol', symbol);
+
+    if (featured) query = query.order('volume', { ascending: false });
+    else query = query.order('symbol', { ascending: true });
+
+    query = query.range(offset, offset + limit - 1);
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    if (shouldTick) await fillPendingLimits(data || []);
+
+    res.setHeader('X-Total-Count', String(count || (data || []).length));
+    return res.status(200).json({
+      items: data || [],
+      total: count || (data || []).length,
+      limit,
+      offset,
+    });
+  } catch (err) {
+    console.error('API error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}

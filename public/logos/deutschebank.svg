@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <rect width="200" height="40" rx="4" fill="#0018A8"/>
+  <rect x="10" y="8" width="24" height="24" fill="none" stroke="#fff" stroke-width="1.4"/>
+  <path d="M16 26V14h4.2l6.6 8.6V14H31v12h-4.2L20.2 17.4V26H16z" fill="#fff"/>
+  <text x="42" y="25" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="600">Deutsche Bank</text>
+</svg>

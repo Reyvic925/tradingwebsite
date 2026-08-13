@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 40" fill="none">
+  <rect width="190" height="40" rx="4" fill="#131722"/>
+  <path d="M12 26l6-14h5l6 14h-5l-1.2-3h-4.6L16.8 26H12zm7.2-6.6h3.2L21 15.2l-1.8 4.2z" fill="#2962FF"/>
+  <circle cx="36" cy="20" r="4.2" fill="#2962FF"/>
+  <text x="46" y="25" fill="#D1D4DC" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="600">TradingView</text>
+</svg>
