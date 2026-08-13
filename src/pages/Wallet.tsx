@@ -53,8 +53,8 @@ export default function Wallet() {
     try {
       if (type === 'deposit') {
         // Request a new deposit address for the chosen currency
-        const res = await apiSend('/api/user/deposit/crypto', 'POST', { currency }) as any;
-        const address = res?.address || res?.data?.address;
+        const res: any = await apiSend('/api/user/deposit/crypto', 'POST', { currency });
+        const address: string | undefined = res?.address || res?.data?.address;
         if (!address) {
           setError('Failed to generate deposit address');
         } else {
@@ -175,17 +175,22 @@ export default function Wallet() {
             Recent Transactions
           </div>
           <div className="max-h-[420px] divide-y divide-white/5 overflow-auto">
-            {txns.filter((t) => t.type === 'deposit' || t.type === 'withdrawal').map((t) => (
-              <div key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                <div>
-                  <div className="capitalize">{t.type} · {t.method || t.currency}</div>
-                  <div className="text-[11px] text-stone-500">{t.reference}</div>
+            {txns.filter((t) => (t.type === 'deposit' || t.type === 'withdrawal')).map((t) => {
+              const key = t.id || `${t.type}-${t.created_at || t.reference}`;
+              const ttype = String((t as any).type || (t as any).direction || '');
+              const isDeposit = ttype === 'deposit';
+              return (
+                <div key={key} className="flex items-center justify-between px-5 py-3 text-sm">
+                  <div>
+                    <div className="capitalize">{ttype} · {(t as any).method || (t as any).currency}</div>
+                    <div className="text-[11px] text-stone-500">{(t as any).reference}</div>
+                  </div>
+                  <div className={`font-mono ${isDeposit ? 'text-emerald-400' : 'text-rose-300'}`}>
+                    {isDeposit ? '+' : '−'}{formatMoney(Number((t as any).amount))}
+                  </div>
                 </div>
-                <div className={`font-mono ${(t.type as string) === 'deposit' ? 'text-emerald-400' : 'text-rose-300'}`}>
-                  {(t.type as string) === 'deposit' ? '+' : '−'}{formatMoney(Number(t.amount))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {!txns.some((t) => t.type === 'deposit' || t.type === 'withdrawal') && (
               <div className="px-5 py-8 text-sm text-stone-500">No cash activity.</div>
             )}
