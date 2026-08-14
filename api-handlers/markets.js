@@ -4,8 +4,55 @@ import { UNIVERSE } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
 
 const MARGIN_RATE = 0.1;
-const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM', 'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD']);
-const BOOK = [...UNIVERSE, ...INTL_UNIVERSE];
+const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
+
+function pairRow(symbol, name, asset_class, price, volume) {
+  const ch = Number(((Math.sin(symbol.length * 2.2 + price / 100) * 1.8) + 0.5).toFixed(2));
+  return {
+    symbol,
+    name,
+    asset_class,
+    price,
+    change_24h: ch,
+    volume,
+    high_24h: Number((price * 1.01).toFixed(4)),
+    low_24h: Number((price * 0.99).toFixed(4)),
+  };
+}
+
+const FOREX_PAIRS = [
+  pairRow('EURUSD', 'Euro / US Dollar', 'forex', 1.0863, 184000000),
+  pairRow('GBPUSD', 'British Pound / US Dollar', 'forex', 1.2724, 152000000),
+  pairRow('USDJPY', 'US Dollar / Japanese Yen', 'forex', 147.18, 196000000),
+  pairRow('AUDUSD', 'Australian Dollar / US Dollar', 'forex', 0.6668, 82000000),
+  pairRow('USDCAD', 'US Dollar / Canadian Dollar', 'forex', 1.3688, 76000000),
+  pairRow('USDCHF', 'US Dollar / Swiss Franc', 'forex', 0.9056, 68000000),
+  pairRow('NZDUSD', 'New Zealand Dollar / US Dollar', 'forex', 0.6124, 46000000),
+  pairRow('EURGBP', 'Euro / British Pound', 'forex', 0.8538, 36000000),
+  pairRow('EURJPY', 'Euro / Japanese Yen', 'forex', 159.92, 54000000),
+  pairRow('GBPJPY', 'British Pound / Japanese Yen', 'forex', 187.38, 42000000),
+  pairRow('AUDJPY', 'Australian Dollar / Japanese Yen', 'forex', 98.18, 38000000),
+  pairRow('XAUUSD', 'Gold / US Dollar', 'forex', 2347.8, 64000000),
+];
+
+const CRYPTO_PAIRS = [
+  pairRow('BTCUSD', 'Bitcoin / US Dollar', 'crypto', 67340.2, 2980000000),
+  pairRow('ETHUSD', 'Ethereum / US Dollar', 'crypto', 3528.4, 1840000000),
+  pairRow('SOLUSD', 'Solana / US Dollar', 'crypto', 168.4, 980000000),
+  pairRow('XRPUSD', 'XRP / US Dollar', 'crypto', 0.64, 820000000),
+  pairRow('ADAUSD', 'Cardano / US Dollar', 'crypto', 0.74, 420000000),
+  pairRow('DOGEUSD', 'Dogecoin / US Dollar', 'crypto', 0.18, 760000000),
+  pairRow('BNBUSD', 'Binance Coin / US Dollar', 'crypto', 610.2, 520000000),
+  pairRow('LINKUSD', 'Chainlink / US Dollar', 'crypto', 18.8, 360000000),
+  pairRow('AVAXUSD', 'Avalanche / US Dollar', 'crypto', 36.4, 220000000),
+  pairRow('DOTUSD', 'Polkadot / US Dollar', 'crypto', 8.4, 280000000),
+  pairRow('MATICUSD', 'Polygon / US Dollar', 'crypto', 0.98, 240000000),
+  pairRow('LTCUSD', 'Litecoin / US Dollar', 'crypto', 92.8, 180000000),
+  pairRow('TRXUSD', 'TRON / US Dollar', 'crypto', 0.16, 200000000),
+  pairRow('ATOMUSD', 'Cosmos / US Dollar', 'crypto', 9.8, 180000000),
+];
+
+const BOOK = [...UNIVERSE, ...INTL_UNIVERSE, ...FOREX_PAIRS, ...CRYPTO_PAIRS];
 
 function orderSideOf(positionSide) {
   return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
