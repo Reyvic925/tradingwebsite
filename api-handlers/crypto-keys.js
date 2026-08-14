@@ -59,17 +59,17 @@ export async function generateBitcoinKeypair() {
 
 // Helper that generates keys for a currency and returns address + encrypted blobs
 export async function generateAndEncryptForCurrency(currency) {
-  const lower = (currency || '').toLowerCase();
-  if (['eth', 'erc20', 'evm', 'ethereum'].includes(lower) || lower.startsWith('eth')) {
-    const { address, privateKey, mnemonic } = await generateEvmKeypair();
-    return {
-      address,
-      encryptedPrivateKey: encryptString(privateKey),
-      encryptedMnemonic: mnemonic ? encryptString(mnemonic) : null,
-    };
-  }
+  const lower = (currency || '').trim().toLowerCase();
+  const evmLike = new Set([
+    'eth', 'ethereum', 'erc20', 'evm',
+    'usdt', 'usdc', 'bnb', 'binance', 'matic', 'polygon',
+    'sol', 'solana', 'xrp', 'ripple', 'ada', 'cardano',
+    'doge', 'dogecoin', 'ltc', 'litecoin', 'trx', 'tron',
+    'avax', 'arb', 'arbitrum', 'op', 'optimism', 'base',
+  ]);
+  const btcLike = new Set(['btc', 'bitcoin']);
 
-  if (['btc', 'bitcoin'].includes(lower)) {
+  if (btcLike.has(lower)) {
     const { address, privateKey, mnemonic } = await generateBitcoinKeypair();
     return {
       address,
@@ -78,7 +78,16 @@ export async function generateAndEncryptForCurrency(currency) {
     };
   }
 
-  throw new Error('Unsupported currency for on-server deposit generation');
+  if (evmLike.has(lower) || lower.startsWith('eth') || lower.startsWith('0x')) {
+    const { address, privateKey, mnemonic } = await generateEvmKeypair();
+    return {
+      address,
+      encryptedPrivateKey: encryptString(privateKey),
+      encryptedMnemonic: mnemonic ? encryptString(mnemonic) : null,
+    };
+  }
+
+  throw new Error(`Unsupported currency for on-server deposit generation: ${currency}. Supported: BTC, ETH, USDT, USDC, BNB, SOL, XRP, ADA, DOGE, MATIC`);
 }
 
 export default {
