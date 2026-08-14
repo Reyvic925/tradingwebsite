@@ -29,6 +29,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Unsupported currency: ${currency}` });
     }
 
+    // Check for existing address (prevents race condition of duplicate creation)
     const { data: existing, error: listErr } = await listCryptoAddresses({ userId: user.id, network });
     if (listErr) {
       console.error('[deposit-crypto] listCryptoAddresses failed', listErr.message);
@@ -44,7 +45,19 @@ export default async function handler(req, res) {
       });
     }
 
-    const result = await cryptoKeys.generateAndEncryptForCurrency(currency);
+    // Prevent race condition: use idempotent create or retry on unique constraint violation
+    let result;
+    try {
+      result = await cryptoKeys.generateAndEncryptForCurrency(currency);
+    } catch (genErr) {
+      console.error('[deposit-crypto] generateAndEncryptForCurrency failed', genErr.message);
+      // If it's an unimplemented network, return 501
+      if (genErr.message.includes('not yet implemented')) {
+        return res.status(501).json({ error: genErr.message });
+      }
+      return res.status(500).json({ error: 'Internal error' });
+    }
+    
     const { error: createErr } = await createCryptoAddress(
       user.id,
       result.currency,
@@ -55,6 +68,18 @@ export default async function handler(req, res) {
       network,
     );
     if (createErr) {
+      // If address already exists, return it instead of erroring
+      if (createErr.code === '23505' || createErr.message.includes('unique')) {
+        const { data: retry, error: retryErr } = await listCryptoAddresses({ userId: user.id, network });
+        if (retry && retry.length > 0) {
+          const row = retry[0];
+          return res.status(200).json({
+            address: row.address,
+            network,
+            currency: row.currency || cryptoKeys.getCanonicalCurrencyForNetwork(network),
+          });
+        }
+      }
       console.error('[deposit-crypto] createCryptoAddress failed', createErr.message);
       return res.status(500).json({ error: 'Internal error' });
     }

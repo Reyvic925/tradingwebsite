@@ -153,17 +153,21 @@ async function creditDeposit({ user_id, amount, currency = 'ETH', tx_hash, times
     throw new Error('Failed to insert transaction: ' + insertRes.raw);
   }
 
-  // Update wallet balance — try wallets table, fallback to users table update via rpc or leave to triggers
+  // Update wallet balance via RPC function (atomic, safe for concurrent updates)
+  // This requires a PostgreSQL function: update_wallet_balance(user_id UUID, amount DECIMAL)
+  // Alternatively, use database trigger on transactions insert to auto-update wallets.
+  // For now, log a warning if neither is implemented.
   try {
-    // Attempt to increment wallets.balance using PostgREST casting via RPC-like update
-    const updateRes = await fetchSupabase(`wallets?user_id=eq.${user_id}`, {
-      method: 'PATCH',
-      body: { balance: `wallets.balance + ${amount}` }
+    // Try calling RPC function if it exists
+    const updateRes = await fetchSupabase('rpc/update_wallet_balance', {
+      method: 'POST',
+      body: { user_id: user_id, amount: amount }
     });
-    // Note: This simplistic patch likely won't work with PostgREST for arithmetic without SQL functions.
-    // Many deployments use DB triggers on transactions insert to update wallets. If so, the above is unnecessary.
+    if (!(updateRes.status >= 200 && updateRes.status < 300)) {
+      console.warn('Wallet balance update RPC failed. Verify DB trigger is in place. Status:', updateRes.status);
+    }
   } catch (err) {
-    console.warn('Could not update wallet automatically; ensure DB trigger or implement incremental update. Error:', err.message);
+    console.warn('RPC update_wallet_balance not available. Ensure DB trigger on transactions table updates wallet balance atomically. Error:', err.message);
   }
 
   // Create user notification

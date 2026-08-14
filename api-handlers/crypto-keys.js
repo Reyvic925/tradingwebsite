@@ -130,9 +130,14 @@ export async function generateKeypairForNetwork(network) {
   if (['ethereum', 'binance', 'polygon', 'avalanche', 'arbitrum', 'optimism', 'base'].includes(normalized)) {
     return generateEvmKeypair();
   }
+  
+  // Solana and Ripple are not yet implemented — throw error instead of falling back to EVM
+  if (['solana', 'ripple', 'cardano', 'dogecoin'].includes(normalized)) {
+    throw new Error(`${normalized} keypair generation not yet implemented. Contact support.`);
+  }
 
-  // Fallback for non-EVM simulated chains: still generate a random wallet and keep the network label.
-  return generateEvmKeypair();
+  // Unknown network
+  throw new Error(`Unsupported network: ${network}`);
 }
 
 export async function generateAndEncryptForCurrency(currency) {

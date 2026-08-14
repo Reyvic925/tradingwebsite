@@ -12,6 +12,7 @@
   },
   "homepage": "https://github.com/Reyvic925/tradingwebsite#readme",
   "type": "module",
+  "keywords": ["trading", "broker", "finance", "crypto", "multi-asset"],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
