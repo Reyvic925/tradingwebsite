@@ -39,7 +39,7 @@ export async function getUsdWallet(supabase, userId) {
   return { ...keep, available, reserved };
 }
 
-export async function getOrCreateWallet(supabase, userId, starting = 1000) {
+export async function getOrCreateWallet(supabase, userId, starting = 0) {
   let wallet = await getUsdWallet(supabase, userId);
   if (wallet) return wallet;
   const { data, error } = await supabase

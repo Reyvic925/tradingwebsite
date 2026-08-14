@@ -113,7 +113,7 @@ export default async function handler(req, res) {
           await supabase.from('notifications').insert({
             user_id: user.id,
             title: 'Welcome to Apex Prime Broker',
-            body: 'Your account is live with a $1,000 welcome credit. Complete KYC to unlock higher limits.',
+            body: 'Your account is ready. Complete KYC and deposit to start trading.',
             read: false,
           });
 
