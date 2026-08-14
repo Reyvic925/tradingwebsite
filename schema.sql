@@ -276,3 +276,36 @@ create table if not exists app_config (
 );
 
 create index if not exists idx_app_config_key on app_config (key);
+
+-- KYC submissions table for document storage and verification tracking
+create table if not exists kyc_submissions (
+  id bigserial primary key,
+  user_id text not null,
+  personal_data jsonb,
+  documents jsonb default '[]'::jsonb,
+  metadata jsonb default '{}'::jsonb,
+  status text default 'pending',
+  reviewer_id text,
+  reviewed_at timestamptz,
+  admin_notes text,
+  submitted_at timestamptz default now()
+);
+
+create index if not exists idx_kyc_submissions_user_id on kyc_submissions (user_id);
+create index if not exists idx_kyc_submissions_status on kyc_submissions (status);
+create index if not exists idx_kyc_submissions_submitted_at on kyc_submissions (submitted_at);
+
+-- Admin audit log for compliance and security
+create table if not exists admin_audit_log (
+  id bigserial primary key,
+  admin_id text,
+  action text not null,
+  target_type text,
+  target_id text,
+  details jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_admin_audit_log_admin_id on admin_audit_log (admin_id);
+create index if not exists idx_admin_audit_log_action on admin_audit_log (action);
+create index if not exists idx_admin_audit_log_created_at on admin_audit_log (created_at);
