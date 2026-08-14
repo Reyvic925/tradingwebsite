@@ -70,7 +70,14 @@ export function getCanonicalCurrencyForNetwork(network) {
 // AES-256-GCM helper using a key derived from ENCRYPTION_MASTER_KEY
 function getMasterKey() {
   const master = process.env.ENCRYPTION_MASTER_KEY;
-  if (!master) throw new Error('ENCRYPTION_MASTER_KEY is not set');
+  if (!master) {
+    // Local dev fallback — deterministic but only safe for in-memory dev stores.
+    // Never rely on this in production or on Vercel.
+    if (!process.env.VERCEL) {
+      return crypto.createHash('sha256').update('local-dev-encryption-key-do-not-use-in-prod', 'utf8').digest();
+    }
+    throw new Error('ENCRYPTION_MASTER_KEY is not set');
+  }
   return crypto.createHash('sha256').update(master, 'utf8').digest();
 }
 

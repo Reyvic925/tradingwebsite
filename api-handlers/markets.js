@@ -33,6 +33,32 @@ const FOREX_PAIRS = [
   pairRow('GBPJPY', 'British Pound / Japanese Yen', 'forex', 187.38, 42000000),
   pairRow('AUDJPY', 'Australian Dollar / Japanese Yen', 'forex', 98.18, 38000000),
   pairRow('XAUUSD', 'Gold / US Dollar', 'forex', 2347.8, 64000000),
+  pairRow('XAGUSD', 'Silver / US Dollar', 'forex', 27.86, 38000000),
+  pairRow('XPTUSD', 'Platinum / US Dollar', 'forex', 972.4, 6200000),
+  pairRow('XPDUSD', 'Palladium / US Dollar', 'forex', 998.2, 4800000),
+  pairRow('USDCNH', 'US Dollar / Chinese Yuan', 'forex', 7.2412, 21000000),
+  pairRow('USDMXN', 'US Dollar / Mexican Peso', 'forex', 17.024, 14000000),
+  pairRow('USDZAR', 'US Dollar / South African Rand', 'forex', 18.426, 9200000),
+  pairRow('USDSEK', 'US Dollar / Swedish Krona', 'forex', 10.482, 8600000),
+  pairRow('USDNOK', 'US Dollar / Norwegian Krone', 'forex', 10.624, 7400000),
+  pairRow('USDPLN', 'US Dollar / Polish Zloty', 'forex', 3.9418, 6800000),
+  pairRow('USDSGD', 'US Dollar / Singapore Dollar', 'forex', 1.3482, 12400000),
+  pairRow('USDHKD', 'US Dollar / Hong Kong Dollar', 'forex', 7.8114, 9600000),
+  pairRow('USDTRY', 'US Dollar / Turkish Lira', 'forex', 32.364, 5400000),
+  pairRow('EURCHF', 'Euro / Swiss Franc', 'forex', 0.9624, 18400000),
+  pairRow('EURAUD', 'Euro / Australian Dollar', 'forex', 1.6328, 8600000),
+  pairRow('EURCAD', 'Euro / Canadian Dollar', 'forex', 1.4866, 7800000),
+  pairRow('EURNZD', 'Euro / New Zealand Dollar', 'forex', 1.7732, 4200000),
+  pairRow('EURSEK', 'Euro / Swedish Krona', 'forex', 11.384, 3600000),
+  pairRow('EURNOK', 'Euro / Norwegian Krone', 'forex', 11.542, 2800000),
+  pairRow('EURPLN', 'Euro / Polish Zloty', 'forex', 4.2814, 3200000),
+  pairRow('GBPCHF', 'British Pound / Swiss Franc', 'forex', 1.1512, 5800000),
+  pairRow('GBPAUD', 'British Pound / Australian Dollar', 'forex', 1.9042, 3800000),
+  pairRow('GBPCAD', 'British Pound / Canadian Dollar', 'forex', 1.7346, 3400000),
+  pairRow('GBPNZD', 'British Pound / New Zealand Dollar', 'forex', 2.0706, 2200000),
+  pairRow('CHFJPY', 'Swiss Franc / Japanese Yen', 'forex', 162.52, 4800000),
+  pairRow('CADJPY', 'Canadian Dollar / Japanese Yen', 'forex', 107.68, 4200000),
+  pairRow('NZDJPY', 'New Zealand Dollar / Japanese Yen', 'forex', 90.22, 2800000),
 ];
 
 const CRYPTO_PAIRS = [
@@ -50,6 +76,34 @@ const CRYPTO_PAIRS = [
   pairRow('LTCUSD', 'Litecoin / US Dollar', 'crypto', 92.8, 180000000),
   pairRow('TRXUSD', 'TRON / US Dollar', 'crypto', 0.16, 200000000),
   pairRow('ATOMUSD', 'Cosmos / US Dollar', 'crypto', 9.8, 180000000),
+  pairRow('BCHUSD', 'Bitcoin Cash / US Dollar', 'crypto', 462.8, 320000000),
+  pairRow('XLMUSD', 'Stellar / US Dollar', 'crypto', 0.11, 240000000),
+  pairRow('XMRUSD', 'Monero / US Dollar', 'crypto', 168.4, 96000000),
+  pairRow('ZECUSD', 'Zcash / US Dollar', 'crypto', 30.4, 64000000),
+  pairRow('ETCUSD', 'Ethereum Classic / US Dollar', 'crypto', 26.4, 120000000),
+  pairRow('NEARUSD', 'NEAR Protocol / US Dollar', 'crypto', 5.2, 180000000),
+  pairRow('ICPUSD', 'Internet Computer / US Dollar', 'crypto', 9.8, 84000000),
+  pairRow('FILUSD', 'Filecoin / US Dollar', 'crypto', 4.62, 92000000),
+  pairRow('ALGOUSD', 'Algorand / US Dollar', 'crypto', 0.15, 78000000),
+  pairRow('VETUSD', 'VeChain / US Dollar', 'crypto', 0.026, 82000000),
+  pairRow('UNIUSD', 'Uniswap / US Dollar', 'crypto', 9.24, 140000000),
+  pairRow('AAVEUSD', 'Aave / US Dollar', 'crypto', 92.4, 98000000),
+  pairRow('COMPUSD', 'Compound / US Dollar', 'crypto', 52.8, 42000000),
+  pairRow('INJUSD', 'Injective / US Dollar', 'crypto', 21.4, 56000000),
+  pairRow('ARBUSD', 'Arbitrum / US Dollar', 'crypto', 0.82, 164000000),
+  pairRow('OPUSD', 'Optimism / US Dollar', 'crypto', 1.78, 128000000),
+  pairRow('APTUSD', 'Aptos / US Dollar', 'crypto', 7.24, 88000000),
+  pairRow('SUIUSD', 'Sui / US Dollar', 'crypto', 1.62, 186000000),
+  pairRow('TIAUSD', 'Celestia / US Dollar', 'crypto', 6.84, 62000000),
+  pairRow('GALAUSD', 'Gala / US Dollar', 'crypto', 0.028, 74000000),
+  pairRow('SANDUSD', 'The Sandbox / US Dollar', 'crypto', 0.32, 58000000),
+  pairRow('MANAUSD', 'Decentraland / US Dollar', 'crypto', 0.38, 48000000),
+  pairRow('AXSUSD', 'Axie Infinity / US Dollar', 'crypto', 5.82, 42000000),
+  pairRow('IMXUSD', 'Immutable / US Dollar', 'crypto', 1.42, 46000000),
+  pairRow('GRTUSD', 'The Graph / US Dollar', 'crypto', 0.18, 52000000),
+  pairRow('CRVUSD', 'Curve DAO / US Dollar', 'crypto', 0.24, 44000000),
+  pairRow('PEPEUSD', 'Pepe / US Dollar', 'crypto', 0.0000082, 620000000),
+  pairRow('SHIBUSD', 'Shiba Inu / US Dollar', 'crypto', 0.0000186, 380000000),
 ];
 
 const BOOK = [...UNIVERSE, ...INTL_UNIVERSE, ...FOREX_PAIRS, ...CRYPTO_PAIRS];
@@ -175,7 +229,7 @@ function applyTick(m) {
   // Momentum approximation: use change_24h as a coarse momentum signal (percent)
   const momentumStrength = 0.3; // tuneable constant (smaller => less momentum influence)
   const momentum = (Number(m.change_24h || 0) / 100) * momentumStrength * (Math.random() * 0.6 + 0.7);
-n  // Mean-reversion: pull towards the 24h mid (high+low)/2 if available
+  // Mean-reversion: pull towards the 24h mid (high+low)/2 if available
   const meanReversionStrength = 0.25; // positive => stronger pull towards mean
   const high24 = Number(m.high_24h || m.price || 0);
   const low24 = Number(m.low_24h || m.price || 0);
@@ -251,8 +305,8 @@ export default async function handler(req, res) {
         sample.push(pool[i]);
       }
       if (symbol) {
-        const hit = pool.find((m) => m.id && false);
-        void hit;
+        const hit = pool.find((m) => m.symbol === symbol);
+        if (hit && !sample.some((s) => s.id === hit.id)) sample.push(hit);
       }
       await Promise.all(sample.map((m) => {
         const u = applyTick(m);

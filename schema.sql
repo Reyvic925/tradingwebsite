@@ -68,6 +68,17 @@ create table if not exists markets (
   low_24h numeric
 );
 
+create table if not exists market_indices (
+  id serial primary key,
+  code text,
+  name text,
+  country text,
+  region text,
+  ytd_low numeric,
+  ytd_high numeric,
+  note text
+);
+
 create table if not exists profiles (
   id serial primary key,
   user_id text not null,

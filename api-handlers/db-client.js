@@ -1,28 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 import { triggerRestore } from './db-wake.js';
+import { default as devClient } from './dev-db.js';
 
 // Resolve Supabase configuration from several possible env vars to be robust
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
-if (!supabaseUrl || !serviceKey) {
+let supabase;
+
+if (supabaseUrl && serviceKey) {
+  supabase = createClient(
+    supabaseUrl,
+    serviceKey,
+    {
+      global: {
+        fetch: async (url, options) => {
+          const res = await fetch(url, options);
+          if (!res.ok && res.status >= 500) triggerRestore();
+          return res;
+        },
+      },
+    }
+  );
+} else if (process.env.VERCEL) {
   // Emit a clear, searchable error to runtime logs so the cause is obvious in Vercel
   console.error('[api] Missing Supabase configuration. Expected NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY).');
   throw new Error('Server Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment.');
+} else {
+  // Local dev without Supabase env: in-memory store so the site is fully explorable.
+  // Data is per-process and resets on restart — never rely on this outside local dev.
+  console.warn('[api] Supabase env not configured — using local in-memory dev store (data resets on restart).');
+  supabase = devClient;
 }
-
-const supabase = createClient(
-  supabaseUrl,
-  serviceKey,
-  {
-    global: {
-      fetch: async (url, options) => {
-        const res = await fetch(url, options);
-        if (!res.ok && res.status >= 500) triggerRestore();
-        return res;
-      },
-    },
-  }
-);
 
 export default supabase;

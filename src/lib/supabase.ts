@@ -10,20 +10,92 @@ let supabase: any;
 if (url && anon) {
   supabase = createClient(url, anon);
 } else {
-  console.warn('[apex-prime] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
+  console.warn('[apex-prime] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — running in local demo mode with an in-memory backend.');
 
-  // Provide a minimal placeholder that implements the auth methods the app uses
-  // so code like `supabase.auth.getSession()` and `supabase.auth.onAuthStateChange(...)` do not throw
-  // during module import. Other Supabase methods will throw a clear error when invoked.
+  // Local demo mode: no Supabase project configured. Provides a persistent guest
+  // session so the app is fully explorable against the local in-memory API.
+  // The user id / token must match the constants in api-handlers/dev-db.js.
+  const DEMO_KEY = 'apex_demo_session';
+  const demoUser = {
+    id: 'demo-local-user',
+    email: 'demo@apex.local',
+    aud: 'authenticated',
+    role: 'authenticated',
+    app_metadata: { provider: 'demo' },
+    user_metadata: { full_name: 'Local Demo Trader', is_admin: true },
+    created_at: new Date().toISOString(),
+  };
+  const newDemoSession = () => ({
+    access_token: 'local-demo-token',
+    refresh_token: 'local-demo-refresh',
+    token_type: 'bearer' as const,
+    expires_in: 365 * 86400,
+    expires_at: Math.floor(Date.now() / 1000) + 365 * 86400,
+    user: demoUser,
+  });
+
+  const listeners: Array<(event: string, session: unknown | null) => void> = [];
+  const notify = (event: string, session: unknown | null) => {
+    listeners.forEach((cb) => cb(event, session));
+  };
+
+  const readDemoSession = () => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DEMO_KEY) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && parsed.access_token ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeDemoSession = (session: unknown | null) => {
+    try {
+      if (session) localStorage.setItem(DEMO_KEY, JSON.stringify(session));
+      else localStorage.removeItem(DEMO_KEY);
+    } catch { /* storage unavailable — session stays in-memory */ }
+  };
+
+  let memorySession: unknown | null = readDemoSession();
+
   const placeholder = {
     auth: {
       async getSession() {
-        // Return a session-shaped value so callers can handle unauthenticated state gracefully
-        return { data: { session: null } };
+        return { data: { session: memorySession }, error: null };
       },
-      onAuthStateChange(_callback: any) {
-        // Return an object with a subscription that has an unsubscribe method
-        return { data: { subscription: { unsubscribe() {} } } };
+      onAuthStateChange(callback: (event: string, session: unknown | null) => void) {
+        listeners.push(callback);
+        return { data: { subscription: { unsubscribe() { const i = listeners.indexOf(callback); if (i >= 0) listeners.splice(i, 1); } } } };
+      },
+      async signInWithPassword(_creds: unknown) {
+        memorySession = newDemoSession();
+        writeDemoSession(memorySession);
+        notify('SIGNED_IN', memorySession);
+        return { data: { session: memorySession, user: demoUser }, error: null };
+      },
+      async signUp(_creds: unknown) {
+        memorySession = newDemoSession();
+        writeDemoSession(memorySession);
+        notify('SIGNED_IN', memorySession);
+        return { data: { session: memorySession, user: demoUser }, error: null };
+      },
+      async signInWithIdToken(_opts: unknown) {
+        memorySession = newDemoSession();
+        writeDemoSession(memorySession);
+        notify('SIGNED_IN', memorySession);
+        return { data: { session: memorySession, user: demoUser }, error: null };
+      },
+      async setSession(session: unknown) {
+        memorySession = session;
+        writeDemoSession(session);
+        notify('SIGNED_IN', session);
+        return { data: { session }, error: null };
+      },
+      async signOut() {
+        memorySession = null;
+        writeDemoSession(null);
+        notify('SIGNED_OUT', null);
+        return { error: null };
       },
     },
   } as any;
