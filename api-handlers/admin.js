@@ -3,6 +3,9 @@ import supabase from './db-client.js';
 import { logAdminAction } from './admin-helpers.js';
 import { ensureUniverse } from './markets.js';
 import { requireAdmin } from './auth-admin.js';
+import adminKycHandler from './admin-kyc.js';
+import adminCryptoAddressesHandler from './admin-crypto-addresses.js';
+import healthHandler from './health.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,13 +14,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const pathname = parse(req.url || '').pathname || '/';
-  // normalize to remove /api if present
   const parts = pathname.split('/').filter(Boolean);
   if (parts[0] === 'api') parts.shift();
-  // now parts[0] should be 'admin', parts[1] is subpath
-  const sub = parts[1] || '';
+  const sub = (parts[1] || '').toLowerCase();
 
   try {
+    if (sub === 'kyc') return adminKycHandler(req, res);
+    if (sub === 'crypto-addresses') return adminCryptoAddressesHandler(req, res);
+    if (sub === 'health') return healthHandler(req, res);
+
     // centralized admin auth (prefer session-based, fallback to header secrets)
     const adminAuth = await requireAdmin(req);
     if (!adminAuth) {
@@ -25,11 +30,14 @@ export default async function handler(req, res) {
     }
 
     if (sub === 'seed-markets' && req.method === 'POST') {
-      // run seeding (idempotent) and return counts
       await ensureUniverse();
       const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
       await logAdminAction(adminAuth.admin?.id || null, 'seed-markets', 'markets', null, { count: count || 0 });
       return res.status(200).json({ ok: true, count: count || 0 });
+    }
+
+    if (!sub) {
+      return res.status(200).json({ ok: true, routes: ['seed-markets', 'kyc', 'crypto-addresses'] });
     }
 
     return res.status(404).json({ error: 'Not found' });

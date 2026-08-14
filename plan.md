@@ -17,6 +17,7 @@ Progress (todos):
 - e2e-pages: BLOCKED — requires browser automation environment and seeded test data
 - admin-portal: DONE — created dedicated /admin/login and /admin/dashboard with protected routes and admin-only guard
 - admin-pages-integration: DONE — KYC review and crypto-address pages now send Authorization headers, support x-admin-secret override, and use the admin shell style
+- admin-route-dispatch: DONE — /api/admin/kyc and /api/admin/crypto-addresses are now routed through the admin dispatcher instead of returning a top-level 404
 
 Notes / Rationale:
 - applyTick is stochastic (uses Math.random). The unit test seeds Math.random with a deterministic LCG so outputs are repeatable for regression tests.
