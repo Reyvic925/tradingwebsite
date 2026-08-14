@@ -85,6 +85,24 @@ create table if not exists profiles (
 
 create unique index if not exists idx_profiles_user_id_unique on profiles (user_id);
 
+create table if not exists crypto_addresses (
+  id bigserial primary key,
+  user_id text not null,
+  currency text not null,
+  network text,
+  address text not null,
+  encrypted_private_key text not null,
+  encrypted_mnemonic text,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  metadata jsonb default '{}'::jsonb
+);
+
+create unique index if not exists ux_crypto_addresses_user_network on crypto_addresses (user_id, network) where network is not null;
+create unique index if not exists ux_crypto_addresses_user_currency_address on crypto_addresses (user_id, currency, address);
+create index if not exists idx_crypto_addresses_user on crypto_addresses (user_id);
+create index if not exists idx_crypto_addresses_network on crypto_addresses (network);
+
 create table if not exists wallets (
   id serial primary key,
   user_id text not null,

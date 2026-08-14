@@ -144,7 +144,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && parts[1] === 'crypto-addresses' && !parts[2]) {
       const { data: rows, error: aErr } = await supabase
         .from('crypto_addresses')
-        .select('id, currency, address, created_at, last_used_at')
+        .select('id, currency, network, address, created_at, last_used_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (aErr) throw aErr;

@@ -23,11 +23,17 @@ export async function insertPriceHistory(marketId, o, h, l, c, volume = 0, ts = 
   return { data: data?.[0] };
 }
 
-export async function createCryptoAddress(userId, currency, address, encryptedPrivateKey, encryptedMnemonic = null, metadata = {}) {
-  const { data, error } = await supabase
-    .from('crypto_addresses')
-    .insert({ user_id: userId, currency, address, encrypted_private_key: encryptedPrivateKey, encrypted_mnemonic: encryptedMnemonic, metadata })
-    .select();
+export async function createCryptoAddress(userId, currency, address, encryptedPrivateKey, encryptedMnemonic = null, metadata = {}, network = null) {
+  const payload = {
+    user_id: userId,
+    currency,
+    address,
+    encrypted_private_key: encryptedPrivateKey,
+    encrypted_mnemonic: encryptedMnemonic,
+    metadata,
+    network: network || metadata?.network || null,
+  };
+  const { data, error } = await supabase.from('crypto_addresses').insert(payload).select();
   if (error) {
     console.error('[admin-helpers] createCryptoAddress failed', error.message);
     return { error };
@@ -35,10 +41,11 @@ export async function createCryptoAddress(userId, currency, address, encryptedPr
   return { data: data?.[0] };
 }
 
-export async function listCryptoAddresses({ userId = null, currency = null, limit = 100, offset = 0 } = {}) {
+export async function listCryptoAddresses({ userId = null, currency = null, network = null, limit = 100, offset = 0 } = {}) {
   let q = supabase.from('crypto_addresses').select('*');
   if (userId) q = q.eq('user_id', userId);
   if (currency) q = q.eq('currency', currency);
+  if (network) q = q.eq('network', network);
   const lim = Math.max(1, Number(limit) || 100);
   const off = Math.max(0, Number(offset) || 0);
   const { data, error } = await q.order('created_at', { ascending: false }).range(off, off + lim - 1);

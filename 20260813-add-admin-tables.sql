@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS crypto_addresses (
   id bigserial PRIMARY KEY,
   user_id text NOT NULL,
   currency text NOT NULL,
+  network text,
   address text NOT NULL,
   encrypted_private_key text NOT NULL,
   encrypted_mnemonic text,
@@ -31,8 +32,12 @@ CREATE TABLE IF NOT EXISTS crypto_addresses (
   last_used_at timestamptz,
   metadata jsonb DEFAULT '{}'::jsonb
 );
+ALTER TABLE IF EXISTS crypto_addresses
+  ADD COLUMN IF NOT EXISTS network text;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_crypto_addresses_user_currency_address ON crypto_addresses (user_id, currency, address);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_crypto_addresses_user_network ON crypto_addresses (user_id, network) WHERE network IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_crypto_addresses_user ON crypto_addresses (user_id);
+CREATE INDEX IF NOT EXISTS idx_crypto_addresses_network ON crypto_addresses (network);
 
 -- kyc_submissions: user KYC payloads and administrative review state
 CREATE TABLE IF NOT EXISTS kyc_submissions (

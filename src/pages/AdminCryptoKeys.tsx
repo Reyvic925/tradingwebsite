@@ -85,6 +85,7 @@ export default function AdminCryptoKeys() {
               <tr>
                 <th className="px-4 py-3 font-medium">ID</th>
                 <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Network</th>
                 <th className="px-4 py-3 font-medium">Currency</th>
                 <th className="px-4 py-3 font-medium">Address</th>
                 <th className="px-4 py-3 font-medium">Created</th>
@@ -96,6 +97,7 @@ export default function AdminCryptoKeys() {
                 <tr key={r.id} className="border-t border-white/10">
                   <td className="px-4 py-3 text-stone-300">{r.id}</td>
                   <td className="px-4 py-3 font-mono text-xs text-stone-300">{r.user_id}</td>
+                  <td className="px-4 py-3 text-stone-200">{r.network || '—'}</td>
                   <td className="px-4 py-3 text-stone-200">{r.currency}</td>
                   <td className="px-4 py-3 font-mono text-xs text-amber-200/80">{r.address}</td>
                   <td className="px-4 py-3 text-stone-400">{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td>

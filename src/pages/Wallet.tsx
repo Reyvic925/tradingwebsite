@@ -17,14 +17,14 @@ export default function Wallet() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; address: string }[]>([]);
+  const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; network?: string; address: string }[]>([]);
 
   const load = async () => {
     try {
       const [w, t, addresses] = await Promise.all([
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiList<Txn>('/api/transactions'),
-        apiList<{ id: number; currency: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
+        apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
       ]);
       if (w) setWallet(w);
       setTxns(asList(t));
@@ -60,7 +60,7 @@ export default function Wallet() {
           setError('Failed to generate deposit address');
         } else {
           setMsg(`Deposit address for ${currency}: ${address}. Send ${currency} to this address to fund your account.`);
-          const updated = await apiList<{ id: number; currency: string; address: string }>('/api/user/crypto-addresses');
+          const updated = await apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses');
           setDepositAddresses(asList(updated));
         }
       } else {
@@ -203,7 +203,10 @@ export default function Wallet() {
           <div className="mt-2 space-y-2">
             {depositAddresses.map((item) => (
               <div key={item.id} className="flex items-center gap-3 text-sm">
-                <span className="w-16 font-medium">{item.currency}</span>
+                <span className="w-20 font-medium">{item.currency}</span>
+                <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                  {item.network || 'network'}
+                </span>
                 <code className="flex-1 truncate rounded bg-black/40 px-2 py-1 font-mono text-xs text-amber-200/80">
                   {item.address}
                 </code>

@@ -58,8 +58,8 @@ export default async function handler(req, res) {
       }
 
       // Otherwise listing
-      const { user_id: userId = null, currency = null, limit = 100, offset = 0 } = req.query || {};
-      const q = { userId: userId || null, currency: currency || null, limit: Number(limit || 100), offset: Number(offset || 0) };
+      const { user_id: userId = null, currency = null, network = null, limit = 100, offset = 0 } = req.query || {};
+      const q = { userId: userId || null, currency: currency || null, network: network || null, limit: Number(limit || 100), offset: Number(offset || 0) };
       const { data, error } = await listCryptoAddresses(q);
       if (error) throw error;
 
@@ -68,6 +68,7 @@ export default async function handler(req, res) {
         id: r.id,
         user_id: r.user_id,
         currency: r.currency,
+        network: r.network || (r.metadata && r.metadata.network) || null,
         address: r.address,
         metadata: r.metadata,
         created_at: r.created_at,

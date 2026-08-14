@@ -24,28 +24,46 @@ export default async function handler(req, res) {
     const { currency } = req.body || {};
     if (!currency) return res.status(400).json({ error: 'currency is required' });
 
-    // Check if user already has a deposit address for this currency
-    const { data: existing, error: listErr } = await listCryptoAddresses({ userId: user.id, currency });
+    const network = cryptoKeys.getNetworkForCurrency(currency);
+    if (!network) {
+      return res.status(400).json({ error: `Unsupported currency: ${currency}` });
+    }
+
+    const { data: existing, error: listErr } = await listCryptoAddresses({ userId: user.id, network });
     if (listErr) {
       console.error('[deposit-crypto] listCryptoAddresses failed', listErr.message);
       return res.status(500).json({ error: 'Internal error' });
     }
 
     if (existing && existing.length > 0) {
-      // Return the most recent address only (never include private keys)
-      return res.status(200).json({ address: existing[0].address });
+      const row = existing[0];
+      return res.status(200).json({
+        address: row.address,
+        network,
+        currency: row.currency || cryptoKeys.getCanonicalCurrencyForNetwork(network),
+      });
     }
 
-    // Generate keys and encrypt them using server master key
     const result = await cryptoKeys.generateAndEncryptForCurrency(currency);
-
-    const { data: created, error: createErr } = await createCryptoAddress(user.id, currency, result.address, result.encryptedPrivateKey, result.encryptedMnemonic);
+    const { error: createErr } = await createCryptoAddress(
+      user.id,
+      result.currency,
+      result.address,
+      result.encryptedPrivateKey,
+      result.encryptedMnemonic,
+      { network },
+      network,
+    );
     if (createErr) {
       console.error('[deposit-crypto] createCryptoAddress failed', createErr.message);
       return res.status(500).json({ error: 'Internal error' });
     }
 
-    return res.status(200).json({ address: result.address });
+    return res.status(200).json({
+      address: result.address,
+      network: result.network,
+      currency: result.currency,
+    });
   } catch (err) {
     console.error('API error:', err);
     res.status(500).json({ error: err.message });

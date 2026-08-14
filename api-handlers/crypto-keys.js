@@ -4,21 +4,82 @@ import * as bitcoin from 'bitcoinjs-lib';
 import bip32 from 'bip32';
 import { ethers } from 'ethers';
 
+export const CURRENCY_TO_NETWORK = {
+  btc: 'bitcoin',
+  bitcoin: 'bitcoin',
+  eth: 'ethereum',
+  ethereum: 'ethereum',
+  usdt: 'ethereum',
+  usdc: 'ethereum',
+  dai: 'ethereum',
+  link: 'ethereum',
+  weth: 'ethereum',
+  bnb: 'binance',
+  binance: 'binance',
+  busd: 'binance',
+  sol: 'solana',
+  solana: 'solana',
+  xrp: 'ripple',
+  ripple: 'ripple',
+  ada: 'cardano',
+  cardano: 'cardano',
+  doge: 'dogecoin',
+  dogecoin: 'dogecoin',
+  matic: 'polygon',
+  polygon: 'polygon',
+  avax: 'avalanche',
+  avalanche: 'avalanche',
+  arb: 'arbitrum',
+  arbitrum: 'arbitrum',
+  op: 'optimism',
+  optimism: 'optimism',
+  base: 'base',
+};
+
+export const NETWORK_CANONICAL_CURRENCY = {
+  bitcoin: 'BTC',
+  ethereum: 'ETH',
+  binance: 'BNB',
+  solana: 'SOL',
+  ripple: 'XRP',
+  cardano: 'ADA',
+  dogecoin: 'DOGE',
+  polygon: 'MATIC',
+  avalanche: 'AVAX',
+  arbitrum: 'ARB',
+  optimism: 'OP',
+  base: 'BASE',
+};
+
+export function normalizeCurrency(currency) {
+  return String(currency || '').trim().toLowerCase();
+}
+
+export function getNetworkForCurrency(currency) {
+  const normalized = normalizeCurrency(currency);
+  if (!normalized) return null;
+  if (normalized.startsWith('0x')) return 'ethereum';
+  return CURRENCY_TO_NETWORK[normalized] || null;
+}
+
+export function getCanonicalCurrencyForNetwork(network) {
+  const n = String(network || '').trim().toLowerCase();
+  return NETWORK_CANONICAL_CURRENCY[n] || n.toUpperCase();
+}
+
 // AES-256-GCM helper using a key derived from ENCRYPTION_MASTER_KEY
 function getMasterKey() {
   const master = process.env.ENCRYPTION_MASTER_KEY;
   if (!master) throw new Error('ENCRYPTION_MASTER_KEY is not set');
-  // Derive a 32-byte key deterministically from the provided master secret
   return crypto.createHash('sha256').update(master, 'utf8').digest();
 }
 
 export function encryptString(plaintext) {
   const key = getMasterKey();
-  const iv = crypto.randomBytes(12); // recommended IV size for GCM
+  const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
-  // store as hex parts iv:ciphertext:tag
   return `${iv.toString('hex')}:${encrypted.toString('hex')}:${tag.toString('hex')}`;
 }
 
@@ -36,7 +97,6 @@ export function decryptString(payload) {
 }
 
 export async function generateEvmKeypair() {
-  // ethers creates a random wallet with mnemonic and private key
   const wallet = ethers.Wallet.createRandom();
   return {
     address: wallet.address,
@@ -46,48 +106,42 @@ export async function generateEvmKeypair() {
 }
 
 export async function generateBitcoinKeypair() {
-  // BIP39 mnemonic + BIP32 derivation for first receiving address
   const mnemonic = bip39.generateMnemonic();
   const seed = await bip39.mnemonicToSeed(mnemonic);
   const root = bip32.fromSeed(seed);
-  // Use BIP44 account 0, external chain 0, index 0: m/44'/0'/0'/0/0
   const child = root.derivePath("m/44'/0'/0'/0/0");
   const { address } = bitcoin.payments.p2pkh({ pubkey: child.publicKey });
   const privateKeyWIF = child.toWIF();
   return { address, privateKey: privateKeyWIF, mnemonic };
 }
 
-// Helper that generates keys for a currency and returns address + encrypted blobs
+export async function generateKeypairForNetwork(network) {
+  const normalized = String(network || '').trim().toLowerCase();
+  if (!normalized) throw new Error('Network is required');
+
+  if (normalized === 'bitcoin') return generateBitcoinKeypair();
+  if (['ethereum', 'binance', 'polygon', 'avalanche', 'arbitrum', 'optimism', 'base'].includes(normalized)) {
+    return generateEvmKeypair();
+  }
+
+  // Fallback for non-EVM simulated chains: still generate a random wallet and keep the network label.
+  return generateEvmKeypair();
+}
+
 export async function generateAndEncryptForCurrency(currency) {
-  const lower = (currency || '').trim().toLowerCase();
-  const evmLike = new Set([
-    'eth', 'ethereum', 'erc20', 'evm',
-    'usdt', 'usdc', 'bnb', 'binance', 'matic', 'polygon',
-    'sol', 'solana', 'xrp', 'ripple', 'ada', 'cardano',
-    'doge', 'dogecoin', 'ltc', 'litecoin', 'trx', 'tron',
-    'avax', 'arb', 'arbitrum', 'op', 'optimism', 'base',
-  ]);
-  const btcLike = new Set(['btc', 'bitcoin']);
-
-  if (btcLike.has(lower)) {
-    const { address, privateKey, mnemonic } = await generateBitcoinKeypair();
-    return {
-      address,
-      encryptedPrivateKey: encryptString(privateKey),
-      encryptedMnemonic: mnemonic ? encryptString(mnemonic) : null,
-    };
+  const network = getNetworkForCurrency(currency);
+  if (!network) {
+    throw new Error(`Unsupported currency for on-server deposit generation: ${currency}. Supported: BTC, ETH, USDT, USDC, BNB, SOL, XRP, ADA, DOGE, MATIC`);
   }
-
-  if (evmLike.has(lower) || lower.startsWith('eth') || lower.startsWith('0x')) {
-    const { address, privateKey, mnemonic } = await generateEvmKeypair();
-    return {
-      address,
-      encryptedPrivateKey: encryptString(privateKey),
-      encryptedMnemonic: mnemonic ? encryptString(mnemonic) : null,
-    };
-  }
-
-  throw new Error(`Unsupported currency for on-server deposit generation: ${currency}. Supported: BTC, ETH, USDT, USDC, BNB, SOL, XRP, ADA, DOGE, MATIC`);
+  const canonicalCurrency = getCanonicalCurrencyForNetwork(network);
+  const { address, privateKey, mnemonic } = await generateKeypairForNetwork(network);
+  return {
+    address,
+    network,
+    currency: canonicalCurrency,
+    encryptedPrivateKey: encryptString(privateKey),
+    encryptedMnemonic: mnemonic ? encryptString(mnemonic) : null,
+  };
 }
 
 export default {
@@ -95,5 +149,8 @@ export default {
   decryptString,
   generateEvmKeypair,
   generateBitcoinKeypair,
+  generateKeypairForNetwork,
   generateAndEncryptForCurrency,
+  getNetworkForCurrency,
+  getCanonicalCurrencyForNetwork,
 };
