@@ -80,8 +80,8 @@ export default async function handler(req, res) {
       const user = await requireUserHelper(supabase, req);
       if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-      const id = Number(req.query?.id);
-      if (!id || Number.isNaN(id)) return res.status(400).json({ error: 'id query param is required' });
+      const id = String(req.query?.id || '');
+      if (!id) return res.status(400).json({ error: 'id query param is required' });
 
       const { data: rows, error } = await supabase
         .from('kyc_files')

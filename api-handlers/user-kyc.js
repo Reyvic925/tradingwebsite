@@ -102,8 +102,9 @@ export default async function handler(req, res) {
       if (fileErr) throw fileErr;
       const byId = new Map((fileRows || []).map((f) => [String(f.id), f]));
       for (const d of documents) {
-        const f = byId.get(String(d.file_id));
-        if (!f) return res.status(400).json({ error: `Uploaded file not found (id ${d.file_id})` });
+        const fid = String(d.file_id);
+        const f = byId.get(fid);
+        if (!f) return res.status(400).json({ error: `Uploaded file not found (id ${fid})` });
         if (String(f.user_id) !== String(user.id)) return res.status(403).json({ error: 'Uploaded documents must belong to your account' });
         if (f.kind !== d.kind) return res.status(400).json({ error: `Uploaded file kind mismatch for ${d.kind}` });
       }
@@ -135,7 +136,7 @@ export default async function handler(req, res) {
         address: { street, city, state: addrState || null, postal_code: postal_code || null, country: addressCountry },
         document: { type: docType, number: docNumber, expiry_date: docExpiry },
       };
-      const docRefs = documents.map((d) => ({ kind: d.kind, file_id: Number(d.file_id), name: d.name || null }));
+      const docRefs = documents.map((d) => ({ kind: d.kind, file_id: d.file_id, name: d.name || null }));
 
       const { data, error } = await insertKycSubmission(user.id, clean, docRefs, metadata);
       if (error) throw error;
