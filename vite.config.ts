@@ -57,7 +57,7 @@ function localApiPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => {
-  const plugins: Plugin[] = [react(), tailwindcss(), localApiPlugin()];
+  const plugins = [react(), tailwindcss(), localApiPlugin()];
   try {
     // @ts-ignore
     const m = await import('./.vite-source-tags.js');
