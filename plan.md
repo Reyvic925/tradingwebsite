@@ -15,6 +15,8 @@ Progress (todos):
 - update-package-test-script: SKIPPED — not modified to avoid changing CI semantics
 - integration-tests: BLOCKED — requires live Supabase and DB fixtures; cannot run in unit-only environment
 - e2e-pages: BLOCKED — requires browser automation environment and seeded test data
+- admin-portal: DONE — created dedicated /admin/login and /admin/dashboard with protected routes and admin-only guard
+- admin-pages-integration: DONE — KYC review and crypto-address pages now send Authorization headers, support x-admin-secret override, and use the admin shell style
 
 Notes / Rationale:
 - applyTick is stochastic (uses Math.random). The unit test seeds Math.random with a deterministic LCG so outputs are repeatable for regression tests.
@@ -24,6 +26,8 @@ Notes / Rationale:
 Recent changes (2026-08-13):
 - Wallet UI updated: replaced user-facing "Reveal Keys" and private-key UI with a crypto-only deposit address list. The frontend now calls the server-side handler at /api/deposit-crypto to generate addresses.
 - User API decrypt route: verified that api-handlers/user.js does not expose any decrypt endpoint. Decryption functionality remains restricted to admin-only api-handlers/admin-crypto-addresses.js (audited).
+- Admin portal created: dedicated /admin/login, /admin/dashboard, /admin/health and protected routes with role checks.
+- KYC and crypto-address admin pages now send Authorization and optional x-admin-secret headers and are integrated into the admin shell styling.
 - Committed changes and pushed to main branch (commits: 0789ea2d, cc85c5d).
 
 Next steps / verification (recommended):

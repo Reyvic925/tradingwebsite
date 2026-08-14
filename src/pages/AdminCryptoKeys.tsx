@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Copy } from 'lucide-react';
+import AdminShell from '../components/AdminShell';
+import { authHeaders } from '../lib/api';
 
 export default function AdminCryptoKeys() {
   const [rows, setRows] = useState<any[]>([]);
@@ -6,16 +9,21 @@ export default function AdminCryptoKeys() {
   const [modal, setModal] = useState<{ id: any; privateKey: string | null; mnemonic: string | null } | null>(null);
   const [revealing, setRevealing] = useState(false);
   const [adminSecret, setAdminSecret] = useState('');
+  const [error, setError] = useState('');
 
   async function fetchList() {
     setLoading(true);
+    setError('');
     try {
-      const res = await fetch('/api/admin/crypto-addresses');
+      const headers = await authHeaders();
+      if (adminSecret) headers['x-admin-secret'] = adminSecret;
+      const res = await fetch('/api/admin/crypto-addresses', { headers });
       const j = await res.json();
+      if (!res.ok) throw new Error(j?.error || 'Failed to load addresses');
       setRows(j?.data || []);
     } catch (e) {
       console.error(e);
-      alert('Failed to load addresses: ' + (e as any)?.message || String(e));
+      setError(e instanceof Error ? e.message : 'Failed to load addresses');
     } finally {
       setLoading(false);
     }
@@ -25,15 +33,20 @@ export default function AdminCryptoKeys() {
 
   async function reveal(id: any) {
     setRevealing(true);
+    setError('');
     try {
-      const headers: any = {};
+      const headers = await authHeaders();
       if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const res = await fetch(`/api/admin/crypto-addresses/${id}/decrypt`, { headers });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'Reveal failed');
-      setModal({ id, privateKey: j?.privateKey || null, mnemonic: j?.mnemonic || null });
+      setModal({
+        id,
+        privateKey: j?.privateKey || null,
+        mnemonic: j?.mnemonic || null,
+      });
     } catch (e) {
-      alert('Reveal error: ' + (e as any)?.message || String(e));
+      setError(e instanceof Error ? e.message : 'Reveal failed');
     } finally {
       setRevealing(false);
     }
@@ -45,75 +58,98 @@ export default function AdminCryptoKeys() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Admin Crypto Addresses</h2>
-
-      <div style={{ marginBottom: 12 }}>
-        <label>Optional admin secret (x-admin-secret header): </label>
-        <input value={adminSecret} onChange={(e) => setAdminSecret(e.target.value)} style={{ width: '40%' }} />
-        <button onClick={() => fetchList()} style={{ marginLeft: 8 }} disabled={loading}>Refresh</button>
+    <AdminShell title="Crypto addresses">
+      <div className="mb-5 rounded-md border border-white/10 bg-[#0a0f17] p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Admin secret override</div>
+            <input
+              value={adminSecret}
+              onChange={(e) => setAdminSecret(e.target.value)}
+              placeholder="Optional x-admin-secret"
+              className="mt-2 w-full rounded-sm border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber-400/60"
+            />
+          </div>
+          <button onClick={() => fetchList()} disabled={loading} className="rounded-sm bg-amber-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#1a1304] disabled:opacity-60">
+            {loading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>User</th>
-              <th>Currency</th>
-              <th>Address</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} style={{ borderTop: '1px solid #ddd' }}>
-                <td>{r.id}</td>
-                <td>{r.user_id}</td>
-                <td>{r.currency}</td>
-                <td>{r.address}</td>
-                <td>{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td>
-                <td>
-                  <button onClick={() => reveal(r.id)} disabled={revealing}>Reveal Keys</button>
-                </td>
+      {error && <div className="mb-4 rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
+
+      <div className="overflow-hidden rounded-md border border-white/10 bg-[#0a0f17]">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-white/[0.02] text-[10px] uppercase tracking-[0.2em] text-stone-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">ID</th>
+                <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Currency</th>
+                <th className="px-4 py-3 font-medium">Address</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t border-white/10">
+                  <td className="px-4 py-3 text-stone-300">{r.id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-stone-300">{r.user_id}</td>
+                  <td className="px-4 py-3 text-stone-200">{r.currency}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-amber-200/80">{r.address}</td>
+                  <td className="px-4 py-3 text-stone-400">{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => reveal(r.id)} disabled={revealing} className="rounded-sm border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-amber-200 disabled:opacity-60">
+                      {revealing ? 'Revealing…' : 'Reveal keys'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && !loading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-stone-500">No crypto addresses found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {modal ? (
-        <div style={{ position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'white', padding: 20, width: '640px', maxWidth: '95%' }}>
-            <h3>Decrypted Keys for Address ID {modal.id}</h3>
-            <p style={{ color: '#a00' }}><strong>Warning:</strong> Private keys and mnemonics are extremely sensitive. Only copy/store them in a secure environment. This action is audited.</p>
-            <div style={{ marginTop: 12 }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-2xl rounded-md border border-white/10 bg-[#0a0f17] p-5">
+            <h3 className="font-display text-2xl">Decrypted keys for address #{modal.id}</h3>
+            <p className="mt-3 rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              Warning: Private keys and mnemonics are highly sensitive. Only copy/store them in a secure environment. This action is audited.
+            </p>
+
+            <div className="mt-5 space-y-5">
               <div>
-                <label>Private Key</label>
-                <pre style={{ whiteSpace: 'pre-wrap', background: '#f7f7f7', padding: 8 }}>{modal.privateKey || '<none>'}</pre>
-                <button onClick={() => copyToClipboard(modal.privateKey)}>Copy Private Key</button>
+                <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-stone-500">Private key</div>
+                <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-3 font-mono text-xs text-stone-200">{modal.privateKey || '<none>'}</pre>
+                <button onClick={() => copyToClipboard(modal.privateKey)} className="mt-2 inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-stone-200">
+                  <Copy size={12} /> Copy private key
+                </button>
               </div>
-              <div style={{ marginTop: 12 }}>
-                <label>Mnemonic</label>
-                <pre style={{ whiteSpace: 'pre-wrap', background: '#f7f7f7', padding: 8 }}>{modal.mnemonic || '<none>'}</pre>
-                <button onClick={() => copyToClipboard(modal.mnemonic)}>Copy Mnemonic</button>
+
+              <div>
+                <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-stone-500">Mnemonic</div>
+                <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-3 font-mono text-xs text-stone-200">{modal.mnemonic || '<none>'}</pre>
+                <button onClick={() => copyToClipboard(modal.mnemonic)} className="mt-2 inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-stone-200">
+                  <Copy size={12} /> Copy mnemonic
+                </button>
               </div>
             </div>
-            <div style={{ marginTop: 16, textAlign: 'right' }}>
-              <button onClick={() => setModal(null)}>Close</button>
+
+            <div className="mt-6 text-right">
+              <button onClick={() => setModal(null)} className="rounded-sm border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.18em] text-stone-200">
+                Close
+              </button>
             </div>
           </div>
         </div>
       ) : null}
-
-      <div style={{ marginTop: 20 }}>
-        <small>
-          Note: This page requires admin access. The frontend will attempt to use the user's session Authorization header by default. You can optionally provide x-admin-secret if your deployment uses the ADMIN_SECRET header for admin API access.
-        </small>
-      </div>
-    </div>
+    </AdminShell>
   );
 }
