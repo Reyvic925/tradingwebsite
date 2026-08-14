@@ -168,12 +168,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PUT') {
-      const { full_name, country, phone, kyc_status } = req.body || {};
+      // kyc_status is intentionally NOT user-writable — it only changes through
+      // the KYC submission/review flow (user-kyc.js / admin-kyc.js).
+      const { full_name, country, phone } = req.body || {};
       const patch = {};
       if (full_name !== undefined) patch.full_name = full_name;
       if (country !== undefined) patch.country = country;
       if (phone !== undefined) patch.phone = phone;
-      if (kyc_status !== undefined) patch.kyc_status = kyc_status;
 
       const existing = await getProfileRow(supabase, user.id);
       if (!existing) return res.status(404).json({ error: 'Profile not found' });

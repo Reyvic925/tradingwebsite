@@ -25,7 +25,28 @@ export default async function handler(req, res) {
       const q = { status: status || null, limit: Number(limit || 200), offset: Number(offset || 0) };
       const { data, error } = await listKycSubmissions(q);
       if (error) throw error;
-      return res.status(200).json({ submissions: data || [] });
+
+      // Attach user email/name so reviewers aren't staring at UUIDs (best-effort)
+      const submissions = data || [];
+      try {
+        const userIds = [...new Set(submissions.map((s) => s.user_id).filter(Boolean))];
+        if (userIds.length) {
+          const { data: profileRows } = await supabase
+            .from('profiles')
+            .select('user_id, email, full_name')
+            .in('user_id', userIds);
+          const byUser = new Map((profileRows || []).map((p) => [p.user_id, p]));
+          for (const s of submissions) {
+            const p = byUser.get(s.user_id);
+            s.user_email = p?.email || null;
+            s.user_name = p?.full_name || null;
+          }
+        }
+      } catch (e) {
+        console.error('[admin-kyc] profile lookup failed', e?.message || e);
+      }
+
+      return res.status(200).json({ submissions });
     }
 
     if (req.method === 'POST') {
@@ -50,22 +71,30 @@ export default async function handler(req, res) {
       const { data, error } = await updateKycSubmission(id, updates);
       if (error) throw error;
 
-      // When approved, update profiles table kyc_status/kyc_verified if profile exists
-      if (action === 'approve') {
-        try {
-          const profile = await getProfileRow(supabase, existing.user_id);
-          if (profile) {
-            const patch = {};
-            if (Object.prototype.hasOwnProperty.call(profile, 'kyc_status')) patch.kyc_status = 'verified';
-            if (Object.prototype.hasOwnProperty.call(profile, 'kyc_verified')) patch.kyc_verified = true;
-            if (Object.keys(patch).length) {
-              await supabase.from('profiles').update(patch).eq('id', profile.id);
-            }
-          }
-        } catch (e) {
-          // non-fatal; log and continue
-          console.error('[admin-kyc] profile update failed', e?.message || e);
+      // Reflect the decision on the user's profile and notify them (both best-effort)
+      const approved = action === 'approve';
+      try {
+        const profile = await getProfileRow(supabase, existing.user_id);
+        if (profile) {
+          const patch = { kyc_status: approved ? 'verified' : 'rejected' };
+          if (approved && Object.prototype.hasOwnProperty.call(profile, 'kyc_verified')) patch.kyc_verified = true;
+          await supabase.from('profiles').update(patch).eq('id', profile.id);
         }
+      } catch (e) {
+        console.error('[admin-kyc] profile update failed', e?.message || e);
+      }
+
+      try {
+        await supabase.from('notifications').insert({
+          user_id: existing.user_id,
+          title: approved ? 'Identity verified' : 'KYC application rejected',
+          body: approved
+            ? 'Your identity verification is complete. Withdrawals are now enabled on your account.'
+            : `Your KYC application was rejected.${admin_notes ? ` Reason: ${admin_notes}` : ''} You can submit a new application from the KYC page.`,
+          read: false,
+        });
+      } catch (e) {
+        console.error('[admin-kyc] notification failed', e?.message || e);
       }
 
       // Log admin action

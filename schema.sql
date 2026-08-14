@@ -295,6 +295,20 @@ create index if not exists idx_kyc_submissions_user_id on kyc_submissions (user_
 create index if not exists idx_kyc_submissions_status on kyc_submissions (status);
 create index if not exists idx_kyc_submissions_submitted_at on kyc_submissions (submitted_at);
 
+-- Uploaded KYC document images (base64 bytes; served only via /api/kyc-upload with owner-or-admin checks)
+create table if not exists kyc_files (
+  id bigserial primary key,
+  user_id text not null,
+  kind text not null,
+  mime text not null,
+  size integer,
+  filename text,
+  data_base64 text not null,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_kyc_files_user_id on kyc_files (user_id);
+
 -- Admin audit log for compliance and security
 create table if not exists admin_audit_log (
   id bigserial primary key,

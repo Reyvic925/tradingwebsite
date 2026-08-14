@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         country: country || '',
         phone: phone || '',
         referral_code: referral_code || `ref_${user.id.substring(0, 12)}`,
-        kyc_status: 'pending',
+        kyc_status: 'unverified',
         role: 'user',
       })
       .select();

@@ -1,7 +1,8 @@
 import supabase from './db-client.js';
-import { first, requireUser as authUser } from './helpers.js';
+import { first, requireUser as authUser, getProfileRow } from './helpers.js';
 import cryptoKeys from './crypto-keys.js';
 import { logAdminAction } from './admin-helpers.js';
+import userKycHandler from './user-kyc.js';
 
 async function requireUser(req) {
   return authUser(supabase, req);
@@ -79,6 +80,11 @@ export default async function handler(req, res) {
     // normalize: if first is 'api' drop it
     if (parts[0] === 'api') parts.shift();
     // after this parts[0] === 'user'
+
+    // /api/user/kyc (submit application + view history) -> dedicated handler
+    if (parts[1] === 'kyc' && !parts[2] && (req.method === 'GET' || req.method === 'POST')) {
+      return userKycHandler(req, res);
+    }
 
     // GET /api/user/order/:id (details)
     if (req.method === 'GET' && parts[1] === 'order' && parts[2] && !parts[3]) {
@@ -213,6 +219,12 @@ export default async function handler(req, res) {
       const amt = Number(amount || 0);
       if (!(amt > 0)) return res.status(400).json({ error: 'Invalid amount' });
       if (!dest) return res.status(400).json({ error: 'Destination address required' });
+
+      // Withdrawals require completed KYC verification
+      const profile = await getProfileRow(supabase, user.id).catch(() => null);
+      if (!profile || profile.kyc_status !== 'verified') {
+        return res.status(403).json({ error: 'KYC verification is required before withdrawing. Complete verification on the KYC page.' });
+      }
 
       const { data: wallets } = await supabase.from('wallets').select('*').eq('user_id', user.id).order('id', { ascending: true }).limit(1);
       const wallet = (wallets && wallets[0]) || null;

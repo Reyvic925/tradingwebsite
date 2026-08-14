@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Share2,
+  ShieldCheck,
   UserRound,
   Users,
   Wallet,
@@ -33,6 +34,7 @@ const nav = [
   { to: '/app/history', label: 'History', icon: History },
   { to: '/app/gains-losses', label: 'Gains/Losses', icon: LineChart },
   { to: '/app/admin/crypto-keys', label: 'Admin Crypto Keys', icon: Wallet },
+  { to: '/app/kyc', label: 'KYC', icon: ShieldCheck },
   { to: '/app/profile', label: 'Profile', icon: UserRound },
 ];
 
