@@ -154,6 +154,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
+    const params = req.query || Object.fromEntries(new URL(req.url || '/', 'http://localhost').searchParams.entries());
+    req.query = params;
+
     if (req.method === 'POST') {
       await ensureUniverse();
       const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
@@ -164,13 +167,13 @@ export default async function handler(req, res) {
 
     await ensureUniverse();
 
-    const q = String(req.query.q || '').trim();
-    const assetClass = String(req.query.class || req.query.asset_class || 'all');
-    const featured = req.query.featured === '1';
-    const shouldTick = req.query.tick === '1';
-    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || (featured ? 12 : 120)));
-    const offset = Math.max(0, Number(req.query.offset) || 0);
-    const symbol = req.query.symbol ? String(req.query.symbol).toUpperCase() : '';
+    const q = String(params.q || '').trim();
+    const assetClass = String(params.class || params.asset_class || 'all');
+    const featured = params.featured === '1';
+    const shouldTick = params.tick === '1';
+    const limit = Math.min(500, Math.max(1, Number(params.limit) || (featured ? 12 : 120)));
+    const offset = Math.max(0, Number(params.offset) || 0);
+    const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
 
     if (shouldTick) {
       const { data: all } = await supabase.from('markets').select('id, asset_class, price, change_24h, high_24h, low_24h');
