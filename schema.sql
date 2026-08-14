@@ -265,3 +265,14 @@ create index if not exists idx_deposits_user on deposits (user_id);
 create index if not exists idx_deposits_status on deposits (status);
 create index if not exists idx_markets_symbol on markets (symbol);
 create index if not exists idx_markets_class on markets (asset_class);
+
+-- Configuration table for app-wide settings
+create table if not exists app_config (
+  id serial primary key,
+  key text not null unique,
+  value jsonb not null,
+  description text,
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_app_config_key on app_config (key);

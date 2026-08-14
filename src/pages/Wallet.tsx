@@ -5,7 +5,8 @@ import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Txn, Wallet as WalletT } from '../types';
 
-const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
+// Fallback - will be replaced by config from API
+const FALLBACK_SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletT | null>(null);
@@ -21,17 +22,22 @@ export default function Wallet() {
   const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; network?: string; address: string }[]>([]);
   const [coinQuery, setCoinQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [supportedCryptos, setSupportedCryptos] = useState<string[]>(FALLBACK_SUPPORTED_CRYPTOS);
 
   const load = async () => {
     try {
-      const [w, t, addresses] = await Promise.all([
+      const [w, t, addresses, config] = await Promise.all([
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiList<Txn>('/api/transactions'),
         apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
+        fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
       if (w) setWallet(w);
       setTxns(asList(t));
       setDepositAddresses(asList(addresses));
+      if (config?.value && Array.isArray(config.value)) {
+        setSupportedCryptos(config.value);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
@@ -135,7 +141,7 @@ export default function Wallet() {
              />
 
              <div className="mt-2 grid grid-cols-2 gap-2">
-               {SUPPORTED_CRYPTOS.filter((c) => c.toLowerCase().includes(coinQuery.toLowerCase())).map((c) => (
+               {supportedCryptos.filter((c) => c.toLowerCase().includes(coinQuery.toLowerCase())).map((c) => (
                  <button
                    key={c}
                    type="button"
@@ -226,7 +232,7 @@ export default function Wallet() {
                onChange={(e) => setCurrency(e.target.value)}
                className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none"
              >
-               {SUPPORTED_CRYPTOS.map((c) => (
+               {supportedCryptos.map((c) => (
                  <option key={c} value={c}>{c}</option>
                ))}
              </select>

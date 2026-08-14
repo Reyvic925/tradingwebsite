@@ -6,7 +6,7 @@ import { formatPct, formatPrice } from '../lib/format';
 import type { Market } from '../types';
 import IndexBoard from '../components/IndexBoard';
 
-const FILTERS = [
+const DEFAULT_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'usa', label: 'USA' },
   { id: 'japan', label: 'Japan' },
@@ -21,7 +21,7 @@ const FILTERS = [
   { id: 'crypto', label: 'Crypto' },
 ];
 
-const REGION_FROM: Record<string, string> = {
+const DEFAULT_REGION_FROM: Record<string, string> = {
   us: 'usa',
   jp: 'japan',
   ca: 'canada',
@@ -41,7 +41,26 @@ export default function Markets() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [regionMapping, setRegionMapping] = useState(DEFAULT_REGION_FROM);
   const pageSize = 50;
+
+  useEffect(() => {
+    // Fetch market filters and region mapping from config
+    Promise.all([
+      fetch('/api/app-config?key=market_filters').then(r => r.json()).catch(() => null),
+      fetch('/api/app-config?key=region_mapping').then(r => r.json()).catch(() => null),
+    ]).then(([filtersConfig, regionConfig]) => {
+      if (filtersConfig?.value && Array.isArray(filtersConfig.value)) {
+        setFilters(filtersConfig.value);
+      }
+      if (regionConfig?.value && typeof regionConfig.value === 'object') {
+        setRegionMapping(regionConfig.value);
+      }
+    }).catch(() => {
+      // Use defaults on error
+    });
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 280);
@@ -92,7 +111,7 @@ export default function Markets() {
           <p className="mt-1 text-sm text-stone-500">{total.toLocaleString()} listed names · USA · Japan · Canada · UK · Europe · India</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
+          {filters.map((f: any) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
@@ -110,7 +129,7 @@ export default function Markets() {
         </div>
       </div>
       <div className="mt-6">
-        <IndexBoard onSelect={(region) => setFilter(REGION_FROM[region] || region)} compact />
+        <IndexBoard onSelect={(region) => setFilter(regionMapping[region] || region)} compact />
       </div>
       {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
