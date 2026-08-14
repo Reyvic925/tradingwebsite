@@ -93,18 +93,18 @@ export default async function handler(req, res) {
       }
 
       // Verify each file belongs to the submitting user
-      const fileIds = documents.map((d) => Number(d.file_id)).filter(Boolean);
+      const fileIds = documents.map((d) => String(d.file_id)).filter(Boolean);
       if (fileIds.length !== documents.length) return res.status(400).json({ error: 'Each document entry needs a file_id from an uploaded file' });
       const { data: fileRows, error: fileErr } = await supabase
         .from('kyc_files')
         .select('id, user_id, kind')
         .in('id', fileIds);
       if (fileErr) throw fileErr;
-      const byId = new Map((fileRows || []).map((f) => [Number(f.id), f]));
+      const byId = new Map((fileRows || []).map((f) => [String(f.id), f]));
       for (const d of documents) {
-        const f = byId.get(Number(d.file_id));
+        const f = byId.get(String(d.file_id));
         if (!f) return res.status(400).json({ error: `Uploaded file not found (id ${d.file_id})` });
-        if (f.user_id !== user.id) return res.status(403).json({ error: 'Uploaded documents must belong to your account' });
+        if (String(f.user_id) !== String(user.id)) return res.status(403).json({ error: 'Uploaded documents must belong to your account' });
         if (f.kind !== d.kind) return res.status(400).json({ error: `Uploaded file kind mismatch for ${d.kind}` });
       }
 
