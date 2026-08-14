@@ -20,7 +20,8 @@
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
     "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs",
-    "backfill:wallets": "node scripts/backfill-wallets.js"
+    "backfill:wallets": "node scripts/backfill-wallets.js",
+    "seed:kyc": "node scripts/seed-kyc-table.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
