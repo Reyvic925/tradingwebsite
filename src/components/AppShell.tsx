@@ -62,6 +62,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await bootstrapProfile();
+        try {
+          await apiGet('/api/user/crypto-addresses');
+        } catch {
+          /* assignment happens in profile bootstrap; fail-open */
+        }
       } catch {
         /* first-login bootstrap */
       }

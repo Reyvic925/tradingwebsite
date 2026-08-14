@@ -1,5 +1,8 @@
 import supabase from './db-client.js';
+import cryptoKeys from './crypto-keys.js';
 import { getOrCreateWallet, getProfileRow, getUsdWallet } from './helpers.js';
+
+const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
 function codeFrom(id) {
   return 'APEX' + String(id).replace(/-/g, '').slice(0, 6).toUpperCase();
@@ -11,6 +14,46 @@ async function requireUser(req) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return null;
   return user;
+}
+
+function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || '');
+  return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
+}
+
+async function ensureAssignedCryptoAddresses(userId) {
+  for (const currency of SUPPORTED_CRYPTOS) {
+    const network = cryptoKeys.getNetworkForCurrency(currency);
+    if (!network) continue;
+
+    const { data: existingRows, error: existingErr } = await supabase
+      .from('crypto_addresses')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('network', network)
+      .limit(1);
+
+    if (existingErr) {
+      if (isMissingSchemaError(existingErr)) return;
+      continue;
+    }
+    if ((existingRows || []).length) continue;
+
+    const generated = await cryptoKeys.generateAndEncryptForCurrency(currency);
+    const { error: createErr } = await supabase.from('crypto_addresses').insert({
+      user_id: userId,
+      currency: generated.currency,
+      address: generated.address,
+      encrypted_private_key: generated.encryptedPrivateKey,
+      encrypted_mnemonic: generated.encryptedMnemonic,
+      network,
+      metadata: { network, auto_assigned: true },
+    });
+
+    if (createErr && !isMissingSchemaError(createErr)) {
+      console.error('[profile] ensureAssignedCryptoAddresses failed', createErr.message);
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -57,6 +100,7 @@ export default async function handler(req, res) {
         } else {
           profile = created?.[0];
           await getOrCreateWallet(supabase, user.id);
+          await ensureAssignedCryptoAddresses(user.id);
 
           await supabase.from('notifications').insert({
             user_id: user.id,
@@ -95,6 +139,7 @@ export default async function handler(req, res) {
         }
       }
 
+      await ensureAssignedCryptoAddresses(user.id);
       const wallet = await getOrCreateWallet(supabase, user.id);
       return res.status(200).json({ profile, wallet });
     }
