@@ -11,6 +11,11 @@ function orderSideOf(positionSide) {
   return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
 }
 
+function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || '');
+  return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
+}
+
 async function ensureUniverse() {
   const { data: existing, error } = await supabase.from('markets').select('symbol');
   if (error) throw error;
@@ -158,14 +163,25 @@ export default async function handler(req, res) {
     req.query = params;
 
     if (req.method === 'POST') {
-      await ensureUniverse();
-      const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
-      return res.status(200).json({ ok: true, count: count || 0 });
+      try {
+        await ensureUniverse();
+        const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
+        return res.status(200).json({ ok: true, count: count || 0 });
+      } catch (err) {
+        if (isMissingSchemaError(err)) {
+          return res.status(200).json({ ok: false, count: 0, message: 'markets table not initialized yet' });
+        }
+        throw err;
+      }
     }
 
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-    await ensureUniverse();
+    try {
+      await ensureUniverse();
+    } catch (err) {
+      if (!isMissingSchemaError(err)) throw err;
+    }
 
     const q = String(params.q || '').trim();
     const assetClass = String(params.class || params.asset_class || 'all');
@@ -218,7 +234,12 @@ export default async function handler(req, res) {
 
     query = query.range(offset, offset + limit - 1);
     const { data, error, count } = await query;
-    if (error) throw error;
+    if (error) {
+      if (isMissingSchemaError(error)) {
+        return res.status(200).json({ items: [], total: 0, limit, offset });
+      }
+      throw error;
+    }
 
     if (shouldTick) await fillPendingLimits(data || []);
 

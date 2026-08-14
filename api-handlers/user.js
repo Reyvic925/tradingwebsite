@@ -9,6 +9,11 @@ async function requireUser(req) {
 
 const DEFAULT_SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
+function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || '');
+  return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
+}
+
 async function ensureAssignedCryptoAddressesForUser(userId) {
   for (const currency of DEFAULT_SUPPORTED_CURRENCIES) {
     const network = cryptoKeys.getNetworkForCurrency(currency);
@@ -22,6 +27,9 @@ async function ensureAssignedCryptoAddressesForUser(userId) {
       .limit(1);
 
     if (existingErr) {
+      if (isMissingSchemaError(existingErr)) {
+        return;
+      }
       console.error('[user] ensureAssignedCryptoAddressesForUser list failed', existingErr.message);
       continue;
     }
@@ -39,7 +47,9 @@ async function ensureAssignedCryptoAddressesForUser(userId) {
     });
 
     if (createErr) {
-      console.error('[user] ensureAssignedCryptoAddressesForUser create failed', createErr.message);
+      if (!isMissingSchemaError(createErr)) {
+        console.error('[user] ensureAssignedCryptoAddressesForUser create failed', createErr.message);
+      }
     }
   }
 }
@@ -180,13 +190,21 @@ export default async function handler(req, res) {
     // GET /api/user/crypto-addresses
     if (req.method === 'GET' && parts[1] === 'crypto-addresses' && !parts[2]) {
       await ensureAssignedCryptoAddressesForUser(user.id);
-      const { data: rows, error: aErr } = await supabase
-        .from('crypto_addresses')
-        .select('id, currency, network, address, created_at, last_used_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (aErr) throw aErr;
-      return res.status(200).json(rows || []);
+      try {
+        const { data: rows, error: aErr } = await supabase
+          .from('crypto_addresses')
+          .select('id, currency, network, address, created_at, last_used_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (aErr) {
+          if (isMissingSchemaError(aErr)) return res.status(200).json([]);
+          throw aErr;
+        }
+        return res.status(200).json(rows || []);
+      } catch (err) {
+        if (isMissingSchemaError(err)) return res.status(200).json([]);
+        throw err;
+      }
     }
 
     // POST /api/user/withdraw/crypto
