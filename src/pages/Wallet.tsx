@@ -54,25 +54,19 @@ export default function Wallet() {
 
     try {
       if (type === 'deposit') {
-        const res = (await apiSend('/api/deposit-crypto', 'POST', { currency })) as any;
-        const address = res?.address || res?.data?.address;
-        if (!address) {
-          setError('Failed to generate deposit address');
-        } else {
-          setMsg(`Deposit address for ${currency}: ${address}. Send ${currency} to this address to fund your account.`);
-          const updated = await apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses');
-          setDepositAddresses(asList(updated));
-        }
-      } else {
-        await apiSend('/api/user/withdraw/crypto', 'POST', {
-          currency,
-          amount: amt,
-          address: withdrawAddress,
-        });
-        setMsg(`Withdrawal of ${formatMoney(amt)} ${currency} to ${withdrawAddress} initiated.`);
-        load();
-        setWithdrawAddress('');
+        setMsg('Deposit addresses are assigned automatically to the account and are listed below.');
+        await load();
+        return;
       }
+
+      await apiSend('/api/user/withdraw/crypto', 'POST', {
+        currency,
+        amount: amt,
+        address: withdrawAddress,
+      });
+      setMsg(`Withdrawal of ${formatMoney(amt)} ${currency} to ${withdrawAddress} initiated.`);
+      load();
+      setWithdrawAddress('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Transfer failed');
     } finally {
@@ -144,7 +138,21 @@ export default function Wallet() {
             ))}
           </select>
 
-          {type === 'withdrawal' && (
+          {type === 'deposit' ? (
+            <div className="mt-4 rounded-sm border border-white/10 bg-black/20 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-stone-500">Assigned addresses</div>
+              <div className="mt-3 space-y-2">
+                {depositAddresses.length ? depositAddresses.map((row) => (
+                  <div key={`${row.currency}-${row.network || 'network'}`} className="rounded-sm border border-white/10 bg-black/20 p-2">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300">{row.network || 'network'} · {row.currency}</div>
+                    <div className="mt-1 break-all font-mono text-[11px] text-stone-200">{row.address}</div>
+                  </div>
+                )) : (
+                  <div className="text-sm text-stone-500">Assigning wallet addresses…</div>
+                )}
+              </div>
+            </div>
+          ) : (
             <>
               <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">
                 Destination Address (external wallet)
@@ -162,14 +170,14 @@ export default function Wallet() {
           {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
 
           <button
-            disabled={busy}
-            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304]"
+            disabled={busy || type === 'deposit'}
+            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy ? 'Processing…' : type === 'deposit' ? 'Generate Deposit Address' : 'Request Withdrawal'}
+            {busy ? 'Processing…' : type === 'deposit' ? 'Assigned Wallets' : 'Request Withdrawal'}
           </button>
           <p className="mt-3 text-[11px] text-stone-600">
             {type === 'deposit'
-              ? 'You will receive a unique address for this currency. Send funds to that address.'
+              ? 'Deposit addresses are automatically assigned to the account and kept on file for wallet funding.'
               : 'Withdrawals are processed after manual review (simulated).'}
           </p>
         </form>

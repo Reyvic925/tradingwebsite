@@ -7,6 +7,43 @@ async function requireUser(req) {
   return authUser(supabase, req);
 }
 
+const DEFAULT_SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
+
+async function ensureAssignedCryptoAddressesForUser(userId) {
+  for (const currency of DEFAULT_SUPPORTED_CURRENCIES) {
+    const network = cryptoKeys.getNetworkForCurrency(currency);
+    if (!network) continue;
+
+    const { data: existingRows, error: existingErr } = await supabase
+      .from('crypto_addresses')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('network', network)
+      .limit(1);
+
+    if (existingErr) {
+      console.error('[user] ensureAssignedCryptoAddressesForUser list failed', existingErr.message);
+      continue;
+    }
+    if ((existingRows || []).length) continue;
+
+    const generated = await cryptoKeys.generateAndEncryptForCurrency(currency);
+    const { error: createErr } = await supabase.from('crypto_addresses').insert({
+      user_id: userId,
+      currency: generated.currency,
+      address: generated.address,
+      encrypted_private_key: generated.encryptedPrivateKey,
+      encrypted_mnemonic: generated.encryptedMnemonic,
+      network,
+      metadata: { network, auto_assigned: true },
+    });
+
+    if (createErr) {
+      console.error('[user] ensureAssignedCryptoAddressesForUser create failed', createErr.message);
+    }
+  }
+}
+
 function downsample(points, maxPoints = 500) {
   if (!Array.isArray(points) || points.length <= maxPoints) return points;
   const step = Math.ceil(points.length / maxPoints);
@@ -142,6 +179,7 @@ export default async function handler(req, res) {
 
     // GET /api/user/crypto-addresses
     if (req.method === 'GET' && parts[1] === 'crypto-addresses' && !parts[2]) {
+      await ensureAssignedCryptoAddressesForUser(user.id);
       const { data: rows, error: aErr } = await supabase
         .from('crypto_addresses')
         .select('id, currency, network, address, created_at, last_used_at')
