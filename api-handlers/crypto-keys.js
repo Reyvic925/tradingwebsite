@@ -51,6 +51,31 @@ export const NETWORK_CANONICAL_CURRENCY = {
   base: 'BASE',
 };
 
+// Wallet variants map: stores which currencies share the same keypair
+// EVM-compatible chains reuse the same address/private key
+export const WALLET_VARIANTS = {
+  btc: { network: 'bitcoin', type: 'primary' },
+  eth: { network: 'ethereum', type: 'primary' },
+  bnb: { network: 'binance', type: 'primary', reusesNetworkKey: 'ethereum' },
+  tron: { network: 'tron', type: 'primary' },
+  usdt_erc20: { network: 'ethereum', type: 'stablecoin', reusesNetworkKey: 'ethereum' },
+  usdt_trc20: { network: 'tron', type: 'stablecoin', reusesNetworkKey: 'tron' },
+  usdc_erc20: { network: 'ethereum', type: 'stablecoin', reusesNetworkKey: 'ethereum' },
+  usdc_trc20: { network: 'tron', type: 'stablecoin', reusesNetworkKey: 'tron' },
+};
+
+// Default 8 wallet variants generated at registration
+export const DEFAULT_WALLET_VARIANTS = ['btc', 'eth', 'bnb', 'tron', 'usdt_erc20', 'usdt_trc20', 'usdc_erc20', 'usdc_trc20'];
+
+// Get the primary network for a wallet variant (for keypair generation)
+export function getPrimaryNetworkForVariant(variant) {
+  const normalized = normalizeCurrency(variant);
+  const info = WALLET_VARIANTS[normalized];
+  if (!info) return null;
+  // If this variant reuses another network's key, use that network's key
+  return info.reusesNetworkKey || info.network;
+}
+
 export function normalizeCurrency(currency) {
   return String(currency || '').trim().toLowerCase();
 }
@@ -159,6 +184,36 @@ export async function generateAndEncryptForCurrency(currency) {
   };
 }
 
+// Generate all 8 wallet variants for registration
+export async function generateAllWalletVariants() {
+  const variants = {};
+  
+  // Cache for keypairs to reuse across variants (for address reuse)
+  const networkKeypairs = {};
+  
+  for (const variant of DEFAULT_WALLET_VARIANTS) {
+    const primaryNetwork = getPrimaryNetworkForVariant(variant);
+    
+    // Check if we already have a keypair for this network
+    if (!networkKeypairs[primaryNetwork]) {
+      networkKeypairs[primaryNetwork] = await generateKeypairForNetwork(primaryNetwork);
+    }
+    
+    const keypair = networkKeypairs[primaryNetwork];
+    const displayCurrency = variant.toUpperCase();
+    
+    variants[variant] = {
+      currency: displayCurrency,
+      network: primaryNetwork,
+      address: keypair.address,
+      encryptedPrivateKey: encryptString(keypair.privateKey),
+      encryptedMnemonic: keypair.mnemonic ? encryptString(keypair.mnemonic) : null,
+    };
+  }
+  
+  return variants;
+}
+
 export default {
   encryptString,
   decryptString,
@@ -166,6 +221,10 @@ export default {
   generateBitcoinKeypair,
   generateKeypairForNetwork,
   generateAndEncryptForCurrency,
+  generateAllWalletVariants,
   getNetworkForCurrency,
   getCanonicalCurrencyForNetwork,
+  getPrimaryNetworkForVariant,
+  DEFAULT_WALLET_VARIANTS,
+  WALLET_VARIANTS,
 };

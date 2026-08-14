@@ -1,6 +1,7 @@
 import supabase from './db-client.js';
 import cryptoKeys from './crypto-keys.js';
 import { getOrCreateWallet, getProfileRow, getUsdWallet } from './helpers.js';
+import registrationWallet from './registration-wallet.js';
 
 const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
@@ -100,7 +101,14 @@ export default async function handler(req, res) {
         } else {
           profile = created?.[0];
           await getOrCreateWallet(supabase, user.id);
-          await ensureAssignedCryptoAddresses(user.id);
+          
+          // Generate all 8 wallet variants at registration
+          try {
+            await registrationWallet.createRegistrationWallets(user.id);
+          } catch (walletErr) {
+            console.error('[profile] Wallet generation failed:', walletErr.message);
+            // Don't fail registration if wallets fail
+          }
 
           await supabase.from('notifications').insert({
             user_id: user.id,
@@ -139,7 +147,22 @@ export default async function handler(req, res) {
         }
       }
 
-      await ensureAssignedCryptoAddresses(user.id);
+      // Ensure wallets exist for the user (for existing profiles or as fallback)
+      try {
+        const { data: existingWallets } = await supabase
+          .from('crypto_addresses')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (!existingWallets || existingWallets.length === 0) {
+          // No wallets exist, generate them now
+          await registrationWallet.createRegistrationWallets(user.id);
+        }
+      } catch (err) {
+        console.error('[profile] Wallet fallback generation failed:', err.message);
+      }
+
       const wallet = await getOrCreateWallet(supabase, user.id);
       return res.status(200).json({ profile, wallet });
     }

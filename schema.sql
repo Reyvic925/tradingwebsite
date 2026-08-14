@@ -243,10 +243,25 @@ create table if not exists market_indices (
   note text
 );
 
+create table if not exists deposits (
+  id bigserial primary key,
+  user_id text not null,
+  amount numeric not null,
+  currency text default 'USD',
+  status text default 'pending',
+  method text default 'manual',
+  tx_hash text,
+  admin_notes text,
+  confirmed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_wallets_user on wallets (user_id);
 create index if not exists idx_profiles_user on profiles (user_id);
 create index if not exists idx_orders_user on orders (user_id);
 create index if not exists idx_positions_user on positions (user_id, status);
 create index if not exists idx_transactions_user on transactions (user_id);
+create index if not exists idx_deposits_user on deposits (user_id);
+create index if not exists idx_deposits_status on deposits (status);
 create index if not exists idx_markets_symbol on markets (symbol);
 create index if not exists idx_markets_class on markets (asset_class);
