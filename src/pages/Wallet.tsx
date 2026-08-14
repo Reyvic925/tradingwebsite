@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, type FormEvent } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
@@ -18,6 +19,8 @@ export default function Wallet() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; network?: string; address: string }[]>([]);
+  const [coinQuery, setCoinQuery] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const load = async () => {
     try {
@@ -120,66 +123,140 @@ export default function Wallet() {
             </button>
           </div>
 
-          <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount</label>
-          <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono outline-none"
-          />
+         {/* Deposit flow: Binance-like coin selector and QR/address card */}
+         {type === 'deposit' ? (
+           <>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Coin</label>
+             <input
+               value={coinQuery}
+               onChange={(e) => setCoinQuery(e.target.value)}
+               placeholder="Search coin (e.g. USDT, BTC)"
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none"
+             />
 
-          <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Currency</label>
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none"
-          >
-            {SUPPORTED_CRYPTOS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+             <div className="mt-2 grid grid-cols-2 gap-2">
+               {SUPPORTED_CRYPTOS.filter((c) => c.toLowerCase().includes(coinQuery.toLowerCase())).map((c) => (
+                 <button
+                   key={c}
+                   type="button"
+                   onClick={() => setCurrency(c)}
+                   className={`rounded-sm border p-2 text-sm ${currency === c ? 'border-amber-400 bg-amber-400/10' : 'border-white/10'}`}
+                 >
+                   <div className="font-medium">{c}</div>
+                   <div className="text-xs text-stone-500">{c}</div>
+                 </button>
+               ))}
+             </div>
 
-          {type === 'deposit' ? (
-            <div className="mt-4 rounded-sm border border-white/10 bg-black/20 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-stone-500">Assigned addresses</div>
-              <div className="mt-3 space-y-2">
-                {depositAddresses.length ? depositAddresses.map((row) => (
-                  <div key={`${row.currency}-${row.network || 'network'}`} className="rounded-sm border border-white/10 bg-black/20 p-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300">{row.network || 'network'} · {row.currency}</div>
-                    <div className="mt-1 break-all font-mono text-[11px] text-stone-200">{row.address}</div>
-                  </div>
-                )) : (
-                  <div className="text-sm text-stone-500">Assigning wallet addresses…</div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">
-                Destination Address (external wallet)
-              </label>
-              <input
-                value={withdrawAddress}
-                onChange={(e) => setWithdrawAddress(e.target.value)}
-                placeholder="0x... or bc1..."
-                className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
-              />
-            </>
-          )}
+             <div className="mt-4 rounded-sm border border-white/10 bg-black/20 p-3">
+               <div className="mb-3 rounded bg-amber-400/10 px-3 py-2 text-xs text-amber-300">Send only {currency} to this address on the selected network. Deposits via other networks may result in loss of funds.</div>
 
-          {error && <div className="mt-3 text-sm text-rose-300">{error}</div>}
-          {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
+               {/* Address / QR card */}
+               <div className="flex flex-col items-center gap-4">
+                 {depositAddresses.length === 0 && (
+                   <div className="text-sm text-stone-500">Generating deposit address…</div>
+                 )}
 
-          <button
-            disabled={busy || type === 'deposit'}
-            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {busy ? 'Processing…' : type === 'deposit' ? 'Assigned Wallets' : 'Request Withdrawal'}
-          </button>
-          <p className="mt-3 text-[11px] text-stone-600">
-            {type === 'deposit'
-              ? 'Deposit addresses are automatically assigned to the account and kept on file for wallet funding.'
-              : 'Withdrawals are processed after manual review (simulated).'}
-          </p>
+                 {depositAddresses.length > 0 && (
+                   (() => {
+                     const addr = depositAddresses.find((a) => a.currency === currency);
+                     const address = addr?.address || '';
+                     const network = addr?.network || 'network';
+                     return (
+                       <div className="w-full max-w-md rounded-md bg-white p-4 text-center">
+                         <div className="bg-white p-4 rounded-md inline-block">
+                           <QRCodeCanvas value={address || ' '} size={200} bgColor={'#ffffff'} fgColor={'#000000'} />
+                         </div>
+                         <div className="mt-3 font-mono text-sm break-all text-stone-900">{address || 'No address assigned'}</div>
+
+                         <div className="mt-3 flex w-full items-center justify-center gap-2">
+                           <button
+                             type="button"
+                             onClick={() => {
+                               if (!address) return;
+                               navigator.clipboard.writeText(address);
+                               setCopied(true);
+                               setTimeout(() => setCopied(false), 2500);
+                             }}
+                             className="rounded-sm bg-amber-400 px-4 py-2 text-sm font-semibold text-[#1a1304]"
+                           >
+                             {copied ? 'Copied' : 'Copy Address'}
+                           </button>
+                         </div>
+
+                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after network confirmation · Address remains the same</div>
+                       </div>
+                     );
+                   })()
+                 )}
+               </div>
+
+               {/* Deposit history */}
+               <div className="mt-4">
+                 <div className="text-[10px] uppercase tracking-widest text-stone-500">Recent Deposits</div>
+                 <div className="mt-2 space-y-2">
+                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => (
+                     <div key={t.id} className="flex items-center justify-between rounded-sm border border-white/5 p-2">
+                       <div>
+                         <div className="text-sm">{t.method || t.currency}</div>
+                         <div className="text-xs text-stone-500">{t.reference}</div>
+                       </div>
+                       <div className="font-mono text-emerald-400">+{formatMoney(Number(t.amount))}</div>
+                     </div>
+                   ))}
+                   {!txns.some((t) => t.type === 'deposit' && t.currency === currency) && (
+                     <div className="text-sm text-stone-500">No recent deposits for {currency}.</div>
+                   )}
+                 </div>
+               </div>
+             </div>
+           </>
+         ) : (
+           <>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount</label>
+             <input
+               value={amount}
+               onChange={(e) => setAmount(e.target.value)}
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono outline-none"
+             />
+
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Currency</label>
+             <select
+               value={currency}
+               onChange={(e) => setCurrency(e.target.value)}
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none"
+             >
+               {SUPPORTED_CRYPTOS.map((c) => (
+                 <option key={c} value={c}>{c}</option>
+               ))}
+             </select>
+
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">
+               Destination Address (external wallet)
+             </label>
+             <input
+               value={withdrawAddress}
+               onChange={(e) => setWithdrawAddress(e.target.value)}
+               placeholder="0x... or bc1..."
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
+             />
+           </>
+         )}
+
+         {error && <div className="mt-3 text-sm text-rose-300">{error}</div>}
+         {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
+
+         <button
+           disabled={busy && type === 'withdrawal'}
+           className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
+         >
+           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Refresh Addresses'}
+         </button>
+         <p className="mt-3 text-[11px] text-stone-600">
+           {type === 'deposit'
+             ? 'Deposit addresses are automatically assigned to the account and kept on file for wallet funding.'
+             : 'Withdrawals are processed after manual review (simulated).'}
+         </p>
         </form>
 
         <div className="rounded-md border border-white/5">
