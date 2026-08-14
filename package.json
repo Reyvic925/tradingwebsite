@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
-    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs"
+    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs",
+    "backfill:wallets": "node scripts/backfill-wallets.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
