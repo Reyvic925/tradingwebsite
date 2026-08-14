@@ -39,7 +39,9 @@ export async function listCryptoAddresses({ userId = null, currency = null, limi
   let q = supabase.from('crypto_addresses').select('*');
   if (userId) q = q.eq('user_id', userId);
   if (currency) q = q.eq('currency', currency);
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(limit).offset(offset);
+  const lim = Math.max(1, Number(limit) || 100);
+  const off = Math.max(0, Number(offset) || 0);
+  const { data, error } = await q.order('created_at', { ascending: false }).range(off, off + lim - 1);
   if (error) {
     console.error('[admin-helpers] listCryptoAddresses failed', error.message);
     return { error };
@@ -71,7 +73,9 @@ export async function updateKycSubmission(id, updates = {}) {
 export async function listKycSubmissions({ status = null, limit = 100, offset = 0 } = {}) {
   let q = supabase.from('kyc_submissions').select('*');
   if (status) q = q.eq('status', status);
-  const { data, error } = await q.order('submitted_at', { ascending: false }).limit(limit).offset(offset);
+  const lim = Math.max(1, Number(limit) || 100);
+  const off = Math.max(0, Number(offset) || 0);
+  const { data, error } = await q.order('submitted_at', { ascending: false }).range(off, off + lim - 1);
   if (error) {
     console.error('[admin-helpers] listKycSubmissions failed', error.message);
     return { error };
