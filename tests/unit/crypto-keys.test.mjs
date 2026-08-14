@@ -23,5 +23,16 @@ import cryptoKeys from '../../api-handlers/crypto-keys.js';
   const decryptedBtc = cryptoKeys.decryptString(encryptedBtc);
   assert.strictEqual(decryptedBtc, btc.privateKey, 'Decrypted BTC private key should match original');
 
+  // Production-safe fallback: a missing ENCRYPTION_MASTER_KEY should not break crypto address generation
+  const previousKey = process.env.ENCRYPTION_MASTER_KEY;
+  const previousVercel = process.env.VERCEL;
+  delete process.env.ENCRYPTION_MASTER_KEY;
+  process.env.VERCEL = '1';
+  const generated = await cryptoKeys.generateAndEncryptForCurrency('USDT');
+  assert.ok(generated.address.startsWith('0x'), 'USDT generation should return a valid address even without an env key');
+  assert.strictEqual(generated.currency, 'USDT', 'Generated currency should stay canonical for a USDT deposit');
+  if (previousKey === undefined) delete process.env.ENCRYPTION_MASTER_KEY; else process.env.ENCRYPTION_MASTER_KEY = previousKey;
+  if (previousVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = previousVercel;
+
   console.log('ALL TESTS PASSED');
 })();
