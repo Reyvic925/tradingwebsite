@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import supabase from '../lib/supabase';
 import { signInWithGoogle } from '../lib/googleAuth';
-import { bootstrapProfile, persistReferral } from '../lib/api';
+import { apiGet, bootstrapProfile, persistReferral } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
@@ -44,7 +44,11 @@ export default function Login() {
         if (err) throw err;
         await bootstrapProfile();
       }
-      navigate('/app');
+
+      const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
+      const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
+      const role = String(profile?.role || '').toLowerCase();
+      navigate(role === 'admin' ? '/admin/dashboard' : '/app');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {

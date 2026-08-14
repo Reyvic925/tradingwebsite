@@ -47,6 +47,7 @@ export default async function handler(req, res) {
             avatar_url: user.user_metadata?.avatar_url || '',
             referral_code: referralCode,
             referred_by: referredBy,
+            role: 'user',
           })
           .select();
 

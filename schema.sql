@@ -79,8 +79,11 @@ create table if not exists profiles (
   avatar_url text,
   referral_code text,
   referred_by text,
+  role text not null default 'user',
   created_at timestamptz default now()
 );
+
+create unique index if not exists idx_profiles_user_id_unique on profiles (user_id);
 
 create table if not exists wallets (
   id serial primary key,

@@ -32,6 +32,7 @@ export type Profile = {
   avatar_url: string;
   referral_code: string;
   referred_by: string | null;
+  role?: string;
 };
 
 export type Position = {

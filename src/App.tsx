@@ -13,6 +13,12 @@ import Referrals from './pages/Referrals';
 import History from './pages/History';
 import Profile from './pages/Profile';
 import Source from './pages/Source';
+import AdminRoute from './guards/AdminRoute';
+import AdminLogin from './pages/admin/Login';
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminHealth from './pages/admin/Health';
+import AdminCryptoKeys from './pages/AdminCryptoKeys';
+import AdminKyc from './pages/AdminKyc';
 
 export default function App() {
   return (
@@ -21,7 +27,25 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
           <Route path="/source" element={<Source />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/health"
+            element={
+              <AdminRoute>
+                <AdminHealth />
+              </AdminRoute>
+            }
+          />
           <Route
             path="/app"
             element={
@@ -100,6 +124,22 @@ export default function App() {
               <ProtectedRoute>
                 <Profile />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/admin/crypto-keys"
+            element={
+              <AdminRoute>
+                <AdminCryptoKeys />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/app/admin/kyc"
+            element={
+              <AdminRoute>
+                <AdminKyc />
+              </AdminRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
