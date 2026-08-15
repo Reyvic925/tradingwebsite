@@ -103,8 +103,8 @@ export default async function handler(req, res) {
 
       const mnemonicSet = new Set((mnemonicRes.data || []).map((row) => normalizeUserId(row.user_id)).filter(Boolean));
 
-      for (const profile of profiles || []) {
       for (const profile of filteredProfiles || []) {
+        const uid = normalizeUserId(profile.user_id);
         const authUser = authUsersById.get(String(profile.user_id));
         const mergedProfile = mergeAuthUserProfile(profile, authUser);
         result.push(buildUserDirectoryEntry(mergedProfile, {
