@@ -51,10 +51,6 @@ export function normalizeAssetClass(symbol, fallback = 'stock') {
   const upper = String(symbol || '').toUpperCase();
   const value = String(fallback || '').toLowerCase();
 
-  if (value === 'forex' || value === 'crypto' || value === 'stock' || value === 'etf') {
-    return value === 'stock' ? 'stock' : value;
-  }
-
   if (CRYPTO_SYMBOLS.has(upper)) return 'crypto';
   if (FUTURE_SYMBOLS.has(upper)) return 'futures';
   if (FX_SYMBOLS.includes(upper)) return 'forex';
@@ -64,9 +60,24 @@ export function normalizeAssetClass(symbol, fallback = 'stock') {
     return 'forex';
   }
 
-  if (value === 'equity') return 'stock';
-  if (value === 'futures') return 'futures';
-  return value === 'etf' ? 'etf' : 'stock';
+  if (value === 'forex' || value === 'crypto' || value === 'stock' || value === 'etf' || value === 'equity' || value === 'futures') {
+    return value === 'equity' ? 'stock' : value;
+  }
+
+  const regionClasses = new Set([
+    'jp', 'jp-etf', 'ca', 'ca-etf', 'uk', 'uk-etf', 'eu', 'eu-etf', 'de', 'de-etf', 'fr', 'fr-etf', 'in', 'in-etf',
+  ]);
+  if (regionClasses.has(value)) return value;
+
+  if (upper.endsWith('.TO')) return 'ca';
+  if (upper.endsWith('.L')) return 'uk';
+  if (upper.endsWith('.T')) return 'jp';
+  if (upper.endsWith('.PA')) return 'fr';
+  if (upper.endsWith('.DE')) return 'de';
+  if (upper.endsWith('.MI')) return 'eu';
+  if (upper.endsWith('.NS') || upper.endsWith('.BO')) return 'in';
+
+  return value && value !== 'all' ? value : 'stock';
 }
 
 const symbolPrecision = (symbol) => {

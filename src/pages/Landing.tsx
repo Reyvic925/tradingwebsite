@@ -36,7 +36,6 @@ const PARTNER_LOGOS: Record<string, string> = {
   'Amazon Web Services': '/logos/aws.svg',
   AWS: '/logos/aws.svg',
   Cloudflare: '/logos/cloudflare.svg',
-  TradingView: '/logos/tradingview.svg',
   'Deutsche Bank': '/logos/deutschebank.svg',
   BlackRock: '/logos/blackrock.svg',
 };
@@ -49,8 +48,7 @@ const fallbackPartners: Partner[] = [
   { id: 5, name: 'Mastercard', mark: 'MC' },
   { id: 6, name: 'Amazon Web Services', mark: 'AWS' },
   { id: 7, name: 'Cloudflare', mark: 'CF' },
-  { id: 8, name: 'TradingView', mark: 'TV' },
-  { id: 9, name: 'Deutsche Bank', mark: 'DB' },
+  { id: 8, name: 'Deutsche Bank', mark: 'DB' },
   { id: 10, name: 'BlackRock', mark: 'BR' },
 ];
 
