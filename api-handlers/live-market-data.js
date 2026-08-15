@@ -223,13 +223,39 @@ async function fetchFrankfurterQuotes() {
   return result;
 }
 
+async function fetchYahooFuturesQuotes() {
+  const symbols = ['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'BZ=F', '6E=F', '6J=F', '6B=F', '6A=F'];
+  const url = `https://query1.finance.yahoo.com/v6/finance/quote?symbols=${symbols.join(',')}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`Yahoo futures request failed (${res.status})`);
+
+  const payload = await res.json();
+  const result = {};
+  for (const row of payload?.quoteResponse?.result || []) {
+    const symbol = String(row.symbol || '').replace(/=F$/, '');
+    const price = Number(row.regularMarketPrice);
+    if (!symbol || !Number.isFinite(price) || price <= 0) continue;
+    result[symbol] = {
+      symbol,
+      price,
+      change_24h: Number(row.regularMarketChangePercent || 0),
+      high_24h: Number(row.regularMarketDayHigh || price),
+      low_24h: Number(row.regularMarketDayLow || price),
+      volume: Number(row.regularMarketVolume || 0),
+      source: 'live',
+    };
+  }
+  return result;
+}
+
 export async function fetchLiveMarketSnapshot() {
   try {
-    const [crypto, fx] = await Promise.all([
+    const [crypto, fx, futures] = await Promise.all([
       fetchCoinGeckoQuotes().catch(() => ({})),
       fetchFrankfurterQuotes().catch(() => ({})),
+      fetchYahooFuturesQuotes().catch(() => ({})),
     ]);
-    return { ...crypto, ...fx };
+    return { ...crypto, ...fx, ...futures };
   } catch {
     return {};
   }
