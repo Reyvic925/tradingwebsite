@@ -138,7 +138,7 @@ export default function Markets() {
       }
     };
     load(false);
-    const id = setInterval(() => load(true), 12000);
+    const id = setInterval(() => load(true), 30000);
     return () => {
       alive = false;
       clearInterval(id);

@@ -72,7 +72,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       }
       if (alive) load();
     })();
-    const id = setInterval(load, 12000);
+    const id = setInterval(load, 30000);
     return () => {
       alive = false;
       clearInterval(id);

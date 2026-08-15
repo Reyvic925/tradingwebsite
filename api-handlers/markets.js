@@ -331,7 +331,13 @@ export default async function handler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
     try {
-      await ensureUniverse();
+      const { count, error: countErr } = await supabase.from('markets').select('*', { count: 'exact', head: true });
+      if (countErr && !isMissingSchemaError(countErr)) {
+        throw countErr;
+      }
+      if (!count || count === 0) {
+        await ensureUniverse();
+      }
     } catch (err) {
       if (!isMissingSchemaError(err)) throw err;
     }
