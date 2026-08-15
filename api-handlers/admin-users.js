@@ -106,12 +106,16 @@ export default async function handler(req, res) {
         reference: `ADM-${action.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
       });
 
-      await supabase.from('notifications').insert({
-        user_id: userId,
-        title: action === 'add' ? 'Admin balance added' : 'Admin balance adjusted',
-        body: action === 'add' ? `Admin added $${delta.toFixed(2)} to your available balance.` : `Admin subtracted $${delta.toFixed(2)} from your available balance.${reason ? ` Reason: ${reason}` : ''}`,
-        read: false,
-      }).catch(()=>{});
+      try {
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          title: action === 'add' ? 'Admin balance added' : 'Admin balance adjusted',
+          body: action === 'add' ? `Admin added $${delta.toFixed(2)} to your available balance.` : `Admin subtracted $${delta.toFixed(2)} from your available balance.${reason ? ` Reason: ${reason}` : ''}`,
+          read: false,
+        });
+      } catch (notificationErr) {
+        console.warn('[admin-users] notification insert failed:', notificationErr?.message || notificationErr);
+      }
 
       return res.status(200).json({
         wallet: updatedWallet?.[0] || null,
