@@ -721,9 +721,9 @@ export const INDEX_SEED = [
 export const CLASS_MAP = {
   usa: ['stock', 'etf'],
   us: ['stock', 'etf'],
-  stock: ['stock'],
-  equity: ['stock'],
-  etf: ['etf'],
+  stock: ['stock', 'etf', 'jp', 'jp-etf', 'ca', 'ca-etf', 'uk', 'uk-etf', 'eu', 'eu-etf', 'de', 'de-etf', 'fr', 'fr-etf', 'in', 'in-etf'],
+  equity: ['stock', 'etf', 'jp', 'jp-etf', 'ca', 'ca-etf', 'uk', 'uk-etf', 'eu', 'eu-etf', 'de', 'de-etf', 'fr', 'fr-etf', 'in', 'in-etf'],
+  etf: ['etf', 'jp-etf', 'ca-etf', 'uk-etf', 'eu-etf', 'de-etf', 'fr-etf', 'in-etf'],
   futures: ['futures'],
   japan: ['jp', 'jp-etf'],
   jp: ['jp', 'jp-etf'],
