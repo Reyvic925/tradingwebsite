@@ -34,8 +34,6 @@ export default async function handler(req, res) {
     const adminAuth = await requireAdmin(req);
     if (!adminAuth) return res.status(403).json({ error: 'Forbidden' });
 
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
     const url = new URL(req.url || '/', 'http://localhost');
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts[0] === 'api') parts.shift();
@@ -123,7 +121,9 @@ export default async function handler(req, res) {
       });
     }
 
-    const { search = '', limit = 200, offset = 0, user_id: UserId } = req.query || {};
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+    const { search = '', limit = 200, offset = 0, user_id: queryUserId } = req.query || {};
     const pageLimit = Math.max(1, Number(limit || 200));
     const pageOffset = Math.max(0, Number(offset || 0));
 
@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     const activeUserIds = new Set([...authUsersById.keys()]);
 
     let profilesQuery = supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    if (userId) profilesQuery = profilesQuery.eq('user_id', normalizeUserId(userId));
+    if (queryUserId) profilesQuery = profilesQuery.eq('user_id', normalizeUserId(queryUserId));
     if (search) {
       const s = String(search).trim();
       if (s) {
