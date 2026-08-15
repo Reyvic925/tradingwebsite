@@ -221,12 +221,13 @@ export function blendLiveQuote(baseQuote, liveQuote) {
     return { ...base, source: base?.source || 'simulated' };
   }
 
-  const delta = (livePrice - current) / current;
-  const momentumBias = delta * 0.42;
-  const brokerPulse = (Math.random() - 0.5) * 0.012;
-  const blendedPrice = current * (1 + momentumBias + brokerPulse);
+  // For live data, heavily weight towards the real price (85% live, 15% momentum bias)
+  const assetClass = base.asset_class || 'equity';
+  const liveWeight = assetClass === 'crypto' ? 0.95 : assetClass === 'forex' ? 0.92 : 0.85;
+  const brokerPulse = (Math.random() - 0.5) * 0.006; // smaller random noise
+  const blendedPrice = (livePrice * liveWeight) + (current * (1 - liveWeight)) + (livePrice * brokerPulse);
   const finalPrice = Math.max(0.00000001, Number(blendedPrice));
-  const change = Number(base.change_24h || 0) * 0.57 + Number(liveQuote?.change_24h || 0) * 0.43;
+  const change = Number(liveQuote?.change_24h || 0);
   const baseHigh = Number(base.high_24h || current || 0);
   const baseLow = Number(base.low_24h || current || 0);
   const precision = symbolPrecision(base.symbol);
