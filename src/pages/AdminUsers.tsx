@@ -37,7 +37,7 @@ export default function AdminUsers() {
       const qs = new URLSearchParams();
       if (search.trim()) qs.set('search', search.trim());
       const res = await fetch(`/api/admin/users${qs.toString() ? `?${qs}` : ''}`, { headers });
-      const j = await res.json();
+      const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Failed to load users');
       setRows(j?.users || []);
       if (selectedUserId) {
@@ -62,8 +62,8 @@ export default function AdminUsers() {
         fetch(`/api/admin/users/${userId}/kyc`, { headers }),
         fetch(`/api/wallets/admin/${userId}`, { headers }),
       ]);
-      const kycData = await kycRes.json();
-      const walletData = await walletsRes.json();
+      const kycData = await readJsonOrText(kycRes);
+      const walletData = await readJsonOrText(walletsRes);
       if (!kycRes.ok) throw new Error(kycData?.error || 'Failed to load KYC details');
       if (!walletsRes.ok) throw new Error(walletData?.error || 'Failed to load wallet details');
       setKycDocs(kycData?.documents || []);
