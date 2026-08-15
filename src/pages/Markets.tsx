@@ -191,29 +191,29 @@ export default function Markets() {
       {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
       <div className="mt-6 overflow-hidden rounded-md border border-white/5">
-        <table className="w-full text-left text-sm">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-left text-sm">
           <thead className="bg-white/[0.02] text-[10px] uppercase tracking-widest text-stone-500">
             <tr>
-              <th className="px-5 py-3">Symbol</th>
-              <th className="px-3 py-3">Name</th>
-              <th className="px-3 py-3">Class</th>
-              <th className="px-3 py-3">Last</th>
-              <th className="px-3 py-3">24h</th>
-              <th className="px-3 py-3">High / Low</th>
-              <th className="px-5 py-3" />
+              <th className="w-[12%] px-5 py-3">Symbol</th>
+              <th className="w-[30%] px-3 py-3">Name</th>
+              <th className="w-[12%] px-3 py-3">Class</th>
+              <th className="w-[12%] px-3 py-3">Last</th>
+              <th className="w-[12%] px-3 py-3">24h</th>
+              <th className="w-[18%] px-3 py-3">High / Low</th>
+              <th className="w-[6%] px-5 py-3 text-right" />
             </tr>
           </thead>
           <tbody>
             {markets.map((m) => (
               <tr key={m.id} className="border-t border-white/5 hover:bg-white/[0.02]">
-                <td className="px-5 py-3 font-mono">{m.symbol}</td>
-                <td className="px-3 py-3 text-stone-400">{m.name}</td>
-                <td className="px-3 py-3 uppercase text-[11px] text-stone-500">{m.asset_class}</td>
-                <td className="px-3 py-3 font-mono">{formatPrice(Number(m.price))}</td>
-                <td className={`px-3 py-3 font-mono ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
-                <td className="px-3 py-3 font-mono text-xs text-stone-500">{formatPrice(Number(m.high_24h))} / {formatPrice(Number(m.low_24h))}</td>
+                <td className="overflow-hidden px-5 py-3 font-mono text-ellipsis whitespace-nowrap">{m.symbol}</td>
+                <td className="overflow-hidden px-3 py-3 text-stone-400 break-words text-ellipsis">{m.name}</td>
+                <td className="overflow-hidden px-3 py-3 uppercase text-[11px] text-stone-500 break-words text-ellipsis">{m.asset_class}</td>
+                <td className="overflow-hidden px-3 py-3 font-mono whitespace-nowrap">{formatPrice(Number(m.price))}</td>
+                <td className={`overflow-hidden px-3 py-3 font-mono whitespace-nowrap ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
+                <td className="overflow-hidden px-3 py-3 font-mono text-xs text-stone-500 whitespace-nowrap">{formatPrice(Number(m.high_24h))} / {formatPrice(Number(m.low_24h))}</td>
                 <td className="px-5 py-3 text-right">
-                  <Link to={`/app/trade/${encodeURIComponent(m.symbol)}`} className="text-xs text-amber-300">Trade</Link>
+                  <Link to={`/app/trade/${encodeURIComponent(m.symbol)}`} className="inline-flex shrink-0 items-center justify-center rounded-sm border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-200 transition hover:border-amber-400/60 hover:bg-amber-400/15">Trade</Link>
                 </td>
               </tr>
             ))}
