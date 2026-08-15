@@ -75,14 +75,15 @@ export default async function handler(req, res) {
         .select();
       if (updateErr) throw updateErr;
 
+      const preferredCurrency = existing.currency === 'USD' ? 'USD' : 'USD';
       const { data: wallets } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', existing.user_id)
-        .eq('currency', existing.currency)
-        .limit(1);
+        .in('currency', [preferredCurrency, existing.currency || 'USD'])
+        .order('id', { ascending: true });
 
-      const wallet = (wallets && wallets[0]) || null;
+      const wallet = (wallets || []).find((row) => row.currency === 'USD') || (wallets || [])[0] || null;
       if (wallet) {
         await supabase
           .from('wallets')
@@ -93,7 +94,7 @@ export default async function handler(req, res) {
           .from('wallets')
           .insert({
             user_id: existing.user_id,
-            currency: existing.currency,
+            currency: 'USD',
             available: Number(amountToCredit),
             reserved: 0,
           });
