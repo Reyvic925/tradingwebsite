@@ -55,10 +55,10 @@ const fallbackPartners: Partner[] = [
 ];
 
 const fallbackPlans: Plan[] = [
-  { id: 1, name: 'Starter', tagline: 'First desk allocation', min_amount: 100, max_amount: 999, daily_rate: 2.5, duration_days: 30, total_return: 175, featured: false },
-  { id: 2, name: 'Premium', tagline: 'The house favorite', min_amount: 1000, max_amount: 4900, daily_rate: 3.5, duration_days: 45, total_return: 257, featured: true },
-  { id: 3, name: 'Gold', tagline: 'For serious books', min_amount: 5000, max_amount: 24900, daily_rate: 4.5, duration_days: 60, total_return: 370, featured: false },
-  { id: 4, name: 'Diamond', tagline: 'Private client mandate', min_amount: 25000, max_amount: null, daily_rate: 6, duration_days: 90, total_return: 640, featured: false },
+  { id: 1, name: 'Starter', tagline: 'First desk allocation', min_amount: 200, max_amount: 999, daily_rate: 2.5, duration_days: 6, total_return: 275, featured: false },
+  { id: 2, name: 'Premium', tagline: 'The house favorite', min_amount: 1000, max_amount: 4900, daily_rate: 3.5, duration_days: 7, total_return: 357, featured: true },
+  { id: 3, name: 'Gold', tagline: 'For serious books', min_amount: 5000, max_amount: 24900, daily_rate: 4.5, duration_days: 9, total_return: 480, featured: false },
+  { id: 4, name: 'Diamond', tagline: 'Private client mandate', min_amount: 25000, max_amount: null, daily_rate: 6, duration_days: 14, total_return: 640, featured: false },
 ];
 
 const fallbackTestimonials: Testimonial[] = [
@@ -375,7 +375,7 @@ export default function Landing() {
               <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Managed plans</div>
               <h2 className="mt-3 font-display text-4xl sm:text-5xl">Capital, compounded on a schedule.</h2>
             </div>
-            <p className="max-w-md text-sm text-stone-400">Daily accrual. Defined duration. Transparent total return. Withdraw principal plus yield when the cycle closes.</p>
+            <p className="max-w-md text-sm text-stone-400">Cycle-based return. Defined duration. Transparent total return. Withdraw principal plus yield when the cycle closes.</p>
           </div>
 
           {loading && <div className="mt-10 h-64 animate-pulse rounded-md bg-white/5" />}
@@ -396,8 +396,8 @@ export default function Landing() {
                 )}
                 <div className="font-display text-3xl text-stone-50">{p.name}</div>
                 <div className="mt-1 text-sm text-stone-500">{p.tagline}</div>
-                <div className="mt-6 font-display text-5xl text-amber-200">{p.daily_rate}%</div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-stone-500">Daily yield</div>
+                <div className="mt-6 font-display text-5xl text-amber-200">{p.total_return}%</div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-stone-500">Total return</div>
                 <ul className="mt-6 space-y-2 text-sm text-stone-300">
                   <li className="flex justify-between border-b border-white/5 py-2">
                     <span className="text-stone-500">Range</span>

@@ -5,14 +5,42 @@ async function requireUser(req) {
   return authUser(supabase, req);
 }
 
-function accrue(inv, plan) {
-  if (inv.status !== 'active') return inv;
+export function computePlanProgress(inv, plan) {
+  if (inv.status !== 'active') return { ...inv, earned: Number(inv.earned || 0), days_elapsed: Number(inv.days_elapsed || 0), status: inv.status || 'active' };
+
+  const amount = Number(inv.amount || 0);
+  const totalReturn = Number(plan.total_return || 0) / 100;
+  const durationDays = Math.max(1, Number(plan.duration_days || 1));
   const start = new Date(inv.start_date).getTime();
   const now = Date.now();
-  const days = Math.min(plan.duration_days, Math.floor((now - start) / 86400000));
-  const earned = Number(inv.amount) * (Number(plan.daily_rate) / 100) * days;
-  const ended = days >= plan.duration_days;
-  return { ...inv, earned, days_elapsed: days, status: ended ? 'completed' : 'active' };
+  const elapsedDays = Math.min(durationDays, Math.max(0, Math.floor((now - start) / 86400000)));
+  const progress = Math.min(1, elapsedDays / durationDays);
+  const earned = amount * totalReturn * progress;
+  const ended = elapsedDays >= durationDays;
+
+  return { ...inv, earned, days_elapsed: elapsedDays, status: ended ? 'completed' : 'active' };
+}
+
+export function simulateInvestmentStep(inv, plan) {
+  const amount = Number(inv.amount || 0);
+  const totalReturn = Number(plan.total_return || 0) / 100;
+  const durationDays = Math.max(1, Number(plan.duration_days || 1));
+  const start = new Date(inv.start_date).getTime();
+  const elapsedDays = Math.min(durationDays, Math.max(0, Math.floor((Date.now() - start) / 86400000)));
+  const progress = Math.min(1, elapsedDays / durationDays);
+  const swing = (Math.random() * 2 - 1) * 0.25;
+  const earned = amount * totalReturn * progress * (1 + swing);
+  const signed = Math.random() > 0.5 ? 1 : -1;
+  const realized = amount * totalReturn * progress + (amount * (totalReturn * 0.18) * signed * (1 - progress));
+  return {
+    earned: Math.max(-amount, Math.min(amount * (totalReturn * 1.2), Number.isFinite(realized) ? realized : earned)),
+    days_elapsed: elapsedDays,
+    status: elapsedDays >= durationDays ? 'completed' : 'active',
+  };
+}
+
+function accrue(inv, plan) {
+  return computePlanProgress(inv, plan);
 }
 
 export default async function handler(req, res) {
@@ -122,7 +150,7 @@ export default async function handler(req, res) {
       await supabase.from('notifications').insert({
         user_id: user.id,
         title: `Subscribed to ${plan.name}`,
-        body: `$${amt.toFixed(2)} allocated for ${plan.duration_days} days at ${plan.daily_rate}% daily.`,
+        body: `$${amt.toFixed(2)} allocated for ${plan.duration_days} days with a ${plan.total_return}% total-return target.`,
         read: false,
       });
 
