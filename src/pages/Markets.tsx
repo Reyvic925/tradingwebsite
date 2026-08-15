@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiMarkets } from '../lib/api';
@@ -41,6 +41,12 @@ const QUICK_FILTERS = [
   { id: 'etf', label: 'Stocks' },
 ];
 
+interface CachedMarketData {
+  items: Market[];
+  total: number;
+  timestamp: number;
+}
+
 export default function Markets() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [total, setTotal] = useState(0);
@@ -53,6 +59,8 @@ export default function Markets() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [regionMapping, setRegionMapping] = useState(DEFAULT_REGION_FROM);
   const pageSize = 50;
+  const cacheRef = useRef<Record<string, CachedMarketData>>({});
+  const CACHE_TTL = 30000;
 
   useEffect(() => {
     Promise.all([
@@ -85,11 +93,24 @@ export default function Markets() {
 
   useEffect(() => {
     setPage(0);
-    setLoading(true);
   }, [filter, debounced]);
 
   useEffect(() => {
     let alive = true;
+    const cacheKey = `${filter}:${debounced}:${page}`;
+    const cached = cacheRef.current[cacheKey];
+    const now = Date.now();
+    const isCacheValid = cached && (now - cached.timestamp) < CACHE_TTL;
+
+    if (isCacheValid && cached) {
+      setMarkets(cached.items);
+      setTotal(cached.total);
+      setError('');
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     const load = async (tick = false) => {
       try {
         const data = await apiMarkets<Market>({
@@ -103,6 +124,11 @@ export default function Markets() {
         setMarkets(data.items);
         setTotal(data.total);
         setError('');
+        cacheRef.current[cacheKey] = {
+          items: data.items,
+          total: data.total,
+          timestamp: Date.now(),
+        };
       } catch (e: unknown) {
         if (alive) setError(e instanceof Error ? e.message : 'Failed');
       } finally {
