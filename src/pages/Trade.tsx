@@ -81,12 +81,19 @@ export default function Trade() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (positions.length > 0 && markets.length > 0) {
-        const symbols = positions.map(p => p.symbol);
-        apiMarkets<Market>({ symbols: symbols.join(','), limit: 50 }).then(({ items }) => {
+        // Fetch prices for each position symbol individually since backend doesn't support multi-symbol filter
+        const uniqueSymbols = [...new Set(positions.map(p => p.symbol))];
+        const pricePromises = uniqueSymbols.map(sym => 
+          apiMarkets<Market>({ symbol: sym, limit: 1 }).then(({ items }) => ({ symbol: sym, price: items[0]?.price }))
+            .catch(() => ({ symbol: sym, price: null }))
+        );
+        
+        Promise.all(pricePromises).then(results => {
           const prices: Record<string, number> = {};
-          items.forEach(m => {
-            // Use the live price directly, no blending
-            prices[m.symbol] = Number(m.price);
+          results.forEach(r => {
+            if (r.price !== null && r.price !== undefined) {
+              prices[r.symbol] = Number(r.price);
+            }
           });
           // Update both maps with the same price to avoid dual pricing
           setMarketPrices(prev => ({ ...prev, ...prices }));
