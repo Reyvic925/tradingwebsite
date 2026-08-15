@@ -64,15 +64,24 @@ export default async function handler(req, res) {
         .select('id, kind, mime, size, filename, created_at');
 
       if (error) throw error;
-      return res.status(201).json({ file: (data || [])[0] || null });
+      const inserted = (data || [])[0];
+      if (!inserted) throw new Error('Insert returned no data');
+      return res.status(201).json({ 
+        file: { 
+          id: inserted.id,
+          kind: inserted.kind,
+          mime: inserted.mime,
+          size: inserted.size
+        } 
+      });
     }
 
     if (req.method === 'GET') {
       const user = await requireUserHelper(supabase, req);
       if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-      const id = Number(req.query?.id);
-      if (!id || Number.isNaN(id)) return res.status(400).json({ error: 'id query param is required' });
+      const id = String(req.query?.id || '');
+      if (!id) return res.status(400).json({ error: 'id query param is required' });
 
       const { data: rows, error } = await supabase
         .from('kyc_files')

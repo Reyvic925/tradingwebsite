@@ -3,13 +3,14 @@ import { QRCodeCanvas } from 'qrcode.react';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
-import type { Txn, Wallet as WalletT } from '../types';
+import type { Txn, Wallet as WalletT, Profile as ProfileT } from '../types';
 
 // Fallback - will be replaced by config from API
 const FALLBACK_SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletT | null>(null);
+  const [profile, setProfile] = useState<ProfileT | null>(null);
   const [txns, setTxns] = useState<Txn[]>([]);
   const [type, setType] = useState<'deposit' | 'withdrawal'>('deposit');
   const [amount, setAmount] = useState('500');
@@ -26,13 +27,15 @@ export default function Wallet() {
 
   const load = async () => {
     try {
-      const [w, t, addresses, config] = await Promise.all([
+      const [w, p, t, addresses, config] = await Promise.all([
         apiGet<WalletT>('/api/wallet').catch(() => null),
+        apiGet<{ profile: ProfileT }>('/api/profile').then(r => r.profile).catch(() => null),
         apiList<Txn>('/api/transactions'),
         apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
         fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
       if (w) setWallet(w);
+      if (p) setProfile(p);
       setTxns(asList(t));
       const uniqueAddresses = asList(addresses).reduce<{ id: number; currency: string; network?: string; address: string }[]>((acc, item) => {
         const key = `${item.currency}|${item.network || ''}|${item.address}`;
@@ -61,6 +64,11 @@ export default function Wallet() {
     if (!(amt > 0)) return setError('Enter a valid amount');
     if (type === 'withdrawal' && !withdrawAddress.trim()) {
       return setError('Please enter a destination address for withdrawal');
+    }
+
+    // KYC gate: withdrawals require verified KYC
+    if (type === 'withdrawal' && profile?.kyc_status !== 'verified') {
+      return setError('KYC verification required before withdrawing. Please complete KYC in the KYC section.');
     }
 
     setBusy(true);
@@ -225,6 +233,11 @@ export default function Wallet() {
            </>
          ) : (
            <>
+             {profile?.kyc_status !== 'verified' && (
+               <div className="mb-4 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                 <strong>KYC Required:</strong> Complete identity verification before withdrawing. Go to <a href="/app/kyc" className="underline">KYC section</a>.
+               </div>
+             )}
              <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount</label>
              <input
                value={amount}

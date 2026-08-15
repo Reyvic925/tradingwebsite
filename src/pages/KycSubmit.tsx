@@ -7,7 +7,7 @@ import { compressImageToDataUrl } from '../lib/image';
 
 interface KycFileRef {
   kind: 'document_front' | 'document_back';
-  file_id: number;
+  file_id: string;
   name?: string | null;
 }
 
@@ -40,7 +40,7 @@ const STEPS = [
   { label: 'Identity document', icon: FileCheck2 },
 ];
 
-type Upload = { fileId: number; preview: string; name: string } | null;
+type Upload = { fileId: string; preview: string; name: string } | null;
 type Slot = { upload: Upload; busy: boolean; error: string };
 
 const emptySlot: Slot = { upload: null, busy: false, error: '' };
@@ -167,7 +167,7 @@ export default function KycSubmit() {
     setError('');
     try {
       const dataUrl = await compressImageToDataUrl(file);
-      const res = await apiSend<{ file: { id: number } }>('/api/kyc-upload', 'POST', {
+      const res = await apiSend<{ file: { id: string } }>('/api/kyc-upload', 'POST', {
         kind,
         data_url: dataUrl,
         filename: file.name,
