@@ -32,6 +32,13 @@ const DEFAULT_REGION_FROM: Record<string, string> = {
   in: 'india',
 };
 
+const QUICK_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'forex', label: 'FX' },
+  { id: 'etf', label: 'Stocks' },
+];
+
 export default function Markets() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [total, setTotal] = useState(0);
@@ -46,19 +53,24 @@ export default function Markets() {
   const pageSize = 50;
 
   useEffect(() => {
-    // Fetch market filters and region mapping from config
     Promise.all([
       fetch('/api/app-config?key=market_filters').then(r => r.json()).catch(() => null),
       fetch('/api/app-config?key=region_mapping').then(r => r.json()).catch(() => null),
     ]).then(([filtersConfig, regionConfig]) => {
-      if (filtersConfig?.value && Array.isArray(filtersConfig.value)) {
-        setFilters(filtersConfig.value);
-      }
+      const rawFilters = Array.isArray(filtersConfig?.value)
+        ? filtersConfig.value
+        : Array.isArray(filtersConfig)
+          ? filtersConfig
+          : DEFAULT_FILTERS;
+
+      const nextFilters = rawFilters.length ? rawFilters : DEFAULT_FILTERS;
+      setFilters(nextFilters);
+
       if (regionConfig?.value && typeof regionConfig.value === 'object') {
         setRegionMapping(regionConfig.value);
       }
     }).catch(() => {
-      // Use defaults on error
+      setFilters(DEFAULT_FILTERS);
     });
   }, []);
 
@@ -111,7 +123,7 @@ export default function Markets() {
           <p className="mt-1 text-sm text-stone-500">{total.toLocaleString()} listed names · USA · Japan · Canada · UK · Europe · India</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {filters.map((f: any) => (
+          {QUICK_FILTERS.map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
@@ -127,6 +139,17 @@ export default function Markets() {
             className="min-w-[180px] rounded-sm border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none"
           />
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {filters.map((f: any) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={`rounded-sm px-3 py-1.5 text-[11px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400 text-[#1a1304]' : 'border border-white/10 text-stone-400'}`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
       <div className="mt-6">
         <IndexBoard onSelect={(region) => setFilter(regionMapping[region] || region)} compact />

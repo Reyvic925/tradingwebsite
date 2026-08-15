@@ -1,5 +1,40 @@
 import supabase from './db-client.js';
 
+export const DEFAULT_MARKET_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'usa', label: 'USA' },
+  { id: 'japan', label: 'Japan' },
+  { id: 'canada', label: 'Canada' },
+  { id: 'uk', label: 'UK' },
+  { id: 'europe', label: 'Europe' },
+  { id: 'germany', label: 'Germany' },
+  { id: 'france', label: 'France' },
+  { id: 'india', label: 'India' },
+  { id: 'etf', label: 'US ETFs' },
+  { id: 'forex', label: 'FX' },
+  { id: 'crypto', label: 'Crypto' },
+];
+
+export function mergeMarketFilters(value) {
+  const base = Array.isArray(value) ? value : DEFAULT_MARKET_FILTERS;
+  const byId = new Map(base.map((item) => [String(item?.id || '').toLowerCase(), item]));
+  const merged = [...base];
+
+  for (const item of DEFAULT_MARKET_FILTERS) {
+    if (!byId.has(String(item.id).toLowerCase())) merged.push(item);
+  }
+
+  return merged.map((item) => ({
+    id: String(item?.id || 'all'),
+    label: String(item?.label || item?.id || 'All'),
+  }));
+}
+
+export function getMarketFiltersConfig(value) {
+  const safeValue = Array.isArray(value) ? value : DEFAULT_MARKET_FILTERS;
+  return mergeMarketFilters(safeValue);
+}
+
 // Initialize default config if needed
 async function ensureDefaults() {
   try {
@@ -13,20 +48,7 @@ async function ensureDefaults() {
         },
         {
           key: 'market_filters',
-          value: [
-            { id: 'all', label: 'All' },
-            { id: 'usa', label: 'USA' },
-            { id: 'japan', label: 'Japan' },
-            { id: 'canada', label: 'Canada' },
-            { id: 'uk', label: 'UK' },
-            { id: 'europe', label: 'Europe' },
-            { id: 'germany', label: 'Germany' },
-            { id: 'france', label: 'France' },
-            { id: 'india', label: 'India' },
-            { id: 'etf', label: 'US ETFs' },
-            { id: 'forex', label: 'FX' },
-            { id: 'crypto', label: 'Crypto' },
-          ],
+          value: DEFAULT_MARKET_FILTERS,
           description: 'Market filter options available on Markets page',
         },
         {
