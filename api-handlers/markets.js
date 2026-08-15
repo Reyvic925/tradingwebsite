@@ -392,6 +392,48 @@ async function fetchLiveCryptoPrices() {
   }
 }
 
+
+async function fetchLiveYahooPrices(symbols) {
+  try {
+    const yahooSymbols = symbols.map(sym => {
+      if (YAHOO_SYMBOL_MAP[sym]) return YAHOO_SYMBOL_MAP[sym];
+      return sym;
+    });
+    
+    const quotes = await yahooFinance.quotes(yahooSymbols, { fields: ["regularMarketPrice", "regularMarketChangePercent", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "regularMarketVolume"] });
+    
+    const priceMap = {};
+    quotes.forEach(quote => {
+      if (!quote.symbol || quote.regularMarketPrice === undefined) return;
+      for (const [ourSymbol, yahooSym] of Object.entries(YAHOO_SYMBOL_MAP)) {
+        if (yahooSym === quote.symbol || (yahooSym.endsWith("=X") && quote.symbol.startsWith(yahooSym.slice(0, -2)))) {
+          priceMap[ourSymbol] = {
+            price: quote.regularMarketPrice,
+            change_24h: quote.regularMarketChangePercent || 0,
+            high_24h: quote.fiftyTwoWeekHigh || quote.regularMarketPrice,
+            low_24h: quote.fiftyTwoWeekLow || quote.regularMarketPrice,
+            volume: quote.regularMarketVolume || 0,
+          };
+          break;
+        }
+      }
+      if (YAHOO_SYMBOL_MAP[quote.symbol] === quote.symbol) {
+        priceMap[quote.symbol] = {
+          price: quote.regularMarketPrice,
+          change_24h: quote.regularMarketChangePercent || 0,
+          high_24h: quote.fiftyTwoWeekHigh || quote.regularMarketPrice,
+          low_24h: quote.fiftyTwoWeekLow || quote.regularMarketPrice,
+          volume: quote.regularMarketVolume || 0,
+        };
+      }
+    });
+    return priceMap;
+  } catch (error) {
+    console.error("Failed to fetch Yahoo Finance prices:", error.message);
+    return {};
+  }
+}
+
 function orderSideOf(positionSide) {
   return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
 }
@@ -619,6 +661,12 @@ export default async function handler(req, res) {
 
     // Fetch live crypto prices from Binance for crypto assets only
     const liveCryptoPrices = await fetchLiveCryptoPrices();
+    const allSymbols = (data || []).map(row => String(row.symbol || "").toUpperCase());
+    const nonCryptoSymbols = allSymbols.filter(sym => {
+      const row = (data || []).find(r => String(r.symbol || "").toUpperCase() === sym);
+      return row && row.asset_class !== "crypto";
+    });
+    const liveYahooPrices = nonCryptoSymbols.length > 0 ? await fetchLiveYahooPrices(nonCryptoSymbols) : {};
     
     let query = supabase.from('markets').select('*', { count: 'exact' });
     if (assetClass && assetClass !== 'all') {
@@ -649,6 +697,7 @@ export default async function handler(req, res) {
       const liveData = liveCryptoPrices[sym];
       
       // If it's a crypto asset and we have live data, use it
+      const yahooData = liveYahooPrices[sym];
       if (row.asset_class === 'crypto' && liveData) {
         return {
           ...row,
@@ -659,7 +708,17 @@ export default async function handler(req, res) {
           volume: liveData.volume,
         };
       }
-      // Otherwise return database price (for stocks, forex, futures)
+      if (yahooData) {
+        return {
+          ...row,
+          price: yahooData.price,
+          change_24h: yahooData.change_24h,
+          high_24h: yahooData.high_24h,
+          low_24h: yahooData.low_24h,
+          volume: yahooData.volume,
+        };
+      }
+      // Otherwise return database price
       return row;
     });
 
