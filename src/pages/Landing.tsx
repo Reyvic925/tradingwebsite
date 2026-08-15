@@ -318,7 +318,7 @@ export default function Landing() {
             <Link to="/login" className="text-sm text-amber-200">Open the desk →</Link>
           </div>
           <div className="mt-8">
-            <IndexBoard />
+            {/* Equity benchmark cards are shown only in the stock markets section, not on the public landing page. */}
           </div>
           <div className="mt-10 overflow-hidden rounded-md border border-white/8">
             <div className="grid grid-cols-2 gap-px bg-white/5 sm:grid-cols-3 lg:grid-cols-4">

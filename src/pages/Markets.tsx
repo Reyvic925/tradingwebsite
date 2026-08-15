@@ -32,6 +32,8 @@ const DEFAULT_REGION_FROM: Record<string, string> = {
   in: 'india',
 };
 
+const STOCK_FILTERS = new Set(['all', 'usa', 'japan', 'canada', 'uk', 'europe', 'germany', 'france', 'india', 'etf']);
+
 const QUICK_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'crypto', label: 'Crypto' },
@@ -113,6 +115,7 @@ export default function Markets() {
   }, [filter, debounced, page]);
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
+  const showIndices = STOCK_FILTERS.has(filter) && !['crypto', 'forex'].includes(filter);
 
   return (
     <AppShell>
@@ -151,9 +154,11 @@ export default function Markets() {
           </button>
         ))}
       </div>
-      <div className="mt-6">
-        <IndexBoard onSelect={(region) => setFilter(regionMapping[region] || region)} compact />
-      </div>
+      {showIndices && (
+        <div className="mt-6">
+          <IndexBoard onSelect={(region) => setFilter(regionMapping[region] || region)} compact />
+        </div>
+      )}
       {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
       <div className="mt-6 overflow-hidden rounded-md border border-white/5">
