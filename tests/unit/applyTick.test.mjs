@@ -44,6 +44,15 @@ function makeSeededRng(seedValue) {
     assert.ok(out1.high_24h >= out1.price, 'high_24h should be >= price');
     assert.ok(out1.low_24h <= out1.price, 'low_24h should be <= price');
 
+    // Long-run regression: a neutral stock should not drift upward forever.
+    let driftPrice = 100;
+    const stockBase = { id: 'DRIFT-CHECK', price: 100, change_24h: 0, high_24h: 101, low_24h: 99, asset_class: 'stock', volatility: 0.0016 };
+    for (let i = 0; i < 200; i += 1) {
+      const next = applyTick({ ...stockBase, price: driftPrice, high_24h: Math.max(101, driftPrice), low_24h: Math.min(99, driftPrice) });
+      driftPrice = next.price;
+    }
+    assert.ok(Math.abs(driftPrice - 100) < 10, 'neutral stock prices should not keep drifting upward over repeated ticks');
+
     console.log('ALL TESTS PASSED');
   } finally {
     Math.random = origRandom;

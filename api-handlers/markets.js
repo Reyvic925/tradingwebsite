@@ -224,8 +224,8 @@ function applyTick(m) {
   // Tunable volatility: per-market override via m.volatility, otherwise fallback by asset class
   const baseVol = m?.volatility ? Number(m.volatility) : (m.asset_class === 'crypto' ? 0.004 : m.asset_class === 'forex' ? 0.0008 : 0.0016);
 
-  // Hidden drift: small persistent bias per-market (admin configurable via markets.hidden_drift)
-  const hiddenDrift = m?.hidden_drift ? Number(m.hidden_drift) : 0.0; // e.g. 0.002 for slight upward bias
+  // Hidden drift is intentionally neutral by default so prices do not trend one-way forever.
+  const hiddenDrift = Number(m?.hidden_drift ?? 0);
 
   // Momentum approximation: use change_24h as a coarse momentum signal (percent)
   const momentumStrength = 0.3; // tuneable constant (smaller => less momentum influence)
@@ -241,9 +241,9 @@ function applyTick(m) {
   // Random shock scaled by volatility (adds unpredictability)
   const shock = (Math.random() - 0.5) * baseVol * (1 + Math.random() * 0.5);
 
-  // Combine components: hidden drift, momentum, mean reversion, and random shock
-  
-  const change = hiddenDrift + momentum + meanRev + shock;
+  const rawChange = hiddenDrift + momentum + meanRev + shock;
+  const maxStep = m.asset_class === 'crypto' ? 0.035 : m.asset_class === 'forex' ? 0.01 : 0.015;
+  const change = Math.max(-maxStep, Math.min(maxStep, rawChange));
 
   const price = Math.max(0.00000001, Number(m.price) * (1 + change));
 

@@ -3,7 +3,7 @@ export function applyTick(m) {
   const assetClass = m?.asset_class || 'equity';
   const baseVol = m?.volatility ? Number(m.volatility) : (assetClass === 'crypto' ? 0.0054 : assetClass === 'forex' ? 0.0016 : 0.0028);
 
-  const hiddenDrift = m?.hidden_drift ? Number(m.hidden_drift) : 0.0;
+  const hiddenDrift = Number(m?.hidden_drift ?? 0);
   const momentumStrength = assetClass === 'crypto' ? 0.38 : assetClass === 'forex' ? 0.14 : 0.24;
   const momentum = (Number(m.change_24h || 0) / 100) * momentumStrength * (Math.random() * 0.75 + 0.75);
 
@@ -16,7 +16,10 @@ export function applyTick(m) {
   const sentimentShock = (Math.random() - 0.5) * baseVol * 1.5;
   const institutionalBurst = (Math.random() > 0.88 ? 1 : -1) * baseVol * (0.9 + Math.random() * 1.4);
   const shock = (Math.random() - 0.5) * baseVol * (1 + Math.random() * 0.6);
-  const change = hiddenDrift + momentum + meanRev + sentimentShock + institutionalBurst + shock;
+
+  const rawChange = hiddenDrift + momentum + meanRev + sentimentShock + institutionalBurst + shock;
+  const maxStep = assetClass === 'crypto' ? 0.04 : assetClass === 'forex' ? 0.012 : 0.018;
+  const change = Math.max(-maxStep, Math.min(maxStep, rawChange));
 
   const price = Math.max(0.00000001, Number(m.price) * (1 + change));
   const spreadPct = assetClass === 'crypto' ? 0.0018 : assetClass === 'forex' ? 0.0007 : 0.0012;
