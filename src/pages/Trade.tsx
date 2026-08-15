@@ -15,7 +15,7 @@ export default function Trade() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [watch, setWatch] = useState<{ id: number; market_id: number; symbol: string }[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState<'all' | 'stock' | 'forex' | 'crypto'>('all');
   const [search, setSearch] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [otype, setOtype] = useState<'market' | 'limit'>('market');
@@ -65,6 +65,13 @@ export default function Trade() {
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, [filter, search, symbol]);
+
+  const FILTERS = [
+    { id: 'all', label: 'All' },
+    { id: 'stock', label: 'Stocks' },
+    { id: 'forex', label: 'Forex' },
+    { id: 'crypto', label: 'Crypto' },
+  ] as const;
 
   const list = markets;
   const watched = (id: number) => watch.some((w) => w.market_id === id);
@@ -135,14 +142,14 @@ export default function Trade() {
     <AppShell>
       <div className="grid gap-4 xl:grid-cols-[260px_1fr_320px]">
         <aside className="rounded-md border border-white/5 bg-[#080b11]">
-          <div className="flex gap-1 border-b border-white/5 p-2">
-            {['all', 'usa', 'japan', 'uk', 'europe', 'india', 'etf', 'forex', 'crypto'].map((f) => (
+          <div className="flex gap-1 overflow-x-auto border-b border-white/5 p-2">
+            {FILTERS.map((f) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`flex-1 rounded-sm px-1 py-1.5 text-[10px] uppercase tracking-widest ${filter === f ? 'bg-amber-400/15 text-amber-200' : 'text-stone-500'}`}
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`shrink-0 rounded-sm px-2 py-1.5 text-[10px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400/15 text-amber-200' : 'text-stone-500'}`}
               >
-                {f}
+                {f.label}
               </button>
             ))}
           </div>
