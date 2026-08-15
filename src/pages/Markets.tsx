@@ -73,14 +73,13 @@ export default function Markets() {
 
   useEffect(() => {
     let alive = true;
-    const load = async (tick = false) => {
+    const load = async () => {
       try {
         const data = await apiMarkets<Market>({
           class: filter,
           q: debounced || undefined,
           limit: pageSize,
           offset: page * pageSize,
-          tick: tick ? 1 : undefined,
         });
         if (!alive) return;
         setMarkets(data.items);
@@ -92,8 +91,8 @@ export default function Markets() {
         if (alive) setLoading(false);
       }
     };
-    load(true);
-    const id = setInterval(() => load(true), 8000);
+    load();
+    const id = setInterval(() => load(), 8000);
     return () => {
       alive = false;
       clearInterval(id);
