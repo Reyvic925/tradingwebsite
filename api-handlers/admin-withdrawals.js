@@ -78,7 +78,6 @@ export default async function handler(req, res) {
       const update = {
         reviewed_at: now,
         admin_notes: admin_notes || null,
-        reviewed_by: adminUser?.id || null,
       };
 
       if (action === 'approve') {

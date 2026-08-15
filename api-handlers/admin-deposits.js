@@ -69,7 +69,6 @@ export default async function handler(req, res) {
           status: 'confirmed',
           confirmed_at: new Date().toISOString(),
           admin_notes: admin_notes || '',
-          reviewed_by: adminUser?.id || null,
           amount: Number(amountToCredit),
         })
         .eq('id', depositId)
