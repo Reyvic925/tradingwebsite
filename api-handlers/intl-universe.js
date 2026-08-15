@@ -722,6 +722,7 @@ export const CLASS_MAP = {
   usa: ['stock', 'etf'],
   us: ['stock', 'etf'],
   stock: ['stock'],
+  equity: ['stock'],
   etf: ['etf'],
   japan: ['jp', 'jp-etf'],
   jp: ['jp', 'jp-etf'],

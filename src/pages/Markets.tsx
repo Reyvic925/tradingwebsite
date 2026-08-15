@@ -208,7 +208,7 @@ export default function Markets() {
               <tr key={m.id} className="border-t border-white/5 hover:bg-white/[0.02]">
                 <td className="overflow-hidden px-5 py-3 font-mono text-ellipsis whitespace-nowrap">{m.symbol}</td>
                 <td className="overflow-hidden px-3 py-3 text-stone-400 break-words text-ellipsis">{m.name}</td>
-                <td className="overflow-hidden px-3 py-3 uppercase text-[11px] text-stone-500 break-words text-ellipsis">{m.asset_class}</td>
+                <td className="overflow-hidden px-3 py-3 uppercase text-[11px] text-stone-500 break-words text-ellipsis">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'etf' ? 'Stocks' : 'Stocks'}</td>
                 <td className="overflow-hidden px-3 py-3 font-mono whitespace-nowrap">{formatPrice(Number(m.price))}</td>
                 <td className={`overflow-hidden px-3 py-3 font-mono whitespace-nowrap ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
                 <td className="overflow-hidden px-3 py-3 font-mono text-xs text-stone-500 whitespace-nowrap">{formatPrice(Number(m.high_24h))} / {formatPrice(Number(m.low_24h))}</td>

@@ -45,6 +45,28 @@ const COIN_GECKO_IDS = {
 
 const FX_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'USDCNH', 'USDMXN', 'USDZAR', 'USDSEK', 'USDNOK', 'USDPLN', 'USDSGD', 'USDHKD', 'USDTRY', 'EURCHF', 'EURAUD', 'EURCAD', 'EURNZD', 'EURSEK', 'EURNOK', 'EURPLN', 'GBPCHF', 'GBPAUD', 'GBPCAD', 'GBPNZD', 'CHFJPY', 'CADJPY', 'NZDJPY'];
 
+const CRYPTO_SYMBOLS = new Set(Object.keys(COIN_GECKO_IDS));
+
+export function normalizeAssetClass(symbol, fallback = 'stock') {
+  const upper = String(symbol || '').toUpperCase();
+  const value = String(fallback || '').toLowerCase();
+
+  if (value === 'forex' || value === 'crypto' || value === 'stock' || value === 'etf') {
+    return value === 'stock' ? 'stock' : value;
+  }
+
+  if (CRYPTO_SYMBOLS.has(upper)) return 'crypto';
+  if (FX_SYMBOLS.includes(upper)) return 'forex';
+  if (upper.includes('USD') && upper.length <= 6) return 'forex';
+  if (upper.includes('USD') && upper.length > 6) return 'forex';
+  if (upper.includes('JPY') || upper.includes('CHF') || upper.includes('CAD') || upper.includes('AUD') || upper.includes('NZD') || upper.includes('GBP') || upper.includes('EUR')) {
+    return 'forex';
+  }
+
+  if (value === 'equity') return 'stock';
+  return value === 'etf' ? 'etf' : 'stock';
+}
+
 const symbolPrecision = (symbol) => {
   const upper = String(symbol || '').toUpperCase();
   return ['JPY', 'CHF', 'SEK', 'NOK', 'PLN', 'HKD', 'TRY', 'CNH', 'MXN', 'ZAR', 'SGD', 'CAD', 'AUD', 'NZD'].some((k) => upper.includes(k)) ? 4 : upper.includes('USD') && upper.length > 6 ? 4 : 6;
@@ -52,12 +74,10 @@ const symbolPrecision = (symbol) => {
 
 function getMarketProfile(symbol) {
   const upper = String(symbol || '').toUpperCase();
-  if (upper.includes('USD') && upper.length <= 6) return { asset_class: 'forex', spreadPct: 0.0006, baseVol: 0.0012, volumeScale: 1 };
-  if (upper.includes('USD') && upper.length > 6) return { asset_class: 'forex', spreadPct: 0.0009, baseVol: 0.0016, volumeScale: 0.75 };
-  if (upper.includes('BTC') || upper.includes('ETH') || upper.includes('SOL') || upper.includes('XRP') || upper.includes('BNB') || upper.includes('ADA') || upper.includes('DOGE')) {
-    return { asset_class: 'crypto', spreadPct: 0.0018, baseVol: 0.0048, volumeScale: 2.8 };
-  }
-  return { asset_class: 'equity', spreadPct: 0.0012, baseVol: 0.0024, volumeScale: 1.6 };
+  const normalizedClass = normalizeAssetClass(upper, 'stock');
+  if (normalizedClass === 'forex') return { asset_class: 'forex', spreadPct: upper.includes('USD') && upper.length > 6 ? 0.0009 : 0.0006, baseVol: upper.includes('USD') && upper.length > 6 ? 0.0016 : 0.0012, volumeScale: upper.includes('USD') && upper.length > 6 ? 0.75 : 1 };
+  if (normalizedClass === 'crypto') return { asset_class: 'crypto', spreadPct: 0.0018, baseVol: 0.0048, volumeScale: 2.8 };
+  return { asset_class: 'stock', spreadPct: 0.0012, baseVol: 0.0024, volumeScale: 1.6 };
 }
 
 function createBrokerStyleSnapshot(symbol, price, liveChange, volume) {
@@ -233,9 +253,12 @@ export function blendLiveQuote(baseQuote, liveQuote) {
   const precision = symbolPrecision(base.symbol);
   const brokerSnapshot = createBrokerStyleSnapshot(base.symbol, finalPrice, change, Number(liveQuote?.volume || base.volume || 0));
 
+  const normalizedClass = normalizeAssetClass(base.symbol, base.asset_class || 'stock');
+
   return {
     ...base,
     ...brokerSnapshot,
+    asset_class: normalizedClass,
     price: Number(finalPrice.toFixed(precision)),
     change_24h: Number(change.toFixed(4)),
     high_24h: Number(Math.max(baseHigh, finalPrice * 1.004).toFixed(precision)),

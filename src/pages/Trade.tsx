@@ -182,7 +182,7 @@ export default function Trade() {
                     </span>
                     {m.symbol}
                   </div>
-                  <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'etf' ? 'Stocks' : 'Stocks'}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-xs">{formatPrice(Number(m.price))}</div>

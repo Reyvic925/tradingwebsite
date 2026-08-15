@@ -326,7 +326,7 @@ export default function Landing() {
                 <div key={m.id} className="bg-[#080b11] p-4">
                   <div className="flex items-center justify-between">
                     <div className="font-mono text-sm">{m.symbol}</div>
-                    <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : 'Stocks'}</div>
                   </div>
                   <div className="mt-2 font-mono text-lg">{formatPrice(Number(m.price))}</div>
                   <div className={`text-xs ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>

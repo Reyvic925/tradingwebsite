@@ -2,7 +2,7 @@ import supabase from './db-client.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
-import { fetchLiveMarketSnapshot, blendLiveQuote } from './live-market-data.js';
+import { fetchLiveMarketSnapshot, blendLiveQuote, normalizeAssetClass } from './live-market-data.js';
 
 const MARGIN_RATE = 0.1;
 const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
@@ -118,7 +118,21 @@ function isMissingSchemaError(err) {
   return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
 }
 
+async function syncMarketAssetClasses() {
+  const { data: rows, error } = await supabase.from('markets').select('id, symbol, asset_class');
+  if (error) return;
+
+  for (const row of rows || []) {
+    const normalized = normalizeAssetClass(row.symbol, row.asset_class || 'stock');
+    if (!row.asset_class || row.asset_class !== normalized) {
+      await supabase.from('markets').update({ asset_class: normalized }).eq('id', row.id);
+    }
+  }
+}
+
 async function ensureUniverse() {
+  await syncMarketAssetClasses();
+
   // First, deduplicate any existing entries by symbol (keep highest volume)
   const { data: allMarkets, error: selectErr } = await supabase.from('markets').select('id, symbol, volume');
   if (!selectErr && allMarkets && allMarkets.length > 0) {
