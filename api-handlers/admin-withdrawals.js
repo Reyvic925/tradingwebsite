@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const { status = 'pending', limit = 200, offset = 0 } = req.query || {};
-      let q = supabase.from('transactions').select('*').eq('direction', 'withdrawal');
+      let q = supabase.from('transactions').select('*').eq('type', 'withdrawal');
       if (status && status !== 'all') q = q.eq('status', status);
 
       const { data, error } = await q
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       if (fetchErr) throw fetchErr;
       const existing = (existingRows || [])[0];
       if (!existing) return res.status(404).json({ error: 'Withdrawal not found' });
-      if (existing.direction !== 'withdrawal') return res.status(400).json({ error: 'This transaction is not a withdrawal' });
+      if (existing.type !== 'withdrawal') return res.status(400).json({ error: 'This transaction is not a withdrawal' });
       if (existing.status !== 'pending') return res.status(400).json({ error: `Withdrawal is already ${existing.status}` });
 
       const now = new Date().toISOString();

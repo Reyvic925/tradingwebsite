@@ -38,6 +38,10 @@ export default function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [kycDocs, setKycDocs] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
+  const [balanceAction, setBalanceAction] = useState<'add' | 'subtract'>('add');
+  const [balanceAmount, setBalanceAmount] = useState('');
+  const [balanceReason, setBalanceReason] = useState('');
+  const [balanceBusy, setBalanceBusy] = useState(false);
 
   async function fetchUsers() {
     setLoading(true);
@@ -58,6 +62,37 @@ export default function AdminUsers() {
       setError(e instanceof Error ? e.message : 'Failed to load users');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function applyBalanceAdjustment() {
+    if (!selectedUser?.user_id) return;
+    const amount = Number(balanceAmount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter a positive amount to adjust the user balance.');
+      return;
+    }
+
+    setBalanceBusy(true);
+    setError('');
+    try {
+      const headers = await authHeaders();
+      headers['Content-Type'] = 'application/json';
+      const res = await fetch(`/api/admin/users/${selectedUser.user_id}/balance`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: balanceAction, amount, currency: 'USD', reason: balanceReason }),
+      });
+      const data = await readJsonOrText(res);
+      if (!res.ok) throw new Error(data?.error || 'Balance adjustment failed');
+      setBalanceAmount('');
+      setBalanceReason('');
+      await loadUserDetails(selectedUser.user_id);
+      setSelectedUser((prev) => prev ? { ...prev } : prev);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Balance adjustment failed');
+    } finally {
+      setBalanceBusy(false);
     }
   }
 
@@ -193,6 +228,47 @@ export default function AdminUsers() {
                 <div><span className="text-stone-500">Wallets:</span> {selectedUser.wallet_count}</div>
                 <div><span className="text-stone-500">Mnemonic:</span> {selectedUser.has_mnemonic ? 'Stored encrypted' : 'Missing'}</div>
                 <div><span className="text-stone-500">Created:</span> {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString() : '—'}</div>
+              </div>
+
+              <div className="rounded-sm border border-amber-400/30 bg-amber-400/5 p-3">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/80">Adjust available balance</div>
+                <p className="mt-2 text-xs text-stone-300">This edits the user’s wallet available cash balance. Equity is calculated separately from available + reserved + unrealized P&amp;L.</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setBalanceAction('add')}
+                    className={`flex-1 rounded-sm px-2 py-1.5 text-[10px] uppercase tracking-[0.18em] ${balanceAction === 'add' ? 'bg-emerald-500/20 text-emerald-200' : 'border border-white/10 text-stone-400'}`}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => setBalanceAction('subtract')}
+                    className={`flex-1 rounded-sm px-2 py-1.5 text-[10px] uppercase tracking-[0.18em] ${balanceAction === 'subtract' ? 'bg-rose-500/20 text-rose-200' : 'border border-white/10 text-stone-400'}`}
+                  >
+                    Subtract
+                  </button>
+                </div>
+                <input
+                  value={balanceAmount}
+                  onChange={(e) => setBalanceAmount(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Amount"
+                  className="mt-3 w-full rounded-sm border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 outline-none focus:border-amber-400/60"
+                />
+                <input
+                  value={balanceReason}
+                  onChange={(e) => setBalanceReason(e.target.value)}
+                  placeholder="Reason (optional)"
+                  className="mt-3 w-full rounded-sm border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 outline-none focus:border-amber-400/60"
+                />
+                <button
+                  onClick={applyBalanceAdjustment}
+                  disabled={balanceBusy}
+                  className="mt-3 w-full rounded-sm bg-amber-400 px-3 py-2 text-[11px] uppercase tracking-[0.18em] font-semibold text-[#1a1304] disabled:opacity-60"
+                >
+                  {balanceBusy ? 'Updating…' : `${balanceAction === 'add' ? 'Add' : 'Subtract'} Balance`}
+                </button>
               </div>
 
               <div>

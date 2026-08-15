@@ -284,10 +284,10 @@ export default async function handler(req, res) {
         user_id: user.id,
         amount: amt,
         currency: currency || 'USDT',
-        tx_hash: null,
-        external_address: dest,
-        direction: 'withdrawal',
+        type: 'withdrawal',
+        method: 'crypto',
         status: 'pending',
+        reference: `WDR-${Date.now().toString(36).toUpperCase()}`,
         created_at: new Date().toISOString(),
       };
       const { data: inserted, error: txErr } = await supabase.from('transactions').insert(tx).select();
