@@ -44,7 +44,7 @@ const COIN_GECKO_IDS = {
 };
 
 const FX_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'USDCNH', 'USDMXN', 'USDZAR', 'USDSEK', 'USDNOK', 'USDPLN', 'USDSGD', 'USDHKD', 'USDTRY', 'EURCHF', 'EURAUD', 'EURCAD', 'EURNZD', 'EURSEK', 'EURNOK', 'EURPLN', 'GBPCHF', 'GBPAUD', 'GBPCAD', 'GBPNZD', 'CHFJPY', 'CADJPY', 'NZDJPY'];
-
+const FUTURE_SYMBOLS = new Set(['ES', 'NQ', 'YM', 'RTY', 'GC', 'SI', 'CL', 'NG', 'HG', 'HO', 'BZ', 'BRN', 'ZS', 'ZW', 'KC', 'SB', 'CT', 'DX', '6E', '6J', '6B', '6A', '6C', '6S']);
 const CRYPTO_SYMBOLS = new Set(Object.keys(COIN_GECKO_IDS));
 
 export function normalizeAssetClass(symbol, fallback = 'stock') {
@@ -56,6 +56,7 @@ export function normalizeAssetClass(symbol, fallback = 'stock') {
   }
 
   if (CRYPTO_SYMBOLS.has(upper)) return 'crypto';
+  if (FUTURE_SYMBOLS.has(upper)) return 'futures';
   if (FX_SYMBOLS.includes(upper)) return 'forex';
   if (upper.includes('USD') && upper.length <= 6) return 'forex';
   if (upper.includes('USD') && upper.length > 6) return 'forex';
@@ -64,6 +65,7 @@ export function normalizeAssetClass(symbol, fallback = 'stock') {
   }
 
   if (value === 'equity') return 'stock';
+  if (value === 'futures') return 'futures';
   return value === 'etf' ? 'etf' : 'stock';
 }
 
@@ -77,6 +79,7 @@ function getMarketProfile(symbol) {
   const normalizedClass = normalizeAssetClass(upper, 'stock');
   if (normalizedClass === 'forex') return { asset_class: 'forex', spreadPct: upper.includes('USD') && upper.length > 6 ? 0.0009 : 0.0006, baseVol: upper.includes('USD') && upper.length > 6 ? 0.0016 : 0.0012, volumeScale: upper.includes('USD') && upper.length > 6 ? 0.75 : 1 };
   if (normalizedClass === 'crypto') return { asset_class: 'crypto', spreadPct: 0.0018, baseVol: 0.0048, volumeScale: 2.8 };
+  if (normalizedClass === 'futures') return { asset_class: 'futures', spreadPct: 0.0009, baseVol: 0.0022, volumeScale: 1.7 };
   return { asset_class: 'stock', spreadPct: 0.0012, baseVol: 0.0024, volumeScale: 1.6 };
 }
 

@@ -15,7 +15,7 @@ export default function Trade() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [watch, setWatch] = useState<{ id: number; market_id: number; symbol: string }[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [filter, setFilter] = useState<'all' | 'stock' | 'forex' | 'crypto'>('all');
+  const [filter, setFilter] = useState<'all' | 'stock' | 'forex' | 'crypto' | 'futures'>('all');
   const [search, setSearch] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [otype, setOtype] = useState<'market' | 'limit'>('market');
@@ -71,6 +71,7 @@ export default function Trade() {
     { id: 'stock', label: 'Stocks' },
     { id: 'forex', label: 'Forex' },
     { id: 'crypto', label: 'Crypto' },
+    { id: 'futures', label: 'Futures' },
   ] as const;
 
   const list = markets;
@@ -182,7 +183,7 @@ export default function Trade() {
                     </span>
                     {m.symbol}
                   </div>
-                  <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'etf' ? 'Stocks' : 'Stocks'}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'futures' ? 'Futures' : 'Stocks'}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-xs">{formatPrice(Number(m.price))}</div>

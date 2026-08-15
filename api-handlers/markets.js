@@ -107,7 +107,24 @@ const CRYPTO_PAIRS = [
   pairRow('SHIBUSD', 'Shiba Inu / US Dollar', 'crypto', 0.0000186, 380000000),
 ];
 
-const BOOK = [...UNIVERSE, ...INTL_UNIVERSE, ...FOREX_PAIRS, ...CRYPTO_PAIRS];
+const FUTURES_PAIRS = [
+  pairRow('ES', 'E-mini S&P 500 Future', 'futures', 5487.0, 64000000),
+  pairRow('NQ', 'E-mini Nasdaq-100 Future', 'futures', 19350.0, 54000000),
+  pairRow('YM', 'Dow Jones Industrial Average Future', 'futures', 41380.0, 22000000),
+  pairRow('RTY', 'Russell 2000 Future', 'futures', 2285.0, 18000000),
+  pairRow('GC', 'Gold Future', 'futures', 4300.0, 37000000),
+  pairRow('SI', 'Silver Future', 'futures', 31.25, 24000000),
+  pairRow('CL', 'Crude Oil Future', 'futures', 76.2, 31000000),
+  pairRow('NG', 'Natural Gas Future', 'futures', 3.62, 25000000),
+  pairRow('HG', 'Copper Future', 'futures', 4.62, 12000000),
+  pairRow('BZ', 'Brent Crude Future', 'futures', 80.4, 18000000),
+  pairRow('6E', 'Euro FX Future', 'futures', 1.1750, 16000000),
+  pairRow('6J', 'Japanese Yen Future', 'futures', 0.00695, 12000000),
+  pairRow('6B', 'British Pound Future', 'futures', 1.3550, 14000000),
+  pairRow('6A', 'Australian Dollar Future', 'futures', 0.6650, 11000000),
+];
+
+const BOOK = [...UNIVERSE, ...INTL_UNIVERSE, ...FOREX_PAIRS, ...CRYPTO_PAIRS, ...FUTURES_PAIRS];
 
 function orderSideOf(positionSide) {
   return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
