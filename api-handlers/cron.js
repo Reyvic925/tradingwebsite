@@ -1,6 +1,7 @@
 import supabase from './db-client.js';
 import { fillPendingLimits, applyTick } from './markets.js';
 import { insertPriceHistory } from './admin-helpers.js';
+import { fetchLiveMarketSnapshot, blendLiveQuote } from './live-market-data.js';
 
 // Cron endpoint: /api/cron/tick
 export default async function handler(req, res) {
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid cron secret' });
     }
 
+    const liveMap = await fetchLiveMarketSnapshot().catch(() => ({}));
     const { data: allMarkets, error: mErr } = await supabase.from('markets').select('id, asset_class, price, change_24h, high_24h, low_24h, hidden_drift, volatility').limit(1000);
     if (mErr) throw mErr;
     const pool = allMarkets || [];
@@ -38,7 +40,9 @@ export default async function handler(req, res) {
 
     for (const m of sample) {
       try {
-        const u = applyTick(m);
+        const liveQuote = liveMap[String(m.symbol).toUpperCase()];
+        const blended = liveQuote ? blendLiveQuote(m, liveQuote) : m;
+        const u = applyTick({ ...m, ...blended });
         const open = Number(m.price);
         const close = Number(u.price);
         const high = Math.max(Number(m.high_24h || open), open, close);

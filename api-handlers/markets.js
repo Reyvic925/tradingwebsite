@@ -2,6 +2,7 @@ import supabase from './db-client.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
+import { fetchLiveMarketSnapshot, blendLiveQuote } from './live-market-data.js';
 
 const MARGIN_RATE = 0.1;
 const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
@@ -229,7 +230,8 @@ function applyTick(m) {
   // Momentum approximation: use change_24h as a coarse momentum signal (percent)
   const momentumStrength = 0.3; // tuneable constant (smaller => less momentum influence)
   const momentum = (Number(m.change_24h || 0) / 100) * momentumStrength * (Math.random() * 0.6 + 0.7);
-  // Mean-reversion: pull towards the 24h mid (high+low)/2 if available
+
+  // Mean-reversion: pull towards the 24h mid (high+low)/2 if available
   const meanReversionStrength = 0.25; // positive => stronger pull towards mean
   const high24 = Number(m.high_24h || m.price || 0);
   const low24 = Number(m.low_24h || m.price || 0);
@@ -239,7 +241,8 @@ function applyTick(m) {
   // Random shock scaled by volatility (adds unpredictability)
   const shock = (Math.random() - 0.5) * baseVol * (1 + Math.random() * 0.5);
 
-  // Combine components: hidden drift, momentum, mean reversion, and random shock  
+  // Combine components: hidden drift, momentum, mean reversion, and random shock
+  
   const change = hiddenDrift + momentum + meanRev + shock;
 
   const price = Math.max(0.00000001, Number(m.price) * (1 + change));
@@ -292,6 +295,8 @@ export default async function handler(req, res) {
     const offset = Math.max(0, Number(params.offset) || 0);
     const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
 
+    const liveMap = await fetchLiveMarketSnapshot().catch(() => ({}));
+
     if (shouldTick) {
       const { data: all } = await supabase.from('markets').select('id, asset_class, price, change_24h, high_24h, low_24h');
       const pool = all || [];
@@ -309,7 +314,9 @@ export default async function handler(req, res) {
         if (hit && !sample.some((s) => s.id === hit.id)) sample.push(hit);
       }
       await Promise.all(sample.map((m) => {
-        const u = applyTick(m);
+        const liveQuote = liveMap[String(m.symbol).toUpperCase()];
+        const visualMarket = liveQuote ? blendLiveQuote(m, liveQuote) : m;
+        const u = applyTick({ ...m, ...visualMarket });
         return supabase.from('markets').update({
           price: u.price,
           change_24h: u.change_24h,
@@ -344,10 +351,16 @@ export default async function handler(req, res) {
 
     if (shouldTick) await fillPendingLimits(data || []);
 
-    res.setHeader('X-Total-Count', String(count || (data || []).length));
+    const items = (data || []).map((row) => {
+      const liveQuote = liveMap[String(row.symbol || '').toUpperCase()];
+      if (!liveQuote) return row;
+      return { ...row, ...blendLiveQuote(row, liveQuote) };
+    });
+
+    res.setHeader('X-Total-Count', String(count || items.length));
     return res.status(200).json({
-      items: data || [],
-      total: count || (data || []).length,
+      items,
+      total: count || items.length,
       limit,
       offset,
     });
