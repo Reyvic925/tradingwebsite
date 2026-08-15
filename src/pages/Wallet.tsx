@@ -8,6 +8,8 @@ import type { Txn, Wallet as WalletT, Profile as ProfileT } from '../types';
 // Fallback - will be replaced by config from API
 const FALLBACK_SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
+type DepositAddress = { id: number; currency: string; network?: string; address: string };
+
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletT | null>(null);
   const [profile, setProfile] = useState<ProfileT | null>(null);
@@ -20,7 +22,7 @@ export default function Wallet() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; network?: string; address: string }[]>([]);
+  const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>([]);
   const [coinQuery, setCoinQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [supportedCryptos, setSupportedCryptos] = useState<string[]>(FALLBACK_SUPPORTED_CRYPTOS);
@@ -31,13 +33,19 @@ export default function Wallet() {
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiGet<{ profile: ProfileT }>('/api/profile').then(r => r.profile).catch(() => null),
         apiList<Txn>('/api/transactions'),
-        apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
+        apiList<DepositAddress>('/api/user/crypto-addresses').catch(() => []),
         fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
       if (w) setWallet(w);
       if (p) setProfile(p);
       setTxns(asList(t));
-      setDepositAddresses(asList(addresses));
+      const uniqueAddresses = addresses.reduce<DepositAddress[]>((acc, item) => {
+        const key = `${item.currency}|${item.network || ''}|${item.address}`;
+        const alreadyPresent = acc.some((existing) => `${existing.currency}|${existing.network || ''}|${existing.address}` === key);
+        if (!alreadyPresent) acc.push(item);
+        return acc;
+      }, []);
+      setDepositAddresses(uniqueAddresses);
       if (config?.value && Array.isArray(config.value)) {
         setSupportedCryptos(config.value);
       }
@@ -71,7 +79,12 @@ export default function Wallet() {
 
     try {
       if (type === 'deposit') {
-        setMsg('Deposit addresses are assigned automatically to the account and are listed below.');
+        await apiSend('/api/deposits', 'POST', {
+          amount: amt,
+          currency,
+          method: 'onchain_transfer',
+        });
+        setMsg(`Deposit request created for ${formatMoney(amt)} ${currency}. After you send the funds, the blockchain confirmation will be reviewed before the wallet is credited.`);
         await load();
         return;
       }
@@ -140,6 +153,16 @@ export default function Wallet() {
          {/* Deposit flow: Binance-like coin selector and QR/address card */}
          {type === 'deposit' ? (
            <>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount to deposit</label>
+             <input
+               value={amount}
+               onChange={(e) => setAmount(e.target.value)}
+               type="number"
+               min="0"
+               step="0.01"
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
+             />
+
              <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Coin</label>
              <input
                value={coinQuery}
@@ -198,7 +221,7 @@ export default function Wallet() {
                            </button>
                          </div>
 
-                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after network confirmation · Address remains the same</div>
+                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after blockchain confirms (typically 5-30 min) · Address remains the same</div>
                        </div>
                      );
                    })()
@@ -209,15 +232,21 @@ export default function Wallet() {
                <div className="mt-4">
                  <div className="text-[10px] uppercase tracking-widest text-stone-500">Recent Deposits</div>
                  <div className="mt-2 space-y-2">
-                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => (
-                     <div key={t.id} className="flex items-center justify-between rounded-sm border border-white/5 p-2">
-                       <div>
-                         <div className="text-sm">{t.method || t.currency}</div>
-                         <div className="text-xs text-stone-500">{t.reference}</div>
+                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => {
+                     const isPending = t.status === 'pending';
+                     return (
+                       <div key={t.id} className={`flex items-center justify-between rounded-sm border p-2 ${isPending ? 'border-amber-400/30 bg-amber-400/5' : 'border-white/5'}`}>
+                         <div>
+                           <div className="text-sm flex items-center gap-2">
+                             {t.method || t.currency}
+                             {isPending && <span className="text-[10px] uppercase tracking-widest text-amber-400">confirming</span>}
+                           </div>
+                           <div className="text-xs text-stone-500">{t.reference}</div>
+                         </div>
+                         <div className={`font-mono ${isPending ? 'text-amber-400' : 'text-emerald-400'}`}>+{formatMoney(Number(t.amount))}</div>
                        </div>
-                       <div className="font-mono text-emerald-400">+{formatMoney(Number(t.amount))}</div>
-                     </div>
-                   ))}
+                     );
+                   })}
                    {!txns.some((t) => t.type === 'deposit' && t.currency === currency) && (
                      <div className="text-sm text-stone-500">No recent deposits for {currency}.</div>
                    )}
@@ -266,10 +295,10 @@ export default function Wallet() {
          {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
 
          <button
-           disabled={busy && type === 'withdrawal'}
+           disabled={busy}
            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
          >
-           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Refresh Addresses'}
+           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Confirm Deposit'}
          </button>
          <p className="mt-3 text-[11px] text-stone-600">
            {type === 'deposit'

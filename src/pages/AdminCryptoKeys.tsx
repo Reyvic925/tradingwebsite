@@ -3,6 +3,16 @@ import { Copy } from 'lucide-react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
 
+async function readJsonOrText(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text || `Request failed (${res.status})`);
+  }
+}
+
 export default function AdminCryptoKeys() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,7 +28,7 @@ export default function AdminCryptoKeys() {
       const headers = await authHeaders();
       if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const res = await fetch('/api/admin/crypto-addresses', { headers });
-      const j = await res.json();
+      const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Failed to load addresses');
       setRows(j?.data || []);
     } catch (e) {
@@ -38,7 +48,7 @@ export default function AdminCryptoKeys() {
       const headers = await authHeaders();
       if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const res = await fetch(`/api/admin/crypto-addresses/${id}/decrypt`, { headers });
-      const j = await res.json();
+      const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Reveal failed');
       setModal({
         id,

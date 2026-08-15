@@ -35,9 +35,6 @@ export default function Footer() {
           <p className="mt-4 text-xs leading-relaxed text-stone-500">
             Trading leveraged products involves substantial risk of loss. Past performance is not indicative of future results. Capital is at risk.
           </p>
-          <a href="/downloads/apex-prime-broker.zip" download className="mt-4 inline-block text-xs uppercase tracking-[0.18em] text-amber-300/80 hover:text-amber-200">
-            Download source zip
-          </a>
         </div>
       </div>
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/5 px-5 pt-6 text-[11px] uppercase tracking-[0.16em] text-stone-600 md:flex-row lg:px-8">

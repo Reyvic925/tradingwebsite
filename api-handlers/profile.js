@@ -3,7 +3,7 @@ import cryptoKeys from './crypto-keys.js';
 import { getOrCreateWallet, getProfileRow, getUsdWallet } from './helpers.js';
 import registrationWallet from './registration-wallet.js';
 
-const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
+const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'MATIC', 'AVAX', 'ARB', 'OP', 'BASE'];
 
 function codeFrom(id) {
   return 'APEX' + String(id).replace(/-/g, '').slice(0, 6).toUpperCase();
@@ -22,33 +22,72 @@ function isMissingSchemaError(err) {
   return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
 }
 
-async function ensureAssignedCryptoAddresses(userId) {
-  for (const currency of SUPPORTED_CRYPTOS) {
-    const network = cryptoKeys.getNetworkForCurrency(currency);
-    if (!network) continue;
+async function getOrCreateUserMnemonic(userId) {
+  // Try to retrieve existing mnemonic
+  const { data: existing, error: fetchErr } = await supabase
+    .from('user_mnemonics')
+    .select('encrypted_mnemonic')
+    .eq('user_id', userId)
+    .limit(1);
 
+  if (!fetchErr && existing && existing.length > 0) {
+    return cryptoKeys.decryptString(existing[0].encrypted_mnemonic);
+  }
+
+  // Generate new mnemonic for this user
+  const mnemonic = cryptoKeys.generateUserMnemonic();
+  const encryptedMnemonic = cryptoKeys.encryptString(mnemonic);
+  
+  const { error: createErr } = await supabase.from('user_mnemonics').insert({
+    user_id: userId,
+    encrypted_mnemonic: encryptedMnemonic,
+  });
+
+  if (createErr && !isMissingSchemaError(createErr)) {
+    console.error('[profile] Failed to store user mnemonic', createErr.message);
+  }
+
+  return mnemonic;
+}
+
+async function ensureAssignedCryptoAddresses(userId) {
+  // Get or create the user's mnemonic
+  const userMnemonic = await getOrCreateUserMnemonic(userId);
+  
+  // Derive all wallet variants from the user's mnemonic
+  const wallets = await cryptoKeys.generateAllWalletVariantsFromMnemonic(userMnemonic);
+  const requiredRows = Object.entries(wallets).map(([variant, wallet]) => ({
+    variant,
+    currency: wallet.currency,
+    network: wallet.network,
+    address: wallet.address,
+    encrypted_private_key: wallet.encryptedPrivateKey,
+    encrypted_mnemonic: wallet.encryptedMnemonic,
+  }));
+
+  for (const row of requiredRows) {
     const { data: existingRows, error: existingErr } = await supabase
       .from('crypto_addresses')
       .select('id')
       .eq('user_id', userId)
-      .eq('network', network)
+      .eq('currency', row.currency)
       .limit(1);
 
     if (existingErr) {
       if (isMissingSchemaError(existingErr)) return;
+      console.error('[profile] ensureAssignedCryptoAddresses list failed', existingErr.message);
       continue;
     }
     if ((existingRows || []).length) continue;
 
-    const generated = await cryptoKeys.generateAndEncryptForCurrency(currency);
     const { error: createErr } = await supabase.from('crypto_addresses').insert({
       user_id: userId,
-      currency: generated.currency,
-      address: generated.address,
-      encrypted_private_key: generated.encryptedPrivateKey,
-      encrypted_mnemonic: generated.encryptedMnemonic,
-      network,
-      metadata: { network, auto_assigned: true },
+      currency: row.currency,
+      address: row.address,
+      encrypted_private_key: row.encrypted_private_key,
+      encrypted_mnemonic: row.encrypted_mnemonic,
+      network: row.network,
+      metadata: { network: row.network, auto_assigned: true, wallet_variant: row.variant },
     });
 
     if (createErr && !isMissingSchemaError(createErr)) {

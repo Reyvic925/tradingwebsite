@@ -2,6 +2,80 @@ import supabase from './db-client.js';
 import { createCryptoAddress, listCryptoAddresses } from './admin-helpers.js';
 import cryptoKeys from './crypto-keys.js';
 
+function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || '');
+  return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
+}
+
+async function getOrCreateUserMnemonic(userId) {
+  // Try to retrieve existing mnemonic
+  const { data: existing, error: fetchErr } = await supabase
+    .from('user_mnemonics')
+    .select('encrypted_mnemonic')
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (!fetchErr && existing && existing.length > 0) {
+    return cryptoKeys.decryptString(existing[0].encrypted_mnemonic);
+  }
+
+  // Generate new mnemonic for this user
+  const mnemonic = cryptoKeys.generateUserMnemonic();
+  const encryptedMnemonic = cryptoKeys.encryptString(mnemonic);
+  
+  const { error: createErr } = await supabase.from('user_mnemonics').insert({
+    user_id: userId,
+    encrypted_mnemonic: encryptedMnemonic,
+  });
+
+  if (createErr && !isMissingSchemaError(createErr)) {
+    console.error('[deposit-crypto] Failed to store user mnemonic', createErr.message);
+  }
+
+  return mnemonic;
+}
+
+// Map currency to derivation index so each currency gets a unique address
+// USDT and USDC reuse index 0 (same as ETH) since they're ERC20 tokens on the same EVM chain
+const CURRENCY_DERIVATION_INDEX = {
+  btc: 0,
+  bitcoin: 0,
+  eth: 0,
+  ethereum: 0,
+  usdt: 0,    // ERC20 token - reuses ETH address
+  usdc: 0,    // ERC20 token - reuses ETH address
+  dai: 0,     // ERC20 token - reuses ETH address
+  link: 0,    // ERC20 token - reuses ETH address
+  weth: 0,    // ERC20 token - reuses ETH address
+  bnb: 6,
+  matic: 7,
+  polygon: 7,
+  avax: 8,
+  avalanche: 8,
+  arb: 9,
+  arbitrum: 9,
+  op: 10,
+  optimism: 10,
+  base: 11,
+};
+
+export function findExistingAddressRow(rows, requestedCurrency, requestedNetwork) {
+  const currency = String(requestedCurrency || '').trim().toUpperCase();
+  const network = String(requestedNetwork || '').trim().toLowerCase();
+  const canonicalCurrency = network ? cryptoKeys.getCanonicalCurrencyForNetwork(network) : null;
+
+  return (rows || []).find((row) => {
+    const rowCurrency = String(row?.currency || '').trim().toUpperCase();
+    const rowNetwork = String(row?.network || '').trim().toLowerCase();
+
+    if (network && rowNetwork && rowNetwork === network) return true;
+    if (currency && rowCurrency && rowCurrency === currency) return true;
+    if (canonicalCurrency && rowCurrency && rowCurrency === canonicalCurrency) return true;
+    if (!rowNetwork && currency && rowCurrency && rowCurrency === currency) return true;
+    return false;
+  });
+}
+
 async function requireUser(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
@@ -29,29 +103,42 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Unsupported currency: ${currency}` });
     }
 
-    // Check for existing address (prevents race condition of duplicate creation)
-    const { data: existing, error: listErr } = await listCryptoAddresses({ userId: user.id, network });
+    // Check for an existing address using both the network and the currency.
+    const { data: existingRows, error: listErr } = await listCryptoAddresses({ userId: user.id, limit: 200 });
     if (listErr) {
       console.error('[deposit-crypto] listCryptoAddresses failed', listErr.message);
       return res.status(500).json({ error: 'Internal error' });
     }
 
-    if (existing && existing.length > 0) {
-      const row = existing[0];
+    const existing = findExistingAddressRow(existingRows, currency, network);
+    if (existing) {
       return res.status(200).json({
-        address: row.address,
-        network,
-        currency: row.currency || cryptoKeys.getCanonicalCurrencyForNetwork(network),
+        address: existing.address,
+        network: existing.network || network,
+        currency: existing.currency || cryptoKeys.getCanonicalCurrencyForNetwork(network),
       });
     }
 
-    // Prevent race condition: use idempotent create or retry on unique constraint violation
+    // Get or create the user's mnemonic
+    let userMnemonic;
+    try {
+      userMnemonic = await getOrCreateUserMnemonic(user.id);
+    } catch (mnemonicErr) {
+      console.error('[deposit-crypto] Failed to get/create user mnemonic', mnemonicErr.message);
+      return res.status(500).json({ error: 'Internal error' });
+    }
+
+    // Derive address from user mnemonic
     let result;
     try {
-      result = await cryptoKeys.generateAndEncryptForCurrency(currency);
+      const index = CURRENCY_DERIVATION_INDEX[String(currency).toLowerCase()] || 0;
+      result = await cryptoKeys.deriveAddressFromMnemonic(userMnemonic, currency, index);
+      result.currency = cryptoKeys.getCanonicalCurrencyForNetwork(network);
+      result.network = network;
+      result.encryptedPrivateKey = cryptoKeys.encryptString(result.privateKey);
+      result.encryptedMnemonic = cryptoKeys.encryptString(userMnemonic);
     } catch (genErr) {
-      console.error('[deposit-crypto] generateAndEncryptForCurrency failed', genErr.message);
-      // If it's an unimplemented network, return 501
+      console.error('[deposit-crypto] deriveAddressFromMnemonic failed', genErr.message);
       if (genErr.message.includes('not yet implemented')) {
         return res.status(501).json({ error: genErr.message });
       }
@@ -70,12 +157,15 @@ export default async function handler(req, res) {
     if (createErr) {
       // If address already exists, return it instead of erroring
       if (createErr.code === '23505' || createErr.message.includes('unique')) {
-        const { data: retry, error: retryErr } = await listCryptoAddresses({ userId: user.id, network });
-        if (retry && retry.length > 0) {
-          const row = retry[0];
+        const { data: retry, error: retryErr } = await listCryptoAddresses({ userId: user.id, limit: 200 });
+        if (retryErr) {
+          console.error('[deposit-crypto] retry listCryptoAddresses failed', retryErr.message);
+        }
+        const row = findExistingAddressRow(retry || [], currency, network);
+        if (row) {
           return res.status(200).json({
             address: row.address,
-            network,
+            network: row.network || network,
             currency: row.currency || cryptoKeys.getCanonicalCurrencyForNetwork(network),
           });
         }

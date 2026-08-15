@@ -86,6 +86,11 @@ class Builder {
   }
 
   select(_cols, opts) {
+    if (['insert', 'update', 'delete'].includes(this.mode)) {
+      if (opts?.count) this.countMode = opts.count;
+      if (opts?.head) this.headOnly = true;
+      return this;
+    }
     this.mode = 'select';
     if (opts?.count) this.countMode = opts.count;
     if (opts?.head) this.headOnly = true;
@@ -151,24 +156,41 @@ class Builder {
     if (this.mode === 'insert') {
       const incoming = Array.isArray(this.payload) ? this.payload : [this.payload];
       const inserted = [];
+      const keyFor = (row) => this.table === 'crypto_addresses'
+        ? `${String(row?.user_id ?? '')}|${String(row?.currency ?? '')}|${String(row?.network ?? '')}|${String(row?.address ?? '')}`
+        : null;
+      const seen = new Set(
+        list
+          .filter((row) => this.table === 'crypto_addresses')
+          .map((row) => keyFor(row))
+          .filter(Boolean)
+      );
+
       for (const row of incoming) {
         if (!row) continue;
+        const key = keyFor(row);
+        if (this.table === 'crypto_addresses' && key && seen.has(key)) continue;
         const withId = { ...row, id: row.id ?? nextId(this.table) };
         list.push(withId);
         inserted.push(withId);
+        if (this.table === 'crypto_addresses' && key) seen.add(key);
       }
       return { data: inserted, error: null, count: inserted.length };
     }
 
     if (this.mode === 'update') {
-      for (const r of data) Object.assign(r, this.payload);
-      return { data, error: null, count: null };
+      const updated = [];
+      for (const r of data) {
+        Object.assign(r, this.payload);
+        updated.push({ ...r });
+      }
+      return { data: updated, error: null, count: updated.length };
     }
 
     if (this.mode === 'delete') {
       const kill = new Set(data);
       tables.set(this.table, list.filter((r) => !kill.has(r)));
-      return { data: null, error: null, count: null };
+      return { data: [...data], error: null, count: data.length };
     }
 
     for (const { col, asc } of [...this.orders].reverse()) {
@@ -207,6 +229,15 @@ const devClient = {
         return { data: { user: DEMO_USER }, error: null };
       }
       return { data: { user: null }, error: { message: 'invalid token' } };
+    },
+    admin: {
+      async listUsers() {
+        return { data: { users: [DEMO_USER] }, error: null };
+      },
+      async getUserById(userId) {
+        if (String(userId) === DEMO_USER_ID) return { data: { user: DEMO_USER }, error: null };
+        return { data: { user: null }, error: { message: 'not found' } };
+      },
     },
   },
   channel() { return { on() { return this; }, subscribe() { return this; } }; },

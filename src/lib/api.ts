@@ -28,7 +28,9 @@ async function readBody(res: Response): Promise<unknown> {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(res.ok ? 'Invalid server response' : `Request failed (${res.status})`);
+    const fallback = text.trim();
+    if (res.ok) return { error: fallback || 'Invalid server response' };
+    return { error: fallback || `Request failed (${res.status})` };
   }
 }
 

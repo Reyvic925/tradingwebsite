@@ -3,8 +3,12 @@ import supabase from './db-client.js';
 import { logAdminAction } from './admin-helpers.js';
 import { ensureUniverse } from './markets.js';
 import { requireAdmin } from './auth-admin.js';
+import adminUsersHandler from './admin-users.js';
 import adminKycHandler from './admin-kyc.js';
 import adminCryptoAddressesHandler from './admin-crypto-addresses.js';
+import adminDepositsHandler from './admin-deposits.js';
+import adminWithdrawalsHandler from './admin-withdrawals.js';
+import adminPlansHandler from './admin-plans.js';
 import healthHandler from './health.js';
 
 export default async function handler(req, res) {
@@ -19,8 +23,12 @@ export default async function handler(req, res) {
   const sub = (parts[1] || '').toLowerCase();
 
   try {
+    if (sub === 'users') return adminUsersHandler(req, res);
     if (sub === 'kyc') return adminKycHandler(req, res);
     if (sub === 'crypto-addresses') return adminCryptoAddressesHandler(req, res);
+    if (sub === 'deposits') return adminDepositsHandler(req, res);
+    if (sub === 'withdrawals') return adminWithdrawalsHandler(req, res);
+    if (sub === 'plans') return adminPlansHandler(req, res);
     if (sub === 'health') return healthHandler(req, res);
 
     // centralized admin auth (prefer session-based, fallback to header secrets)

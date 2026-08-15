@@ -70,8 +70,8 @@ export default function Invest() {
           <div key={p.id} className={`rounded-md border p-5 ${p.featured ? 'border-amber-300/35 bg-amber-400/5' : 'border-white/8 bg-white/[0.02]'}`}>
             <div className="font-display text-2xl">{p.name}</div>
             <div className="text-xs text-stone-500">{p.tagline}</div>
-            <div className="mt-4 font-display text-4xl text-amber-200">{p.daily_rate}%</div>
-            <div className="text-[10px] uppercase tracking-widest text-stone-500">Daily · {p.duration_days} days · {p.total_return}% total</div>
+            <div className="mt-4 font-display text-4xl text-amber-200">{p.total_return}%</div>
+            <div className="text-[10px] uppercase tracking-widest text-stone-500">{p.duration_days} day cycle · total return</div>
             <div className="mt-4 text-sm text-stone-400">
               ${Number(p.min_amount).toLocaleString()}{p.max_amount ? ` – $${Number(p.max_amount).toLocaleString()}` : '+'}
             </div>

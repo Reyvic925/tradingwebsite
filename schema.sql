@@ -109,10 +109,19 @@ create table if not exists crypto_addresses (
   metadata jsonb default '{}'::jsonb
 );
 
-create unique index if not exists ux_crypto_addresses_user_network on crypto_addresses (user_id, network) where network is not null;
 create unique index if not exists ux_crypto_addresses_user_currency_address on crypto_addresses (user_id, currency, address);
 create index if not exists idx_crypto_addresses_user on crypto_addresses (user_id);
 create index if not exists idx_crypto_addresses_network on crypto_addresses (network);
+
+-- Per-user encrypted HD wallet mnemonic used to derive all deposit addresses.
+-- Written and read only by the API with the service role key.
+create table if not exists user_mnemonics (
+  id bigserial primary key,
+  user_id text not null unique,
+  encrypted_mnemonic text not null,
+  created_at timestamptz not null default now()
+);
+alter table user_mnemonics enable row level security; -- service_role bypasses RLS
 
 create table if not exists wallets (
   id serial primary key,

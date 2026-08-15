@@ -1,21 +1,54 @@
 /**
  * Registration Wallet Generator
  * 
- * Called when a new user signs up to generate all 8 wallet variants
+ * Called when a new user signs up to generate all wallet variants from their mnemonic
  * and store them in the crypto_addresses table
  */
 
 import supabase from './db-client.js';
 import cryptoKeys from './crypto-keys.js';
 
+function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || '');
+  return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
+}
+
 /**
- * Generate and store all 8 wallet variants for a new user
+ * Generate and store all wallet variants for a new user
  * @param {string} userId - Supabase user ID
  * @returns {Promise<Object>} Generated wallet addresses indexed by variant
  */
 export async function createRegistrationWallets(userId) {
   try {
-    const wallets = await cryptoKeys.generateAllWalletVariants();
+    // Generate or retrieve the user's mnemonic
+    let userMnemonic;
+    try {
+      const { data: existing, error: fetchErr } = await supabase
+        .from('user_mnemonics')
+        .select('encrypted_mnemonic')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (!fetchErr && existing && existing.length > 0) {
+        userMnemonic = cryptoKeys.decryptString(existing[0].encrypted_mnemonic);
+      } else {
+        userMnemonic = cryptoKeys.generateUserMnemonic();
+        const encryptedMnemonic = cryptoKeys.encryptString(userMnemonic);
+        await supabase.from('user_mnemonics').insert({
+          user_id: userId,
+          encrypted_mnemonic: encryptedMnemonic,
+        });
+      }
+    } catch (mnemonicErr) {
+      if (!isMissingSchemaError(mnemonicErr)) {
+        console.error('[registration-wallet] Error managing user mnemonic:', mnemonicErr.message);
+      }
+      // Fall back to generating a temporary mnemonic for this call
+      userMnemonic = cryptoKeys.generateUserMnemonic();
+    }
+
+    // Generate all wallet variants from the user's mnemonic
+    const wallets = await cryptoKeys.generateAllWalletVariantsFromMnemonic(userMnemonic);
     const results = {};
 
     // Store each wallet variant in crypto_addresses table
@@ -33,8 +66,9 @@ export async function createRegistrationWallets(userId) {
         });
 
       if (error) {
-        console.error(`[registration-wallet] Failed to insert ${variant}:`, error.message);
-        // Don't throw - continue with other variants
+        if (!isMissingSchemaError(error)) {
+          console.error(`[registration-wallet] Failed to insert ${variant}:`, error.message);
+        }
         results[variant] = { error: error.message };
       } else {
         results[variant] = { address: walletData.address, currency: walletData.currency };

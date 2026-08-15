@@ -18,8 +18,11 @@ import AdminRoute from './guards/AdminRoute';
 import AdminLogin from './pages/admin/Login';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminHealth from './pages/admin/Health';
+import AdminUsers from './pages/AdminUsers';
 import AdminCryptoKeys from './pages/AdminCryptoKeys';
 import AdminKyc from './pages/AdminKyc';
+import AdminDeposits from './pages/AdminDeposits';
+import AdminWithdrawals from './pages/AdminWithdrawals';
 
 export default function App() {
   return (
@@ -136,6 +139,14 @@ export default function App() {
             }
           />
           <Route
+            path="/app/admin/users"
+            element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
+            }
+          />
+          <Route
             path="/app/admin/crypto-keys"
             element={
               <AdminRoute>
@@ -148,6 +159,22 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminKyc />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/app/admin/deposits"
+            element={
+              <AdminRoute>
+                <AdminDeposits />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/app/admin/withdrawals"
+            element={
+              <AdminRoute>
+                <AdminWithdrawals />
               </AdminRoute>
             }
           />

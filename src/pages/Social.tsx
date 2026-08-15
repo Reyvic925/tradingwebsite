@@ -47,7 +47,7 @@ export default function Social() {
     <AppShell>
       <div className="text-[11px] uppercase tracking-[0.24em] text-amber-300/70">Copy desk</div>
       <h1 className="font-display text-4xl">Social trading</h1>
-      <p className="mt-2 max-w-xl text-sm text-stone-400">Allocate capital to verified lead traders. Their tickets print on your book, sized to your allocation.</p>
+      <p className="mt-2 max-w-xl text-sm text-stone-400">Allocate capital to lead traders using a risk-managed copy allocation. Strategy metrics are illustrative and never guaranteed; all trading remains subject to market risk.</p>
       {msg && <div className="mt-4 text-sm text-amber-200">{msg}</div>}
       {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
 
@@ -89,6 +89,7 @@ export default function Social() {
       </div>
 
       <h2 className="mt-12 text-sm uppercase tracking-[0.18em] text-stone-400">Your copies</h2>
+      <div className="mt-2 text-xs text-stone-500">Performance and win-rate figures are for reference only and should not be interpreted as a promise of returns.</div>
       <div className="mt-4 divide-y divide-white/5 rounded-md border border-white/5">
         {copies.map((c) => (
           <div key={c.id} className="flex items-center justify-between px-5 py-3 text-sm">

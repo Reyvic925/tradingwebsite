@@ -2,7 +2,7 @@ export type Market = {
   id: number;
   symbol: string;
   name: string;
-  asset_class: 'stock' | 'etf' | 'forex' | 'crypto' | string;
+  asset_class: 'stock' | 'etf' | 'forex' | 'crypto' | 'futures' | string;
   price: number;
   change_24h: number;
   volume: number;

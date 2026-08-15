@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
 
+async function readJsonOrText(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text || `Request failed (${res.status})`);
+  }
+}
+
 type Submission = {
   id: number;
   user_id: number;
@@ -40,7 +50,7 @@ export default function AdminKyc() {
       if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const statusParam = statusFilter !== 'pending' ? `?status=${statusFilter}` : '';
       const res = await fetch(`/api/admin/kyc${statusParam}`, { headers });
-      const j = await res.json();
+      const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Failed to load KYC submissions');
       setSubmissions(j?.submissions || []);
     } catch (e) {
@@ -65,7 +75,7 @@ export default function AdminKyc() {
         headers,
         body: JSON.stringify({ id, action, admin_notes: reviewNote }),
       });
-      const j = await res.json();
+      const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Review failed');
       setReviewNote('');
       setReviewId(null);

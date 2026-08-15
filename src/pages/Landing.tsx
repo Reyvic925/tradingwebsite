@@ -36,7 +36,6 @@ const PARTNER_LOGOS: Record<string, string> = {
   'Amazon Web Services': '/logos/aws.svg',
   AWS: '/logos/aws.svg',
   Cloudflare: '/logos/cloudflare.svg',
-  TradingView: '/logos/tradingview.svg',
   'Deutsche Bank': '/logos/deutschebank.svg',
   BlackRock: '/logos/blackrock.svg',
 };
@@ -49,16 +48,15 @@ const fallbackPartners: Partner[] = [
   { id: 5, name: 'Mastercard', mark: 'MC' },
   { id: 6, name: 'Amazon Web Services', mark: 'AWS' },
   { id: 7, name: 'Cloudflare', mark: 'CF' },
-  { id: 8, name: 'TradingView', mark: 'TV' },
-  { id: 9, name: 'Deutsche Bank', mark: 'DB' },
+  { id: 8, name: 'Deutsche Bank', mark: 'DB' },
   { id: 10, name: 'BlackRock', mark: 'BR' },
 ];
 
 const fallbackPlans: Plan[] = [
-  { id: 1, name: 'Starter', tagline: 'First desk allocation', min_amount: 100, max_amount: 999, daily_rate: 2.5, duration_days: 30, total_return: 175, featured: false },
-  { id: 2, name: 'Premium', tagline: 'The house favorite', min_amount: 1000, max_amount: 4900, daily_rate: 3.5, duration_days: 45, total_return: 257, featured: true },
-  { id: 3, name: 'Gold', tagline: 'For serious books', min_amount: 5000, max_amount: 24900, daily_rate: 4.5, duration_days: 60, total_return: 370, featured: false },
-  { id: 4, name: 'Diamond', tagline: 'Private client mandate', min_amount: 25000, max_amount: null, daily_rate: 6, duration_days: 90, total_return: 640, featured: false },
+  { id: 1, name: 'Starter', tagline: 'First desk allocation', min_amount: 200, max_amount: 999, daily_rate: 2.5, duration_days: 6, total_return: 275, featured: false },
+  { id: 2, name: 'Premium', tagline: 'The house favorite', min_amount: 1000, max_amount: 4900, daily_rate: 3.5, duration_days: 7, total_return: 357, featured: true },
+  { id: 3, name: 'Gold', tagline: 'For serious books', min_amount: 5000, max_amount: 24900, daily_rate: 4.5, duration_days: 9, total_return: 480, featured: false },
+  { id: 4, name: 'Diamond', tagline: 'Private client mandate', min_amount: 25000, max_amount: null, daily_rate: 6, duration_days: 14, total_return: 640, featured: false },
 ];
 
 const fallbackTestimonials: Testimonial[] = [
@@ -256,13 +254,6 @@ export default function Landing() {
               >
                 View plans
               </a>
-              <a
-                href="/downloads/apex-prime-broker.zip"
-                download="apex-prime-broker.zip"
-                className="inline-flex items-center gap-2 rounded-sm border border-amber-300/40 bg-amber-400/10 px-6 py-3 text-sm uppercase tracking-[0.16em] text-amber-100 hover:bg-amber-400/20"
-              >
-                Download full website
-              </a>
             </div>
           </motion.div>
         </div>
@@ -325,7 +316,7 @@ export default function Landing() {
             <Link to="/login" className="text-sm text-amber-200">Open the desk →</Link>
           </div>
           <div className="mt-8">
-            <IndexBoard />
+            {/* Equity benchmark cards are shown only in the stock markets section, not on the public landing page. */}
           </div>
           <div className="mt-10 overflow-hidden rounded-md border border-white/8">
             <div className="grid grid-cols-2 gap-px bg-white/5 sm:grid-cols-3 lg:grid-cols-4">
@@ -333,7 +324,7 @@ export default function Landing() {
                 <div key={m.id} className="bg-[#080b11] p-4">
                   <div className="flex items-center justify-between">
                     <div className="font-mono text-sm">{m.symbol}</div>
-                    <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'futures' ? 'Futures' : 'Stocks'}</div>
                   </div>
                   <div className="mt-2 font-mono text-lg">{formatPrice(Number(m.price))}</div>
                   <div className={`text-xs ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>
@@ -382,7 +373,7 @@ export default function Landing() {
               <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Managed plans</div>
               <h2 className="mt-3 font-display text-4xl sm:text-5xl">Capital, compounded on a schedule.</h2>
             </div>
-            <p className="max-w-md text-sm text-stone-400">Daily accrual. Defined duration. Transparent total return. Withdraw principal plus yield when the cycle closes.</p>
+            <p className="max-w-md text-sm text-stone-400">Cycle-based return. Defined duration. Transparent total return. Withdraw principal plus yield when the cycle closes.</p>
           </div>
 
           {loading && <div className="mt-10 h-64 animate-pulse rounded-md bg-white/5" />}
@@ -403,8 +394,8 @@ export default function Landing() {
                 )}
                 <div className="font-display text-3xl text-stone-50">{p.name}</div>
                 <div className="mt-1 text-sm text-stone-500">{p.tagline}</div>
-                <div className="mt-6 font-display text-5xl text-amber-200">{p.daily_rate}%</div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-stone-500">Daily yield</div>
+                <div className="mt-6 font-display text-5xl text-amber-200">{p.total_return}%</div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-stone-500">Total return</div>
                 <ul className="mt-6 space-y-2 text-sm text-stone-300">
                   <li className="flex justify-between border-b border-white/5 py-2">
                     <span className="text-stone-500">Range</span>
@@ -496,7 +487,7 @@ export default function Landing() {
               { icon: Lock, title: '256-bit SSL', copy: 'Every session encrypted end to end.' },
               { icon: ShieldCheck, title: 'GDPR', copy: 'EU data residency & subject rights.' },
               { icon: Fingerprint, title: 'PCI-DSS', copy: 'Card data never touches our vaults.' },
-              { icon: Landmark, title: 'Registered company', copy: 'Apex Prime Markets Ltd · Apex Broker · 11847291' },
+              { icon: Landmark, title: 'Registered company', copy: 'The Prime Markets Ltd · Prime Markets · 11847291' },
               { icon: Clock, title: 'Money-back', copy: '30-day satisfaction guarantee.' },
             ].map((b) => (
               <div key={b.title} className="rounded-md border border-white/8 bg-white/[0.02] p-5 text-center">
@@ -517,13 +508,6 @@ export default function Landing() {
                 <Link to="/login?mode=signup" className="rounded-sm bg-amber-400 px-6 py-3 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304]">
                   Create free account
                 </Link>
-                <a
-                  href="/downloads/apex-prime-broker.zip"
-                  download
-                  className="rounded-sm border border-white/20 px-6 py-3 text-sm uppercase tracking-[0.16em] text-stone-100 hover:border-amber-300/50"
-                >
-                  Download source
-                </a>
               </div>
             </div>
           </div>

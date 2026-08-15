@@ -1,32 +1,75 @@
 import supabase from './db-client.js';
 
+export const DEFAULT_MARKET_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'usa', label: 'USA' },
+  { id: 'japan', label: 'Japan' },
+  { id: 'canada', label: 'Canada' },
+  { id: 'uk', label: 'UK' },
+  { id: 'europe', label: 'Europe' },
+  { id: 'germany', label: 'Germany' },
+  { id: 'france', label: 'France' },
+  { id: 'india', label: 'India' },
+  { id: 'etf', label: 'US ETFs' },
+  { id: 'forex', label: 'FX' },
+  { id: 'crypto', label: 'Crypto' },
+];
+
+export function sanitizeMarketFilters(value) {
+  const base = Array.isArray(value) ? value : DEFAULT_MARKET_FILTERS;
+  const cleaned = base
+    .filter((item) => item && typeof item === 'object' && String(item?.id || '').trim())
+    .map((item) => ({
+      id: String(item.id).trim(),
+      label: String(item.label || item.id || 'All').trim() || String(item.id || 'All').trim(),
+    }))
+    .filter((item) => item.id && item.label);
+
+  const byId = new Map(cleaned.map((item) => [String(item.id).toLowerCase(), item]));
+  const merged = [...cleaned];
+
+  for (const item of DEFAULT_MARKET_FILTERS) {
+    const key = String(item.id).toLowerCase();
+    if (!byId.has(key)) merged.push({ id: String(item.id), label: String(item.label) });
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  for (const item of merged) {
+    const id = String(item?.id || '').trim();
+    const label = String(item?.label || id || 'All').trim();
+    if (!id || !label) continue;
+    const key = id.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ id, label });
+  }
+
+  return deduped;
+}
+
+export function mergeMarketFilters(value) {
+  return sanitizeMarketFilters(value);
+}
+
+export function getMarketFiltersConfig(value) {
+  return sanitizeMarketFilters(value);
+}
+
 // Initialize default config if needed
 async function ensureDefaults() {
   try {
-    const { data: existing } = await supabase.from('app_config').select('key');
+    const { data: existing } = await supabase.from('app_config').select('key, value');
     if (!existing?.length) {
       const defaults = [
         {
           key: 'supported_cryptos',
-          value: ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'],
-          description: 'List of supported cryptocurrencies for deposits/withdrawals',
+          value: ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'MATIC', 'AVAX', 'ARB', 'OP', 'BASE'],
+          description: 'List of production-supported cryptocurrencies for deposits/withdrawals',
         },
         {
           key: 'market_filters',
-          value: [
-            { id: 'all', label: 'All' },
-            { id: 'usa', label: 'USA' },
-            { id: 'japan', label: 'Japan' },
-            { id: 'canada', label: 'Canada' },
-            { id: 'uk', label: 'UK' },
-            { id: 'europe', label: 'Europe' },
-            { id: 'germany', label: 'Germany' },
-            { id: 'france', label: 'France' },
-            { id: 'india', label: 'India' },
-            { id: 'etf', label: 'US ETFs' },
-            { id: 'forex', label: 'FX' },
-            { id: 'crypto', label: 'Crypto' },
-          ],
+          value: DEFAULT_MARKET_FILTERS,
           description: 'Market filter options available on Markets page',
         },
         {
@@ -64,6 +107,17 @@ async function ensureDefaults() {
       ];
 
       await supabase.from('app_config').insert(defaults);
+      return;
+    }
+
+    const byKey = Object.fromEntries((existing || []).map((row) => [row.key, row.value]));
+    if (!byKey.market_filters || !Array.isArray(byKey.market_filters) || sanitizeMarketFilters(byKey.market_filters).length !== (byKey.market_filters || []).length) {
+      await supabase.from('app_config').upsert({
+        key: 'market_filters',
+        value: DEFAULT_MARKET_FILTERS,
+        description: 'Market filter options available on Markets page',
+        updated_at: new Date().toISOString(),
+      }).select();
     }
   } catch (err) {
     console.error('[app-config] Failed to ensure defaults:', err.message);
@@ -84,7 +138,6 @@ export default async function handler(req, res) {
       const { key } = req.query;
 
       if (key) {
-        // Get specific config by key
         const { data, error } = await supabase
           .from('app_config')
           .select('*')
@@ -93,9 +146,17 @@ export default async function handler(req, res) {
 
         if (error) {
           if (error.code === 'PGRST116') {
+            if (key === 'market_filters') {
+              return res.status(200).json({ key, value: DEFAULT_MARKET_FILTERS, description: 'Market filter options available on Markets page' });
+            }
             return res.status(404).json({ error: `Config key "${key}" not found` });
           }
           throw error;
+        }
+
+        if (key === 'market_filters') {
+          const nextValue = sanitizeMarketFilters(data.value);
+          return res.status(200).json({ ...data, value: nextValue });
         }
 
         return res.status(200).json(data);
@@ -116,18 +177,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST' || req.method === 'PUT') {
-      // Admin-only: set/update config
       const { key, value, description } = req.body;
 
       if (!key || !value) {
         return res.status(400).json({ error: 'Missing required fields: key, value' });
       }
 
+      const nextValue = key === 'market_filters' ? sanitizeMarketFilters(value) : value;
+
       const { data, error } = await supabase
         .from('app_config')
         .upsert({
           key,
-          value,
+          value: nextValue,
           description,
           updated_at: new Date().toISOString(),
         })

@@ -1,13 +1,16 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2 } from 'lucide-react';
+import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import supabase from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const nav = [
   { to: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
   { to: '/admin/health', label: 'Health', icon: Activity },
+  { to: '/app/admin/users', label: 'All Users', icon: Users },
   { to: '/app/admin/crypto-keys', label: 'Crypto Keys', icon: Wallet },
   { to: '/app/admin/kyc', label: 'KYC', icon: FileCheck2 },
+  { to: '/app/admin/deposits', label: 'Deposits', icon: ArrowUpRight },
+  { to: '/app/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownLeft },
 ];
 
 export default function AdminShell({ children, title }: { children: React.ReactNode; title: string }) {
@@ -28,7 +31,7 @@ export default function AdminShell({ children, title }: { children: React.ReactN
               <ShieldCheck size={18} />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80">Apex Prime</div>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80">The Prime Markets</div>
               <div className="font-display text-xl">Admin</div>
             </div>
           </div>

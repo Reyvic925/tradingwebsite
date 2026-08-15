@@ -8,43 +8,84 @@ async function requireUser(req) {
   return authUser(supabase, req);
 }
 
-const DEFAULT_SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
+const DEFAULT_SUPPORTED_CURRENCIES = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'MATIC', 'AVAX', 'ARB', 'OP', 'BASE'];
 
 function isMissingSchemaError(err) {
   const msg = String(err?.message || err || '');
   return err?.code === '42P01' || err?.code === '42703' || /does not exist/.test(msg) || /relation .* does not exist/.test(msg) || /column .* does not exist/.test(msg);
 }
 
+async function getOrCreateUserMnemonic(userId) {
+  // Try to retrieve existing mnemonic
+  const { data: existing, error: fetchErr } = await supabase
+    .from('user_mnemonics')
+    .select('encrypted_mnemonic')
+    .eq('user_id', userId)
+    .limit(1);
+
+  if (!fetchErr && existing && existing.length > 0) {
+    return cryptoKeys.decryptString(existing[0].encrypted_mnemonic);
+  }
+
+  // Generate new mnemonic for this user
+  const mnemonic = cryptoKeys.generateUserMnemonic();
+  const encryptedMnemonic = cryptoKeys.encryptString(mnemonic);
+  
+  const { error: createErr } = await supabase.from('user_mnemonics').insert({
+    user_id: userId,
+    encrypted_mnemonic: encryptedMnemonic,
+  });
+
+  if (createErr && !isMissingSchemaError(createErr)) {
+    console.error('[user] Failed to store user mnemonic', createErr.message);
+  }
+
+  return mnemonic;
+}
+
 async function ensureAssignedCryptoAddressesForUser(userId) {
-  for (const currency of DEFAULT_SUPPORTED_CURRENCIES) {
-    const network = cryptoKeys.getNetworkForCurrency(currency);
-    if (!network) continue;
+  // Get or create the user's mnemonic
+  const userMnemonic = await getOrCreateUserMnemonic(userId);
 
-    const { data: existingRows, error: existingErr } = await supabase
-      .from('crypto_addresses')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('network', network)
-      .limit(1);
+  // Derive all wallet variants from the user's mnemonic
+  const wallets = await cryptoKeys.generateAllWalletVariantsFromMnemonic(userMnemonic);
+  const requiredRows = Object.entries(wallets).map(([variant, wallet]) => ({
+    variant,
+    currency: wallet.currency,
+    network: wallet.network,
+    address: wallet.address,
+    encrypted_private_key: wallet.encryptedPrivateKey,
+    encrypted_mnemonic: wallet.encryptedMnemonic,
+  }));
 
-    if (existingErr) {
-      if (isMissingSchemaError(existingErr)) {
-        return;
+  // First, delete all old crypto addresses for this user to ensure we have fresh addresses
+  // This is important when we update the code to use new derivation paths
+  await supabase
+    .from('crypto_addresses')
+    .delete()
+    .eq('user_id', userId)
+    .then((result) => {
+      if (result.error && !isMissingSchemaError(result.error)) {
+        console.error('[user] Failed to delete old addresses', result.error.message);
       }
-      console.error('[user] ensureAssignedCryptoAddressesForUser list failed', existingErr.message);
-      continue;
-    }
-    if ((existingRows || []).length) continue;
+    });
 
-    const generated = await cryptoKeys.generateAndEncryptForCurrency(currency);
+  const seenRows = new Set();
+
+  // Now create fresh addresses from the current mnemonic
+  for (const row of requiredRows) {
+    const rowKey = `${row.currency}|${row.network || ''}|${row.address}`;
+    if (seenRows.has(rowKey)) continue;
+    seenRows.add(rowKey);
+
     const { error: createErr } = await supabase.from('crypto_addresses').insert({
       user_id: userId,
-      currency: generated.currency,
-      address: generated.address,
-      encrypted_private_key: generated.encryptedPrivateKey,
-      encrypted_mnemonic: generated.encryptedMnemonic,
-      network,
-      metadata: { network, auto_assigned: true },
+      currency: row.currency,
+      address: row.address,
+      encrypted_private_key: row.encrypted_private_key,
+      encrypted_mnemonic: row.encrypted_mnemonic,
+      network: row.network,
+      metadata: { network: row.network, auto_assigned: true, wallet_variant: row.variant },
     });
 
     if (createErr) {
@@ -206,7 +247,14 @@ export default async function handler(req, res) {
           if (isMissingSchemaError(aErr)) return res.status(200).json([]);
           throw aErr;
         }
-        return res.status(200).json(rows || []);
+
+        const deduped = Array.from(
+          new Map(
+            (rows || []).map((row) => [`${row.currency}|${row.network || ''}|${row.address}`, row])
+          ).values()
+        );
+
+        return res.status(200).json(deduped);
       } catch (err) {
         if (isMissingSchemaError(err)) return res.status(200).json([]);
         throw err;
@@ -236,10 +284,10 @@ export default async function handler(req, res) {
         user_id: user.id,
         amount: amt,
         currency: currency || 'USDT',
-        tx_hash: null,
-        external_address: dest,
-        direction: 'withdrawal',
+        type: 'withdrawal',
+        method: 'crypto',
         status: 'pending',
+        reference: `WDR-${Date.now().toString(36).toUpperCase()}`,
         created_at: new Date().toISOString(),
       };
       const { data: inserted, error: txErr } = await supabase.from('transactions').insert(tx).select();
