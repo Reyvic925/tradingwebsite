@@ -33,9 +33,15 @@ CREATE TABLE IF NOT EXISTS crypto_addresses (
   metadata jsonb DEFAULT '{}'::jsonb
 );
 ALTER TABLE IF EXISTS crypto_addresses
-  ADD COLUMN IF NOT EXISTS network text;
+  ADD COLUMN IF NOT EXISTS network text,
+  ADD COLUMN IF NOT EXISTS encrypted_mnemonic text,
+  ADD COLUMN IF NOT EXISTS last_used_at timestamptz,
+  ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;
+-- Several wallet variants intentionally share one network (eth + usdt_erc20 on
+-- 'ethereum', bnb + usdc_erc20 on 'binance'), so uniqueness is per
+-- user/currency/address only — never per user/network.
+DROP INDEX IF EXISTS ux_crypto_addresses_user_network;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_crypto_addresses_user_currency_address ON crypto_addresses (user_id, currency, address);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_crypto_addresses_user_network ON crypto_addresses (user_id, network) WHERE network IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_crypto_addresses_user ON crypto_addresses (user_id);
 CREATE INDEX IF NOT EXISTS idx_crypto_addresses_network ON crypto_addresses (network);
 
