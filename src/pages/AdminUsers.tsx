@@ -3,6 +3,16 @@ import { ArrowRight, FileText, ShieldCheck, Wallet, Search } from 'lucide-react'
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
 
+async function readJsonOrText(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text || `Request failed (${res.status})`);
+  }
+}
+
 type UserRow = {
   id: number | null;
   user_id: string | null;
