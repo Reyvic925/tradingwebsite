@@ -40,7 +40,7 @@ export default function LiveTicker() {
     { id: 1, trader_name: 'M. Hale', symbol: 'NVDA', side: 'BUY', quantity: 120, price: 131.05, asset_class: 'stock', created_at: '' },
     { id: 2, trader_name: 'E. Voss', symbol: 'EURUSD', side: 'SELL', quantity: 25000, price: 1.0863, asset_class: 'forex', created_at: '' },
     { id: 3, trader_name: 'K. Nakamura', symbol: 'BTCUSD', side: 'BUY', quantity: 0.42, price: 67380, asset_class: 'crypto', created_at: '' },
-    { id: 4, trader_name: 'S. Alvarez', symbol: 'XAUUSD', side: 'BUY', quantity: 12, price: 2347.8, asset_class: 'forex', created_at: '' },
+    { id: 4, trader_name: 'S. Alvarez', symbol: 'XAUUSD', side: 'BUY', quantity: 12, price: 4300.0, asset_class: 'forex', created_at: '' },
     { id: 5, trader_name: 'J. Okafor', symbol: 'AAPL', side: 'BUY', quantity: 80, price: 228.2, asset_class: 'stock', created_at: '' },
     { id: 6, trader_name: 'P. Mehta', symbol: 'ETHUSD', side: 'SELL', quantity: 4.2, price: 3491.1, asset_class: 'crypto', created_at: '' },
   ];
