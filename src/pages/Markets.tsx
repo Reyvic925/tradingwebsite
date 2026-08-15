@@ -85,6 +85,7 @@ export default function Markets() {
 
   useEffect(() => {
     setPage(0);
+    setLoading(true);
   }, [filter, debounced]);
 
   useEffect(() => {
@@ -108,8 +109,8 @@ export default function Markets() {
         if (alive) setLoading(false);
       }
     };
-    load(true);
-    const id = setInterval(() => load(true), 8000);
+    load(false);
+    const id = setInterval(() => load(true), 12000);
     return () => {
       alive = false;
       clearInterval(id);
