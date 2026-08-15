@@ -34,7 +34,13 @@ export default function Wallet() {
       ]);
       if (w) setWallet(w);
       setTxns(asList(t));
-      setDepositAddresses(asList(addresses));
+      const uniqueAddresses = asList(addresses).reduce<{ id: number; currency: string; network?: string; address: string }[]>((acc, item) => {
+        const key = `${item.currency}|${item.network || ''}|${item.address}`;
+        const alreadyPresent = acc.some((existing) => `${existing.currency}|${existing.network || ''}|${existing.address}` === key);
+        if (!alreadyPresent) acc.push(item);
+        return acc;
+      }, []);
+      setDepositAddresses(uniqueAddresses);
       if (config?.value && Array.isArray(config.value)) {
         setSupportedCryptos(config.value);
       }

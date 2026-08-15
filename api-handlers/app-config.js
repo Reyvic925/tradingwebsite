@@ -8,8 +8,8 @@ async function ensureDefaults() {
       const defaults = [
         {
           key: 'supported_cryptos',
-          value: ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'],
-          description: 'List of supported cryptocurrencies for deposits/withdrawals',
+          value: ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'MATIC', 'AVAX', 'ARB', 'OP', 'BASE'],
+          description: 'List of production-supported cryptocurrencies for deposits/withdrawals',
         },
         {
           key: 'market_filters',
