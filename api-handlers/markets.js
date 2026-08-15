@@ -119,6 +119,24 @@ function isMissingSchemaError(err) {
 }
 
 async function ensureUniverse() {
+  // First, deduplicate any existing entries by symbol (keep highest volume)
+  const { data: allMarkets, error: selectErr } = await supabase.from('markets').select('id, symbol, volume');
+  if (!selectErr && allMarkets && allMarkets.length > 0) {
+    const bySymbol = {};
+    for (const m of allMarkets) {
+      const sym = String(m.symbol || '').toUpperCase();
+      if (!bySymbol[sym] || Number(m.volume || 0) > Number(bySymbol[sym].volume || 0)) {
+        bySymbol[sym] = m;
+      }
+    }
+    const keepIds = new Set(Object.values(bySymbol).map((m) => m.id));
+    const deleteIds = allMarkets.filter((m) => !keepIds.has(m.id)).map((m) => m.id);
+    if (deleteIds.length > 0) {
+      await supabase.from('markets').delete().in('id', deleteIds);
+      console.log(`Deduplicated ${deleteIds.length} duplicate market entries`);
+    }
+  }
+
   const { data: existing, error } = await supabase.from('markets').select('symbol');
   if (error) throw error;
   const have = new Set((existing || []).map((r) => r.symbol));
