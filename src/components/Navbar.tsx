@@ -10,7 +10,6 @@ const links = [
   { href: '#plans', label: 'Plans' },
   { href: '#proof', label: 'Proof' },
   { href: '#trust', label: 'Trust' },
-  { href: '/source', label: 'Source' },
 ];
 
 export default function Navbar() {

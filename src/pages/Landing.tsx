@@ -489,7 +489,7 @@ export default function Landing() {
               { icon: Lock, title: '256-bit SSL', copy: 'Every session encrypted end to end.' },
               { icon: ShieldCheck, title: 'GDPR', copy: 'EU data residency & subject rights.' },
               { icon: Fingerprint, title: 'PCI-DSS', copy: 'Card data never touches our vaults.' },
-              { icon: Landmark, title: 'Registered company', copy: 'Apex Prime Markets Ltd · Apex Broker · 11847291' },
+              { icon: Landmark, title: 'Registered company', copy: 'The Prime Markets Ltd · Prime Markets · 11847291' },
               { icon: Clock, title: 'Money-back', copy: '30-day satisfaction guarantee.' },
             ].map((b) => (
               <div key={b.title} className="rounded-md border border-white/8 bg-white/[0.02] p-5 text-center">

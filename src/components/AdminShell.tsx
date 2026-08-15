@@ -29,7 +29,7 @@ export default function AdminShell({ children, title }: { children: React.ReactN
               <ShieldCheck size={18} />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80">Apex Prime</div>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80">The Prime Markets</div>
               <div className="font-display text-xl">Admin</div>
             </div>
           </div>
