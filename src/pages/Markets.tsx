@@ -65,7 +65,9 @@ export default function Markets() {
           ? filtersConfig
           : DEFAULT_FILTERS;
 
-      const nextFilters = rawFilters.length ? rawFilters : DEFAULT_FILTERS;
+      const nextFilters = (rawFilters || []).filter((entry: any) => entry && typeof entry === 'object' && String(entry?.id || '').trim() && String(entry?.label || entry?.id || '').trim()).length
+        ? (rawFilters || []).filter((entry: any) => entry && typeof entry === 'object' && String(entry?.id || '').trim() && String(entry?.label || entry?.id || '').trim())
+        : DEFAULT_FILTERS;
       setFilters(nextFilters);
 
       if (regionConfig?.value && typeof regionConfig.value === 'object') {
