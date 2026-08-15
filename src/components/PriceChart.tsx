@@ -43,8 +43,51 @@ function mapSymbolToTradingView(symbol: string) {
     return mapping[upper] || upper;
   }
 
-  if (/\.TO$/.test(upper)) return `TSX:${upper.replace('.TO', '')}`;
-  if (/^\d/.test(upper)) return upper;
+  const exchangeMap: Record<string, string> = {
+    '.T': 'TSE:',
+    '.TO': 'TSX:',
+    '.L': 'LSE:',
+    '.PA': 'EPA:',
+    '.DE': 'XETR:',
+    '.NS': 'NSE:',
+    '.BO': 'BSE:',
+    '.HK': 'HKE:',
+    '.AS': 'AMS:',
+    '.BR': 'B3:',
+    '.MC': 'BME:',
+    '.HE': 'HEX:',
+    '.SW': 'SWX:',
+    '.ST': 'STO:',
+    '.SE': 'STO:',
+    '.V': 'BVL:',
+    '.BE': 'ENEXT:',
+    '.F': 'XETR:',
+    '.MI': 'MTA:',
+    '.AT': 'VIE:',
+    '.CP': 'ENEXT:',
+    '.A': 'ASX:',
+    '.AX': 'ASX:',
+    '.NZ': 'NZX:',
+    '.SA': 'B3:',
+    '.KL': 'KLS:',
+    '.SG': 'SGX:',
+    '.TW': 'TWO:',
+    '.B': 'BME:',
+    '.CO': 'BVC:',
+    '.PR': 'BME:',
+    '.MA': 'ENEXT:',
+    '.BM': 'BME:',
+    '.M': 'MEX:',
+  };
+
+  for (const [suffix, prefix] of Object.entries(exchangeMap)) {
+    if (upper.endsWith(suffix)) {
+      const base = upper.replace(new RegExp(`${suffix.replace('.', '\\.')}$`), '');
+      return `${prefix}${base}`;
+    }
+  }
+
+  if (/^\d/.test(upper)) return `TSE:${upper}`;
   return `NASDAQ:${upper}`;
 }
 
