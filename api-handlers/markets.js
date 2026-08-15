@@ -479,7 +479,8 @@ async function ensureUniverse() {
   const { data: existing, error } = await supabase.from('markets').select('symbol');
   if (error) throw error;
   const have = new Set((existing || []).map((r) => r.symbol));
-  const missing = BOOK.filter((r) => !have.has(r.symbol) && !SKIP.has(r.symbol));
+  const allUniverse = [...(UNIVERSE || []), ...(INTL_UNIVERSE || [])];
+  const missing = allUniverse.filter((r) => !have.has(r.symbol) && !SKIP.has(r.symbol));
   for (let i = 0; i < missing.length; i += 80) {
     const chunk = missing.slice(i, i + 80);
     const { error: iErr } = await supabase.from('markets').insert(chunk);
