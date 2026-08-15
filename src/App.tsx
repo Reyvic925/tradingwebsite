@@ -21,6 +21,7 @@ import AdminHealth from './pages/admin/Health';
 import AdminUsers from './pages/AdminUsers';
 import AdminCryptoKeys from './pages/AdminCryptoKeys';
 import AdminKyc from './pages/AdminKyc';
+import AdminWithdrawals from './pages/AdminWithdrawals';
 
 export default function App() {
   return (
@@ -157,6 +158,14 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminKyc />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/app/admin/withdrawals"
+            element={
+              <AdminRoute>
+                <AdminWithdrawals />
               </AdminRoute>
             }
           />

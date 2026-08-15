@@ -79,7 +79,7 @@ export default function Wallet() {
 
     try {
       if (type === 'deposit') {
-        setMsg('Deposit addresses are assigned automatically to the account and are listed below.');
+        setMsg(`${currency} address is ready. Send your ${currency} to this address and it will be credited after blockchain confirmation (usually 5-30 minutes).`);
         await load();
         return;
       }
@@ -206,7 +206,7 @@ export default function Wallet() {
                            </button>
                          </div>
 
-                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after network confirmation · Address remains the same</div>
+                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after blockchain confirms (typically 5-30 min) · Address remains the same</div>
                        </div>
                      );
                    })()
@@ -217,15 +217,21 @@ export default function Wallet() {
                <div className="mt-4">
                  <div className="text-[10px] uppercase tracking-widest text-stone-500">Recent Deposits</div>
                  <div className="mt-2 space-y-2">
-                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => (
-                     <div key={t.id} className="flex items-center justify-between rounded-sm border border-white/5 p-2">
-                       <div>
-                         <div className="text-sm">{t.method || t.currency}</div>
-                         <div className="text-xs text-stone-500">{t.reference}</div>
+                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => {
+                     const isPending = t.status === 'pending';
+                     return (
+                       <div key={t.id} className={`flex items-center justify-between rounded-sm border p-2 ${isPending ? 'border-amber-400/30 bg-amber-400/5' : 'border-white/5'}`}>
+                         <div>
+                           <div className="text-sm flex items-center gap-2">
+                             {t.method || t.currency}
+                             {isPending && <span className="text-[10px] uppercase tracking-widest text-amber-400">confirming</span>}
+                           </div>
+                           <div className="text-xs text-stone-500">{t.reference}</div>
+                         </div>
+                         <div className={`font-mono ${isPending ? 'text-amber-400' : 'text-emerald-400'}`}>+{formatMoney(Number(t.amount))}</div>
                        </div>
-                       <div className="font-mono text-emerald-400">+{formatMoney(Number(t.amount))}</div>
-                     </div>
-                   ))}
+                     );
+                   })}
                    {!txns.some((t) => t.type === 'deposit' && t.currency === currency) && (
                      <div className="text-sm text-stone-500">No recent deposits for {currency}.</div>
                    )}

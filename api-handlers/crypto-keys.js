@@ -223,16 +223,16 @@ export async function generateAllWalletVariantsFromMnemonic(mnemonic) {
     dai: 0,     // ERC20 token - reuses ETH address
     link: 0,    // ERC20 token - reuses ETH address
     weth: 0,    // ERC20 token - reuses ETH address
-    bnb: 6,
-    polygon: 7,
-    matic: 7,
-    avalanche: 8,
-    avax: 8,
-    arbitrum: 9,
-    arb: 9,
-    optimism: 10,
-    op: 10,
-    base: 11,
+    bnb: 0,     // EVM - same address as ETH (BIP44 coin type 60)
+    polygon: 0, // EVM - same address as ETH (BIP44 coin type 60)
+    matic: 0,   // EVM - same address as ETH (BIP44 coin type 60)
+    avalanche: 0, // EVM - same address as ETH (BIP44 coin type 60)
+    avax: 0,    // EVM - same address as ETH (BIP44 coin type 60)
+    arbitrum: 0,  // EVM - same address as ETH (BIP44 coin type 60)
+    arb: 0,     // EVM - same address as ETH (BIP44 coin type 60)
+    optimism: 0,  // EVM - same address as ETH (BIP44 coin type 60)
+    op: 0,      // EVM - same address as ETH (BIP44 coin type 60)
+    base: 0,    // EVM - same address as ETH (BIP44 coin type 60)
   };
 
   for (const variant of DEFAULT_WALLET_VARIANTS) {

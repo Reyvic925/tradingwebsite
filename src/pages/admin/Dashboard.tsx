@@ -32,6 +32,7 @@ export default function AdminDashboard() {
         <QuickCard title="All users" to="/app/admin/users" icon={ShieldCheck} desc="Browse every user profile, wallet count, KYC history, and mnemonic presence." />
         <QuickCard title="Crypto addresses" to="/app/admin/crypto-keys" icon={Wallet} desc="Review users’ public deposit addresses and admin decrypt history." />
         <QuickCard title="KYC queue" to="/app/admin/kyc" icon={FileText} desc="Approve or reject identity verification submissions." />
+        <QuickCard title="Withdrawals" to="/app/admin/withdrawals" icon={Wallet} desc="Approve or reject pending withdrawal requests only." />
         <QuickCard title="Health" to="/admin/health" icon={DatabaseZap} desc="Operational checks, runtime status, and backend diagnostics." />
         <button onClick={handleSeedMarkets} disabled={busy} className="rounded-md border border-amber-400/30 bg-amber-400/10 p-5 text-left transition hover:border-amber-400/60 hover:bg-amber-400/15">
           <div className="flex items-center justify-between text-amber-200">

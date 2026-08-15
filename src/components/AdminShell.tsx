@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2 } from 'lucide-react';
+import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2, ArrowDownLeft } from 'lucide-react';
 import supabase from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +9,7 @@ const nav = [
   { to: '/app/admin/users', label: 'All Users', icon: Users },
   { to: '/app/admin/crypto-keys', label: 'Crypto Keys', icon: Wallet },
   { to: '/app/admin/kyc', label: 'KYC', icon: FileCheck2 },
+  { to: '/app/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownLeft },
 ];
 
 export default function AdminShell({ children, title }: { children: React.ReactNode; title: string }) {
