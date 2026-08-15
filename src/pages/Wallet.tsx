@@ -84,7 +84,7 @@ export default function Wallet() {
           currency,
           method: 'onchain_transfer',
         });
-        setMsg(`Deposit request created for ${formatMoney(amt)} ${currency}. After you send the funds, the admin will verify the exact on-chain amount before crediting your wallet.`);
+        setMsg(`Deposit request created for ${formatMoney(amt)} ${currency}. After you send the funds, the blockchain confirmation will be reviewed before the wallet is credited.`);
         await load();
         return;
       }
