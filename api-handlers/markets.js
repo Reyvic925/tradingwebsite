@@ -345,7 +345,8 @@ export default async function handler(req, res) {
     const q = String(params.q || '').trim();
     const assetClass = String(params.class || params.asset_class || 'all');
     const featured = params.featured === '1';
-    const shouldTick = params.tick === '1';
+    // Disabled tick updates - they were causing dual pricing and performance issues
+    const shouldTick = false;
     const limit = Math.min(500, Math.max(1, Number(params.limit) || (featured ? 12 : 120)));
     const offset = Math.max(0, Number(params.offset) || 0);
     const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
@@ -407,9 +408,8 @@ export default async function handler(req, res) {
     if (shouldTick) await fillPendingLimits(data || []);
 
     const items = (data || []).map((row) => {
-      const liveQuote = liveMap[String(row.symbol || '').toUpperCase()];
-      if (!liveQuote) return row;
-      return { ...row, ...blendLiveQuote(row, liveQuote) };
+      // Return raw data without blending to ensure single consistent price source
+      return row;
     });
 
     res.setHeader('X-Total-Count', String(count || items.length));

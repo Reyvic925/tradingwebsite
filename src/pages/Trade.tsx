@@ -28,6 +28,7 @@ export default function Trade() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [marketPrices, setMarketPrices] = useState<Record<string, number>>({});
+  const [latestPrice, setLatestPrice] = useState<Record<string, number>>({});
 
   const selected = useMemo(() => {
     if (!markets.length) return null;
@@ -60,6 +61,7 @@ export default function Trade() {
         prices[mkt.symbol] = Number(mkt.price);
       });
       setMarketPrices(prices);
+      setLatestPrice(prices);
       
       setErr('');
     } catch (e: unknown) {
@@ -75,18 +77,20 @@ export default function Trade() {
     return () => clearInterval(id);
   }, [filter, search, symbol]);
   
-  // Real-time P&L update every second
+  // Real-time P&L update every second - use single price source
   useEffect(() => {
     const interval = setInterval(() => {
-      // Fetch latest prices for all symbols in positions
       if (positions.length > 0 && markets.length > 0) {
         const symbols = positions.map(p => p.symbol);
         apiMarkets<Market>({ symbols: symbols.join(','), limit: 50 }).then(({ items }) => {
           const prices: Record<string, number> = {};
           items.forEach(m => {
+            // Use the live price directly, no blending
             prices[m.symbol] = Number(m.price);
           });
+          // Update both maps with the same price to avoid dual pricing
           setMarketPrices(prev => ({ ...prev, ...prices }));
+          setLatestPrice(prev => ({ ...prev, ...prices }));
         }).catch(() => {});
       }
     }, 1000);
@@ -271,7 +275,8 @@ export default function Trade() {
                 </thead>
                 <tbody>
                   {positions.map((p) => {
-                    const currentPrice = marketPrices[p.symbol] || Number(p.entry_price);
+                    // Use single price source for P&L calculation to avoid dual pricing
+                    const currentPrice = latestPrice[p.symbol] || marketPrices[p.symbol] || Number(p.entry_price);
                     const entryPrice = Number(p.entry_price);
                     const qty = Number(p.quantity);
                     let pnl = 0;
