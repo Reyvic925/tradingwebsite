@@ -96,15 +96,8 @@ export default async function handler(req, res) {
         .select();
       if (updateErr) throw updateErr;
 
-      await supabase.from('transactions').insert({
-        user_id: userId,
-        type: action === 'add' ? 'adjustment_credit' : 'adjustment_debit',
-        amount: delta,
-        currency,
-        method: 'admin_adjustment',
-        status: 'completed',
-        reference: `ADM-${action.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
-      });
+      // Manual balance edits are operational-only and should not appear in the user ledger.
+      // Deposit/withdrawal history is handled through the deposit approval and withdrawal flows.
 
       try {
         await supabase.from('notifications').insert({

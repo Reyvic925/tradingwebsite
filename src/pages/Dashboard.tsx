@@ -151,15 +151,15 @@ export default function Dashboard() {
       <div className="mt-6 rounded-md border border-white/5">
         <div className="border-b border-white/5 px-5 py-3 text-sm uppercase tracking-[0.16em] text-stone-400">Recent ledger</div>
         <div className="divide-y divide-white/5">
-          {txns.length === 0 && <div className="px-5 py-6 text-sm text-stone-500">No movements yet.</div>}
-          {txns.map((t) => (
+          {txns.filter((t) => t.type === 'deposit' || t.type === 'withdrawal').length === 0 && <div className="px-5 py-6 text-sm text-stone-500">No movements yet.</div>}
+          {txns.filter((t) => t.type === 'deposit' || t.type === 'withdrawal').map((t) => (
             <div key={t.id} className="flex items-center justify-between px-5 py-3 text-sm">
               <div>
-                <div className="capitalize">{t.type.replace('_', ' ')}</div>
-                <div className="text-[11px] text-stone-500">{t.reference} · {t.method}</div>
+                <div className="capitalize">{t.type}</div>
+                <div className="text-[11px] text-stone-500">{t.reference} · {t.method} · {t.currency || 'USD'}</div>
               </div>
-              <div className={`font-mono ${t.type === 'withdrawal' || t.type === 'investment' ? 'text-rose-300' : 'text-emerald-300'}`}>
-                {t.type === 'withdrawal' || t.type === 'investment' ? '−' : '+'}{formatMoney(Number(t.amount))}
+              <div className={`font-mono ${t.type === 'withdrawal' ? 'text-rose-300' : 'text-emerald-300'}`}>
+                {t.type === 'withdrawal' ? '−' : '+'}{formatMoney(Number(t.amount))} {t.currency || 'USD'}
               </div>
             </div>
           ))}

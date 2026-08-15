@@ -100,6 +100,16 @@ export default async function handler(req, res) {
           });
       }
 
+      await supabase.from('transactions').insert({
+        user_id: existing.user_id,
+        type: 'deposit',
+        amount: Number(amountToCredit),
+        currency: existing.currency || 'USD',
+        method: existing.method || 'admin_approval',
+        status: 'completed',
+        reference: `DEP-${Date.now().toString(36).toUpperCase()}`,
+      });
+
       await logAdminAction(
         adminUser?.id || null,
         'deposit.approve',

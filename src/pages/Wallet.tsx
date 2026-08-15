@@ -79,7 +79,12 @@ export default function Wallet() {
 
     try {
       if (type === 'deposit') {
-        setMsg(`${currency} address is ready. Send your ${currency} to this address and it will be credited after blockchain confirmation (usually 5-30 minutes).`);
+        await apiSend('/api/deposits', 'POST', {
+          amount: amt,
+          currency,
+          method: 'onchain_transfer',
+        });
+        setMsg(`Deposit request created for ${formatMoney(amt)} ${currency}. After you send the funds, the admin will verify the exact on-chain amount before crediting your wallet.`);
         await load();
         return;
       }
@@ -148,6 +153,16 @@ export default function Wallet() {
          {/* Deposit flow: Binance-like coin selector and QR/address card */}
          {type === 'deposit' ? (
            <>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount to deposit</label>
+             <input
+               value={amount}
+               onChange={(e) => setAmount(e.target.value)}
+               type="number"
+               min="0"
+               step="0.01"
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
+             />
+
              <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Coin</label>
              <input
                value={coinQuery}
@@ -280,10 +295,10 @@ export default function Wallet() {
          {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
 
          <button
-           disabled={busy && type === 'withdrawal'}
+           disabled={busy}
            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
          >
-           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Refresh Addresses'}
+           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Confirm Deposit'}
          </button>
          <p className="mt-3 text-[11px] text-stone-600">
            {type === 'deposit'
