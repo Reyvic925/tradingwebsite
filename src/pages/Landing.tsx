@@ -256,13 +256,6 @@ export default function Landing() {
               >
                 View plans
               </a>
-              <a
-                href="/downloads/apex-prime-broker.zip"
-                download="apex-prime-broker.zip"
-                className="inline-flex items-center gap-2 rounded-sm border border-amber-300/40 bg-amber-400/10 px-6 py-3 text-sm uppercase tracking-[0.16em] text-amber-100 hover:bg-amber-400/20"
-              >
-                Download full website
-              </a>
             </div>
           </motion.div>
         </div>
@@ -517,13 +510,6 @@ export default function Landing() {
                 <Link to="/login?mode=signup" className="rounded-sm bg-amber-400 px-6 py-3 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304]">
                   Create free account
                 </Link>
-                <a
-                  href="/downloads/apex-prime-broker.zip"
-                  download
-                  className="rounded-sm border border-white/20 px-6 py-3 text-sm uppercase tracking-[0.16em] text-stone-100 hover:border-amber-300/50"
-                >
-                  Download source
-                </a>
               </div>
             </div>
           </div>
