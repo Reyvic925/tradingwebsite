@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildUserDirectoryEntry } from '../../api-handlers/admin-user-utils.js';
+import { buildUserDirectoryEntry, filterActiveProfiles } from '../../api-handlers/admin-user-utils.js';
 
 const entry = buildUserDirectoryEntry(
   {
@@ -28,5 +28,18 @@ assert.equal(entry.wallet_count, 2);
 assert.equal(entry.kyc_status, 'approved');
 assert.equal(entry.has_mnemonic, true);
 assert.equal(entry.latest_kyc_submission_id, 9);
+
+const activeProfiles = filterActiveProfiles(
+  [
+    { user_id: 'u-1', full_name: 'active' },
+    { user_id: 'u-deleted', full_name: 'stale' },
+  ],
+  new Set(['u-1'])
+);
+
+assert.equal(activeProfiles.length, 1);
+assert.equal(activeProfiles[0].user_id, 'u-1');
+
+assert.deepEqual(filterActiveProfiles([{ user_id: 'u-1' }], []), []);
 
 console.log('ADMIN_USERS_UTIL_TESTS_PASSED');

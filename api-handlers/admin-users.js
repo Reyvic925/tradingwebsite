@@ -1,9 +1,27 @@
 import supabase from './db-client.js';
 import { requireAdmin } from './auth-admin.js';
-import { buildUserDirectoryEntry } from './admin-user-utils.js';
+import { buildUserDirectoryEntry, dedupeProfiles, filterActiveProfiles, mergeAuthUserProfile } from './admin-user-utils.js';
 
 function normalizeUserId(value) {
   return value == null ? null : String(value);
+}
+
+async function getUsersById() {
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) {
+      console.warn('[admin-users] auth listUsers failed:', error.message || error);
+      return new Map();
+    }
+    const map = new Map();
+    for (const user of data?.users || []) {
+      map.set(String(user.id), user);
+    }
+    return map;
+  } catch (e) {
+    console.warn('[admin-users] auth listUsers unavailable:', e?.message || e);
+    return new Map();
+  }
 }
 
 export default async function handler(req, res) {
@@ -36,6 +54,9 @@ export default async function handler(req, res) {
     const pageLimit = Math.max(1, Number(limit || 200));
     const pageOffset = Math.max(0, Number(offset || 0));
 
+    const authUsersById = await getUsersById();
+    const activeUserIds = new Set([...authUsersById.keys()]);
+
     let profilesQuery = supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (userId) profilesQuery = profilesQuery.eq('user_id', normalizeUserId(userId));
     if (search) {
@@ -48,7 +69,9 @@ export default async function handler(req, res) {
     const { data: profiles, error: profilesError } = await profilesQuery.range(pageOffset, pageOffset + pageLimit - 1);
     if (profilesError) throw profilesError;
 
-    const userIds = [...new Set((profiles || []).map((p) => normalizeUserId(p.user_id)).filter(Boolean))];
+    const dedupedProfiles = dedupeProfiles(profiles || []);
+    const filteredProfiles = filterActiveProfiles(dedupedProfiles, activeUserIds);
+    const userIds = [...new Set((filteredProfiles || []).map((p) => normalizeUserId(p.user_id)).filter(Boolean))];
     const result = [];
 
     if (userIds.length) {
@@ -81,8 +104,10 @@ export default async function handler(req, res) {
       const mnemonicSet = new Set((mnemonicRes.data || []).map((row) => normalizeUserId(row.user_id)).filter(Boolean));
 
       for (const profile of profiles || []) {
-        const uid = normalizeUserId(profile.user_id);
-        result.push(buildUserDirectoryEntry(profile, {
+      for (const profile of filteredProfiles || []) {
+        const authUser = authUsersById.get(String(profile.user_id));
+        const mergedProfile = mergeAuthUserProfile(profile, authUser);
+        result.push(buildUserDirectoryEntry(mergedProfile, {
           walletCount: walletCounts.get(uid) || 0,
           kycCount: kycCounts.get(uid) || 0,
           hasMnemonic: mnemonicSet.has(uid),
@@ -90,8 +115,10 @@ export default async function handler(req, res) {
         }));
       }
     } else {
-      for (const profile of profiles || []) {
-        result.push(buildUserDirectoryEntry(profile, { walletCount: 0, kycCount: 0, hasMnemonic: false, latestKyc: null }));
+      for (const profile of filteredProfiles || []) {
+        const authUser = authUsersById.get(String(profile.user_id));
+        const mergedProfile = mergeAuthUserProfile(profile, authUser);
+        result.push(buildUserDirectoryEntry(mergedProfile, { walletCount: 0, kycCount: 0, hasMnemonic: false, latestKyc: null }));
       }
     }
 

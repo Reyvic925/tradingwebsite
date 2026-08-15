@@ -230,6 +230,15 @@ const devClient = {
       }
       return { data: { user: null }, error: { message: 'invalid token' } };
     },
+    admin: {
+      async listUsers() {
+        return { data: { users: [DEMO_USER] }, error: null };
+      },
+      async getUserById(userId) {
+        if (String(userId) === DEMO_USER_ID) return { data: { user: DEMO_USER }, error: null };
+        return { data: { user: null }, error: { message: 'not found' } };
+      },
+    },
   },
   channel() { return { on() { return this; }, subscribe() { return this; } }; },
   removeSubscription() {},
