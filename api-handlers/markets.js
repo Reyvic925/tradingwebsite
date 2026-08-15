@@ -2,129 +2,94 @@ import supabase from './db-client.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
-import { fetchLiveMarketSnapshot, blendLiveQuote, normalizeAssetClass } from './live-market-data.js';
+import { normalizeAssetClass } from './live-market-data.js';
+import fetch from 'node-fetch';
 
 const MARGIN_RATE = 0.1;
 const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
 
-function pairRow(symbol, name, asset_class, price, volume) {
-  const ch = Number(((Math.sin(symbol.length * 2.2 + price / 100) * 1.8) + 0.5).toFixed(2));
-  return {
-    symbol,
-    name,
-    asset_class,
-    price,
-    change_24h: ch,
-    volume,
-    high_24h: Number((price * 1.01).toFixed(4)),
-    low_24h: Number((price * 0.99).toFixed(4)),
-  };
+// Map our symbols to Binance symbols
+const BINANCE_SYMBOL_MAP = {
+  'BTCUSD': 'BTCUSDT',
+  'ETHUSD': 'ETHUSDT',
+  'SOLUSD': 'SOLUSDT',
+  'XRPUSD': 'XRPUSDT',
+  'ADAUSD': 'ADAUSDT',
+  'DOGEUSD': 'DOGEUSDT',
+  'BNBUSD': 'BNBUSDT',
+  'LINKUSD': 'LINKUSDT',
+  'AVAXUSD': 'AVAXUSDT',
+  'DOTUSD': 'DOTUSDT',
+  'MATICUSD': 'MATICUSDT',
+  'LTCUSD': 'LTCUSDT',
+  'TRXUSD': 'TRXUSDT',
+  'ATOMUSD': 'ATOMUSDT',
+  'BCHUSD': 'BCHUSDT',
+  'XLMUSD': 'XLMUSDT',
+  'XMRUSD': 'XMRUSDT',
+  'ZECUSD': 'ZECUSDT',
+  'ETCUSD': 'ETCUSDT',
+  'NEARUSD': 'NEARUSDT',
+  'ICPUSD': 'ICPUSDT',
+  'FILUSD': 'FILUSDT',
+  'ALGOUSD': 'ALGOUSDT',
+  'VETUSD': 'VETUSDT',
+  'UNIUSD': 'UNIUSDT',
+  'AAVEUSD': 'AAVEUSDT',
+  'COMPUSD': 'COMPUSDT',
+  'INJUSD': 'INJUSDT',
+  'ARBUSD': 'ARBUSDT',
+  'OPUSD': 'OPUSDT',
+  'APTUSD': 'APTUSDT',
+  'SUIUSD': 'SUIUSDT',
+  'TIAUSD': 'TIAUSDT',
+  'GALAUSD': 'GALAUSDT',
+  'SANDUSD': 'SANDUSDT',
+  'MANAUSD': 'MANAUSDT',
+  'AXSUSD': 'AXSUSDT',
+  'IMXUSD': 'IMXUSDT',
+  'GRTUSD': 'GRTUSDT',
+  'CRVUSD': 'CRVUSDT',
+  'PEPEUSD': 'PEPEUSDT',
+  'SHIBUSD': 'SHIBUSDT',
+};
+
+// Fetch live crypto prices from Binance
+async function fetchLiveCryptoPrices() {
+  try {
+    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+    if (!response.ok) throw new Error('Binance API error');
+    const data = await response.json();
+    
+    const priceMap = {};
+    data.forEach(ticker => {
+      const symbol = ticker.symbol;
+      // Find matching our symbol
+      for (const [ourSymbol, binanceSymbol] of Object.entries(BINANCE_SYMBOL_MAP)) {
+        if (binanceSymbol === symbol) {
+          const price = parseFloat(ticker.lastPrice);
+          const change = parseFloat(ticker.priceChangePercent);
+          const high = parseFloat(ticker.highPrice);
+          const low = parseFloat(ticker.lowPrice);
+          const volume = parseFloat(ticker.quoteVolume || '0');
+          
+          priceMap[ourSymbol] = {
+            price,
+            change_24h: change,
+            high_24h: high,
+            low_24h: low,
+            volume,
+          };
+          break;
+        }
+      }
+    });
+    return priceMap;
+  } catch (error) {
+    console.error('Failed to fetch Binance prices:', error.message);
+    return {};
+  }
 }
-
-const FOREX_PAIRS = [
-  pairRow('EURUSD', 'Euro / US Dollar', 'forex', 1.1750, 184000000),
-  pairRow('GBPUSD', 'British Pound / US Dollar', 'forex', 1.3550, 152000000),
-  pairRow('USDJPY', 'US Dollar / Japanese Yen', 'forex', 146.30, 196000000),
-  pairRow('AUDUSD', 'Australian Dollar / US Dollar', 'forex', 0.6650, 82000000),
-  pairRow('USDCAD', 'US Dollar / Canadian Dollar', 'forex', 1.3625, 76000000),
-  pairRow('USDCHF', 'US Dollar / Swiss Franc', 'forex', 0.8860, 68000000),
-  pairRow('NZDUSD', 'New Zealand Dollar / US Dollar', 'forex', 0.6100, 46000000),
-  pairRow('EURGBP', 'Euro / British Pound', 'forex', 0.8660, 36000000),
-  pairRow('EURJPY', 'Euro / Japanese Yen', 'forex', 171.50, 54000000),
-  pairRow('GBPJPY', 'British Pound / Japanese Yen', 'forex', 198.20, 42000000),
-  pairRow('AUDJPY', 'Australian Dollar / Japanese Yen', 'forex', 97.30, 38000000),
-  pairRow('XAUUSD', 'Gold / US Dollar', 'forex', 4300.0, 64000000),
-  pairRow('XAGUSD', 'Silver / US Dollar', 'forex', 31.20, 38000000),
-  pairRow('XPTUSD', 'Platinum / US Dollar', 'forex', 1045.0, 6200000),
-  pairRow('XPDUSD', 'Palladium / US Dollar', 'forex', 1210.0, 4800000),
-  pairRow('USDCNH', 'US Dollar / Chinese Yuan', 'forex', 7.2700, 21000000),
-  pairRow('USDMXN', 'US Dollar / Mexican Peso', 'forex', 18.40, 14000000),
-  pairRow('USDZAR', 'US Dollar / South African Rand', 'forex', 17.90, 9200000),
-  pairRow('USDSEK', 'US Dollar / Swedish Krona', 'forex', 10.35, 8600000),
-  pairRow('USDNOK', 'US Dollar / Norwegian Krone', 'forex', 10.70, 7400000),
-  pairRow('USDPLN', 'US Dollar / Polish Zloty', 'forex', 3.82, 6800000),
-  pairRow('USDSGD', 'US Dollar / Singapore Dollar', 'forex', 1.3550, 12400000),
-  pairRow('USDHKD', 'US Dollar / Hong Kong Dollar', 'forex', 7.78, 9600000),
-  pairRow('USDTRY', 'US Dollar / Turkish Lira', 'forex', 32.40, 5400000),
-  pairRow('EURCHF', 'Euro / Swiss Franc', 'forex', 0.9550, 18400000),
-  pairRow('EURAUD', 'Euro / Australian Dollar', 'forex', 1.7600, 8600000),
-  pairRow('EURCAD', 'Euro / Canadian Dollar', 'forex', 1.6000, 7800000),
-  pairRow('EURNZD', 'Euro / New Zealand Dollar', 'forex', 1.7900, 4200000),
-  pairRow('EURSEK', 'Euro / Swedish Krona', 'forex', 11.60, 3600000),
-  pairRow('EURNOK', 'Euro / Norwegian Krone', 'forex', 11.90, 2800000),
-  pairRow('EURPLN', 'Euro / Polish Zloty', 'forex', 4.45, 3200000),
-  pairRow('GBPCHF', 'British Pound / Swiss Franc', 'forex', 1.1900, 5800000),
-  pairRow('GBPAUD', 'British Pound / Australian Dollar', 'forex', 2.0400, 3800000),
-  pairRow('GBPCAD', 'British Pound / Canadian Dollar', 'forex', 1.8450, 3400000),
-  pairRow('GBPNZD', 'British Pound / New Zealand Dollar', 'forex', 2.2200, 2200000),
-  pairRow('CHFJPY', 'Swiss Franc / Japanese Yen', 'forex', 165.40, 4800000),
-  pairRow('CADJPY', 'Canadian Dollar / Japanese Yen', 'forex', 107.20, 4200000),
-  pairRow('NZDJPY', 'New Zealand Dollar / Japanese Yen', 'forex', 90.20, 2800000),
-];
-
-const CRYPTO_PAIRS = [
-  pairRow('BTCUSD', 'Bitcoin / US Dollar', 'crypto', 67340.2, 2980000000),
-  pairRow('ETHUSD', 'Ethereum / US Dollar', 'crypto', 3528.4, 1840000000),
-  pairRow('SOLUSD', 'Solana / US Dollar', 'crypto', 168.4, 980000000),
-  pairRow('XRPUSD', 'XRP / US Dollar', 'crypto', 0.64, 820000000),
-  pairRow('ADAUSD', 'Cardano / US Dollar', 'crypto', 0.74, 420000000),
-  pairRow('DOGEUSD', 'Dogecoin / US Dollar', 'crypto', 0.18, 760000000),
-  pairRow('BNBUSD', 'Binance Coin / US Dollar', 'crypto', 610.2, 520000000),
-  pairRow('LINKUSD', 'Chainlink / US Dollar', 'crypto', 18.8, 360000000),
-  pairRow('AVAXUSD', 'Avalanche / US Dollar', 'crypto', 36.4, 220000000),
-  pairRow('DOTUSD', 'Polkadot / US Dollar', 'crypto', 8.4, 280000000),
-  pairRow('MATICUSD', 'Polygon / US Dollar', 'crypto', 0.98, 240000000),
-  pairRow('LTCUSD', 'Litecoin / US Dollar', 'crypto', 92.8, 180000000),
-  pairRow('TRXUSD', 'TRON / US Dollar', 'crypto', 0.16, 200000000),
-  pairRow('ATOMUSD', 'Cosmos / US Dollar', 'crypto', 9.8, 180000000),
-  pairRow('BCHUSD', 'Bitcoin Cash / US Dollar', 'crypto', 462.8, 320000000),
-  pairRow('XLMUSD', 'Stellar / US Dollar', 'crypto', 0.11, 240000000),
-  pairRow('XMRUSD', 'Monero / US Dollar', 'crypto', 168.4, 96000000),
-  pairRow('ZECUSD', 'Zcash / US Dollar', 'crypto', 30.4, 64000000),
-  pairRow('ETCUSD', 'Ethereum Classic / US Dollar', 'crypto', 26.4, 120000000),
-  pairRow('NEARUSD', 'NEAR Protocol / US Dollar', 'crypto', 5.2, 180000000),
-  pairRow('ICPUSD', 'Internet Computer / US Dollar', 'crypto', 9.8, 84000000),
-  pairRow('FILUSD', 'Filecoin / US Dollar', 'crypto', 4.62, 92000000),
-  pairRow('ALGOUSD', 'Algorand / US Dollar', 'crypto', 0.15, 78000000),
-  pairRow('VETUSD', 'VeChain / US Dollar', 'crypto', 0.026, 82000000),
-  pairRow('UNIUSD', 'Uniswap / US Dollar', 'crypto', 9.24, 140000000),
-  pairRow('AAVEUSD', 'Aave / US Dollar', 'crypto', 92.4, 98000000),
-  pairRow('COMPUSD', 'Compound / US Dollar', 'crypto', 52.8, 42000000),
-  pairRow('INJUSD', 'Injective / US Dollar', 'crypto', 21.4, 56000000),
-  pairRow('ARBUSD', 'Arbitrum / US Dollar', 'crypto', 0.82, 164000000),
-  pairRow('OPUSD', 'Optimism / US Dollar', 'crypto', 1.78, 128000000),
-  pairRow('APTUSD', 'Aptos / US Dollar', 'crypto', 7.24, 88000000),
-  pairRow('SUIUSD', 'Sui / US Dollar', 'crypto', 1.62, 186000000),
-  pairRow('TIAUSD', 'Celestia / US Dollar', 'crypto', 6.84, 62000000),
-  pairRow('GALAUSD', 'Gala / US Dollar', 'crypto', 0.028, 74000000),
-  pairRow('SANDUSD', 'The Sandbox / US Dollar', 'crypto', 0.32, 58000000),
-  pairRow('MANAUSD', 'Decentraland / US Dollar', 'crypto', 0.38, 48000000),
-  pairRow('AXSUSD', 'Axie Infinity / US Dollar', 'crypto', 5.82, 42000000),
-  pairRow('IMXUSD', 'Immutable / US Dollar', 'crypto', 1.42, 46000000),
-  pairRow('GRTUSD', 'The Graph / US Dollar', 'crypto', 0.18, 52000000),
-  pairRow('CRVUSD', 'Curve DAO / US Dollar', 'crypto', 0.24, 44000000),
-  pairRow('PEPEUSD', 'Pepe / US Dollar', 'crypto', 0.0000082, 620000000),
-  pairRow('SHIBUSD', 'Shiba Inu / US Dollar', 'crypto', 0.0000186, 380000000),
-];
-
-const FUTURES_PAIRS = [
-  pairRow('ES', 'E-mini S&P 500 Future', 'futures', 5487.0, 64000000),
-  pairRow('NQ', 'E-mini Nasdaq-100 Future', 'futures', 19350.0, 54000000),
-  pairRow('YM', 'Dow Jones Industrial Average Future', 'futures', 41380.0, 22000000),
-  pairRow('RTY', 'Russell 2000 Future', 'futures', 2285.0, 18000000),
-  pairRow('GC', 'Gold Future', 'futures', 4300.0, 37000000),
-  pairRow('SI', 'Silver Future', 'futures', 31.25, 24000000),
-  pairRow('CL', 'Crude Oil Future', 'futures', 76.2, 31000000),
-  pairRow('NG', 'Natural Gas Future', 'futures', 3.62, 25000000),
-  pairRow('HG', 'Copper Future', 'futures', 4.62, 12000000),
-  pairRow('BZ', 'Brent Crude Future', 'futures', 80.4, 18000000),
-  pairRow('6E', 'Euro FX Future', 'futures', 1.1750, 16000000),
-  pairRow('6J', 'Japanese Yen Future', 'futures', 0.00695, 12000000),
-  pairRow('6B', 'British Pound Future', 'futures', 1.3550, 14000000),
-  pairRow('6A', 'Australian Dollar Future', 'futures', 0.6650, 11000000),
-];
-
-const BOOK = [...UNIVERSE, ...INTL_UNIVERSE, ...FOREX_PAIRS, ...CRYPTO_PAIRS, ...FUTURES_PAIRS];
 
 function orderSideOf(positionSide) {
   return positionSide === 'long' || positionSide === 'buy' ? 'buy' : 'sell';
@@ -351,37 +316,9 @@ export default async function handler(req, res) {
     const offset = Math.max(0, Number(params.offset) || 0);
     const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
 
-    const liveMap = await fetchLiveMarketSnapshot().catch(() => ({}));
-
-    if (shouldTick) {
-      const { data: all } = await supabase.from('markets').select('id, asset_class, price, change_24h, high_24h, low_24h');
-      const pool = all || [];
-      const sample = [];
-      const n = Math.min(36, pool.length);
-      const used = new Set();
-      while (sample.length < n && used.size < pool.length) {
-        const i = Math.floor(Math.random() * pool.length);
-        if (used.has(i)) continue;
-        used.add(i);
-        sample.push(pool[i]);
-      }
-      if (symbol) {
-        const hit = pool.find((m) => m.symbol === symbol);
-        if (hit && !sample.some((s) => s.id === hit.id)) sample.push(hit);
-      }
-      await Promise.all(sample.map((m) => {
-        const liveQuote = liveMap[String(m.symbol).toUpperCase()];
-        const visualMarket = liveQuote ? blendLiveQuote(m, liveQuote) : m;
-        const u = applyTick({ ...m, ...visualMarket });
-        return supabase.from('markets').update({
-          price: u.price,
-          change_24h: u.change_24h,
-          high_24h: u.high_24h,
-          low_24h: u.low_24h,
-        }).eq('id', u.id);
-      }));
-    }
-
+    // Fetch live crypto prices from Binance for crypto assets only
+    const liveCryptoPrices = await fetchLiveCryptoPrices();
+    
     let query = supabase.from('markets').select('*', { count: 'exact' });
     if (assetClass && assetClass !== 'all') {
       const mapped = CLASS_MAP[assetClass] || [assetClass];
@@ -405,10 +342,23 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    if (shouldTick) await fillPendingLimits(data || []);
-
+    // Apply live Binance prices to crypto assets
     const items = (data || []).map((row) => {
-      // Return raw data without blending to ensure single consistent price source
+      const sym = String(row.symbol || '').toUpperCase();
+      const liveData = liveCryptoPrices[sym];
+      
+      // If it's a crypto asset and we have live data, use it
+      if (row.asset_class === 'crypto' && liveData) {
+        return {
+          ...row,
+          price: liveData.price,
+          change_24h: liveData.change_24h,
+          high_24h: liveData.high_24h,
+          low_24h: liveData.low_24h,
+          volume: liveData.volume,
+        };
+      }
+      // Otherwise return database price (for stocks, forex, futures)
       return row;
     });
 
