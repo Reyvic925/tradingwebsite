@@ -19,7 +19,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
-    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs",
+    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs",
     "backfill:wallets": "node scripts/backfill-wallets.js",
     "seed:kyc": "node scripts/seed-kyc-table.js"
   },

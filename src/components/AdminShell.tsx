@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 const nav = [
   { to: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
   { to: '/admin/health', label: 'Health', icon: Activity },
+  { to: '/app/admin/users', label: 'All Users', icon: Users },
   { to: '/app/admin/crypto-keys', label: 'Crypto Keys', icon: Wallet },
   { to: '/app/admin/kyc', label: 'KYC', icon: FileCheck2 },
 ];

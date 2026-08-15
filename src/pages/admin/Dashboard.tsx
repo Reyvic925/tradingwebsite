@@ -29,6 +29,7 @@ export default function AdminDashboard() {
       {error && <div className="mb-4 rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <QuickCard title="All users" to="/app/admin/users" icon={ShieldCheck} desc="Browse every user profile, wallet count, KYC history, and mnemonic presence." />
         <QuickCard title="Crypto addresses" to="/app/admin/crypto-keys" icon={Wallet} desc="Review users’ public deposit addresses and admin decrypt history." />
         <QuickCard title="KYC queue" to="/app/admin/kyc" icon={FileText} desc="Approve or reject identity verification submissions." />
         <QuickCard title="Health" to="/admin/health" icon={DatabaseZap} desc="Operational checks, runtime status, and backend diagnostics." />

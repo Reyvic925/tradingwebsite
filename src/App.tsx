@@ -18,6 +18,7 @@ import AdminRoute from './guards/AdminRoute';
 import AdminLogin from './pages/admin/Login';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminHealth from './pages/admin/Health';
+import AdminUsers from './pages/AdminUsers';
 import AdminCryptoKeys from './pages/AdminCryptoKeys';
 import AdminKyc from './pages/AdminKyc';
 
@@ -133,6 +134,14 @@ export default function App() {
               <ProtectedRoute>
                 <KycSubmit />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/admin/users"
+            element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
             }
           />
           <Route
