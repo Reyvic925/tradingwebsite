@@ -27,6 +27,7 @@ export default function Trade() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
+  const [marketPrices, setMarketPrices] = useState<Record<string, number>>({});
 
   const selected = useMemo(() => {
     if (!markets.length) return null;
@@ -52,6 +53,14 @@ export default function Trade() {
       setOrders(asList(o));
       if (w) setWallet(w);
       setWatch(asList(wl));
+      
+      // Build market prices map for real-time P&L
+      const prices: Record<string, number> = {};
+      merged.forEach(mkt => {
+        prices[mkt.symbol] = Number(mkt.price);
+      });
+      setMarketPrices(prices);
+      
       setErr('');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Desk unavailable');
@@ -65,6 +74,24 @@ export default function Trade() {
     const id = setInterval(load, 20000);
     return () => clearInterval(id);
   }, [filter, search, symbol]);
+  
+  // Real-time P&L update every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Fetch latest prices for all symbols in positions
+      if (positions.length > 0 && markets.length > 0) {
+        const symbols = positions.map(p => p.symbol);
+        apiMarkets<Market>({ symbols: symbols.join(','), limit: 50 }).then(({ items }) => {
+          const prices: Record<string, number> = {};
+          items.forEach(m => {
+            prices[m.symbol] = Number(m.price);
+          });
+          setMarketPrices(prev => ({ ...prev, ...prices }));
+        }).catch(() => {});
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [positions.length, markets.length]);
 
   const FILTERS = [
     { id: 'all', label: 'All' },
@@ -243,20 +270,31 @@ export default function Trade() {
                   </tr>
                 </thead>
                 <tbody>
-                  {positions.map((p) => (
-                    <tr key={p.id} className="border-t border-white/5">
-                      <td className="px-4 py-2 font-mono">{p.symbol}</td>
-                      <td className={`px-3 py-2 uppercase ${p.side === 'long' || p.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}`}>{p.side}</td>
-                      <td className="px-3 py-2 font-mono">{p.quantity}</td>
-                      <td className={`px-3 py-2 font-mono ${Number(p.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(p.pnl))}</td>
-                      <td className="px-3 py-2">
-                        <RiskInline pos={p} onSave={updateRisk} />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <button onClick={() => closePos(p.id)} className="text-xs text-rose-300 hover:text-rose-200">Close</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {positions.map((p) => {
+                    const currentPrice = marketPrices[p.symbol] || Number(p.entry_price);
+                    const entryPrice = Number(p.entry_price);
+                    const qty = Number(p.quantity);
+                    let pnl = 0;
+                    if (p.side === 'long' || p.side === 'buy') {
+                      pnl = (currentPrice - entryPrice) * qty;
+                    } else {
+                      pnl = (entryPrice - currentPrice) * qty;
+                    }
+                    return (
+                      <tr key={p.id} className="border-t border-white/5">
+                        <td className="px-4 py-2 font-mono">{p.symbol}</td>
+                        <td className={`px-3 py-2 uppercase ${p.side === 'long' || p.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}`}>{p.side}</td>
+                        <td className="px-3 py-2 font-mono">{p.quantity}</td>
+                        <td className={`px-3 py-2 font-mono ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(pnl)}</td>
+                        <td className="px-3 py-2">
+                          <RiskInline pos={p} onSave={updateRisk} />
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <button onClick={() => closePos(p.id)} className="text-xs text-rose-300 hover:text-rose-200">Close</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {!positions.length && (
                     <tr><td colSpan={6} className="px-4 py-6 text-center text-stone-500">Flat book.</td></tr>
                   )}
