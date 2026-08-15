@@ -8,6 +8,8 @@ import type { Txn, Wallet as WalletT, Profile as ProfileT } from '../types';
 // Fallback - will be replaced by config from API
 const FALLBACK_SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
+type DepositAddress = { id: number; currency: string; network?: string; address: string };
+
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletT | null>(null);
   const [profile, setProfile] = useState<ProfileT | null>(null);
@@ -20,7 +22,7 @@ export default function Wallet() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [depositAddresses, setDepositAddresses] = useState<{ id: number; currency: string; network?: string; address: string }[]>([]);
+  const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>([]);
   const [coinQuery, setCoinQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [supportedCryptos, setSupportedCryptos] = useState<string[]>(FALLBACK_SUPPORTED_CRYPTOS);
@@ -31,13 +33,13 @@ export default function Wallet() {
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiGet<{ profile: ProfileT }>('/api/profile').then(r => r.profile).catch(() => null),
         apiList<Txn>('/api/transactions'),
-        apiList<{ id: number; currency: string; network?: string; address: string }>('/api/user/crypto-addresses').catch(() => []),
+        apiList<DepositAddress>('/api/user/crypto-addresses').catch(() => []),
         fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
       if (w) setWallet(w);
       if (p) setProfile(p);
       setTxns(asList(t));
-      const uniqueAddresses = asList(addresses).reduce<{ id: number; currency: string; network?: string; address: string }[]>((acc, item) => {
+      const uniqueAddresses = addresses.reduce<DepositAddress[]>((acc, item) => {
         const key = `${item.currency}|${item.network || ''}|${item.address}`;
         const alreadyPresent = acc.some((existing) => `${existing.currency}|${existing.network || ''}|${existing.address}` === key);
         if (!alreadyPresent) acc.push(item);
