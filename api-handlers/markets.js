@@ -3,7 +3,9 @@ import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE, CRYPTO_PAIRS, FX_PAIRS, FUTURE_PAIRS } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
 import { normalizeAssetClass, fetchCoinGeckoQuotes } from './live-market-data.js';
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+
+const yahooFinance = new YahooFinance();
 
 const MARGIN_RATE = 0.1;
 const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
@@ -330,28 +332,36 @@ async function fetchLiveCryptoPrices() {
 
 async function fetchLiveYahooPrices(symbols) {
   try {
-    const yahooSymbols = symbols.map(sym => {
-      if (YAHOO_SYMBOL_MAP[sym]) return YAHOO_SYMBOL_MAP[sym];
-      return sym;
-    });
-    
-    const quotes = await yahooFinance.quotes(yahooSymbols, { fields: ["regularMarketPrice", "regularMarketChangePercent", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "regularMarketVolume"] });
-    
+    const yahooSymbols = [...new Set(symbols.map(sym => YAHOO_SYMBOL_MAP[sym] || sym))];
+    const quoteResults = await Promise.allSettled(
+      yahooSymbols.map((sym) => yahooFinance.quote(sym, {
+        fields: ['regularMarketPrice', 'regularMarketChangePercent', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow', 'regularMarketVolume', 'symbol'],
+      }))
+    );
+
     const priceMap = {};
-    quotes.forEach(quote => {
-      if (!quote.symbol || quote.regularMarketPrice === undefined) return;
-      for (const [ourSymbol, yahooSym] of Object.entries(YAHOO_SYMBOL_MAP)) {
-        if (yahooSym === quote.symbol || (yahooSym.endsWith("=X") && quote.symbol.startsWith(yahooSym.slice(0, -2)))) {
-          priceMap[ourSymbol] = {
-            price: quote.regularMarketPrice,
-            change_24h: quote.regularMarketChangePercent || 0,
-            high_24h: quote.fiftyTwoWeekHigh || quote.regularMarketPrice,
-            low_24h: quote.fiftyTwoWeekLow || quote.regularMarketPrice,
-            volume: quote.regularMarketVolume || 0,
-          };
-          break;
-        }
+    quoteResults.forEach((result) => {
+      if (result.status !== 'fulfilled' || !result.value) return;
+      const quote = result.value;
+      if (!quote?.symbol || quote.regularMarketPrice === undefined) return;
+      const lookup = Object.entries(YAHOO_SYMBOL_MAP).find(([ourSymbol, yahooSym]) => {
+        if (yahooSym === quote.symbol) return true;
+        if (typeof yahooSym === 'string' && yahooSym.endsWith('=X') && quote.symbol.startsWith(yahooSym.slice(0, -2))) return true;
+        return false;
+      });
+
+      const targetSymbol = lookup ? lookup[0] : null;
+      if (targetSymbol) {
+        priceMap[targetSymbol] = {
+          price: quote.regularMarketPrice,
+          change_24h: quote.regularMarketChangePercent || 0,
+          high_24h: quote.fiftyTwoWeekHigh || quote.regularMarketPrice,
+          low_24h: quote.fiftyTwoWeekLow || quote.regularMarketPrice,
+          volume: quote.regularMarketVolume || 0,
+        };
+        return;
       }
+
       if (YAHOO_SYMBOL_MAP[quote.symbol] === quote.symbol) {
         priceMap[quote.symbol] = {
           price: quote.regularMarketPrice,
@@ -364,7 +374,7 @@ async function fetchLiveYahooPrices(symbols) {
     });
     return priceMap;
   } catch (error) {
-    console.error("Failed to fetch Yahoo Finance prices:", error.message);
+    console.error('Failed to fetch Yahoo Finance prices:', error.message);
     return {};
   }
 }
