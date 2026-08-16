@@ -672,8 +672,8 @@ export default async function handler(req, res) {
       if (countErr && !isMissingSchemaError(countErr)) {
         throw countErr;
       }
-      if (!count || count === 0) {
-        console.log('Markets table empty or missing, calling ensureUniverse()...');
+      if (!count || count < 1000) {
+        console.log(`Markets table count ${count || 0} below threshold, calling ensureUniverse()...`);
         await ensureUniverse();
         console.log('ensureUniverse() completed');
       }

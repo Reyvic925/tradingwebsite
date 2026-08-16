@@ -741,4 +741,6 @@ export const CLASS_MAP = {
   in: ['in', 'in-etf'],
   forex: ['forex'],
   crypto: ['crypto'],
+  futures: ['futures'],
+  stocks: ['stock', 'ca', 'jp', 'uk', 'eu', 'de', 'fr', 'in'],
 };

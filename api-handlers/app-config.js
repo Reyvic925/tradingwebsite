@@ -2,6 +2,7 @@ import supabase from './db-client.js';
 
 export const DEFAULT_MARKET_FILTERS = [
   { id: 'all', label: 'All' },
+  { id: 'stocks', label: 'Stocks' },
   { id: 'usa', label: 'USA' },
   { id: 'japan', label: 'Japan' },
   { id: 'canada', label: 'Canada' },
@@ -13,6 +14,7 @@ export const DEFAULT_MARKET_FILTERS = [
   { id: 'etf', label: 'US ETFs' },
   { id: 'forex', label: 'FX' },
   { id: 'crypto', label: 'Crypto' },
+  { id: 'futures', label: 'Futures' },
 ];
 
 export function sanitizeMarketFilters(value) {
