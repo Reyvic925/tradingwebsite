@@ -55,10 +55,13 @@ export default function Trade() {
       if (w) setWallet(w);
       setWatch(asList(wl));
       
-      // Build market prices map for real-time P&L
+      // Build market prices map for real-time P&L - only include valid prices
       const prices: Record<string, number> = {};
       merged.forEach(mkt => {
-        prices[mkt.symbol] = Number(mkt.price);
+        const numPrice = Number(mkt.price);
+        if (!isNaN(numPrice) && numPrice > 0) {
+          prices[mkt.symbol] = numPrice;
+        }
       });
       setMarketPrices(prices);
       setLatestPrice(prices);
@@ -92,7 +95,11 @@ export default function Trade() {
           const prices: Record<string, number> = {};
           results.forEach(r => {
             if (r.price !== null && r.price !== undefined) {
-              prices[r.symbol] = Number(r.price);
+              const numPrice = Number(r.price);
+              // Only update if it's a valid positive number
+              if (!isNaN(numPrice) && numPrice > 0) {
+                prices[r.symbol] = numPrice;
+              }
             }
           });
           // Update both maps with the same price to avoid dual pricing
@@ -223,7 +230,7 @@ export default function Trade() {
                   <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'futures' ? 'Futures' : m.asset_class === 'jp' || m.asset_class === 'jp-etf' || m.asset_class === 'ca' || m.asset_class === 'ca-etf' || m.asset_class === 'uk' || m.asset_class === 'uk-etf' || m.asset_class === 'eu' || m.asset_class === 'eu-etf' || m.asset_class === 'de' || m.asset_class === 'de-etf' || m.asset_class === 'fr' || m.asset_class === 'fr-etf' || m.asset_class === 'in' || m.asset_class === 'in-etf' ? 'Stocks' : 'Stocks'}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-xs">{formatPrice(Number(m.price))}</div>
+                  <div className="font-mono text-xs">{formatPrice(latestPrice[m.symbol] ?? Number(m.price))}</div>
                   <div className={`text-[10px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>
                 </div>
               </button>
@@ -241,12 +248,12 @@ export default function Trade() {
                   <div className="font-display text-4xl">{selected.symbol}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-3xl">{formatPrice(Number(selected.price))}</div>
+                  <div className="font-mono text-3xl">{formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
                   <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatPct(Number(selected.change_24h))} 24h</div>
                 </div>
               </div>
               <div className="h-72 rounded-md border border-white/5 bg-[#080b11] p-2 md:h-96">
-                <PriceChart symbol={selected.symbol} price={Number(selected.price)} change={Number(selected.change_24h)} />
+                <PriceChart symbol={selected.symbol} price={latestPrice[selected.symbol] ?? Number(selected.price)} change={Number(selected.change_24h)} />
               </div>
               <div className="grid grid-cols-3 gap-3 text-xs">
                 <div className="rounded-sm border border-white/5 p-3">
