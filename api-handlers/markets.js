@@ -632,6 +632,26 @@ export default async function handler(req, res) {
     const params = req.query || Object.fromEntries(new URL(req.url || '/', 'http://localhost').searchParams.entries());
     req.query = params;
 
+    // Admin endpoint to force rebuild markets
+    if (req.method === 'POST' && params.action === 'reseed') {
+      console.log('Received reseed request...');
+      try {
+        // Clear existing markets
+        const { error: delErr } = await supabase.from('markets').delete().neq('id', 0);
+        if (!delErr) console.log('Cleared existing markets');
+        
+        // Reseed with universe data
+        await ensureUniverse();
+        
+        const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
+        console.log(`Reseed completed. Markets count: ${count}`);
+        return res.status(200).json({ ok: true, count: count || 0, message: `Reseeded ${count} markets` });
+      } catch (err) {
+        console.error('Reseed error:', err.message);
+        return res.status(500).json({ ok: false, error: err.message });
+      }
+    }
+
     if (req.method === 'POST') {
       try {
         await ensureUniverse();
@@ -671,11 +691,22 @@ export default async function handler(req, res) {
     const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
 
     let query = supabase.from('markets').select('*', { count: 'exact' });
+    
+    // Handle asset class filtering - default to 'all' if not recognized
     if (assetClass && assetClass !== 'all') {
-      const mapped = CLASS_MAP[assetClass] || [assetClass];
-      if (mapped.length === 1) query = query.eq('asset_class', mapped[0]);
-      else query = query.in('asset_class', mapped);
+      const mapped = CLASS_MAP[assetClass];
+      if (mapped) {
+        console.log(`Filtering by ${assetClass}: ${JSON.stringify(mapped)}`);
+        if (mapped.length === 1) {
+          query = query.eq('asset_class', mapped[0]);
+        } else {
+          query = query.in('asset_class', mapped);
+        }
+      } else {
+        console.warn(`Unknown asset class: ${assetClass}, defaulting to all`);
+      }
     }
+    
     if (q) {
       query = query.or(`symbol.ilike.%${q}%,name.ilike.%${q}%`);
     }
