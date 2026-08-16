@@ -27,10 +27,10 @@ export default function TraderProfile() {
   const [trader, setTrader] = useState<Trader | null>(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { trades } = useTraderTrades(Number(traderId));
+  const [error, setError] = useState<string | null>(null);
+  const { trades } = useTraderTrades(traderId as string);
   const { followTrader } = useCopyTrading();
-  const animatedReturn = usePnlAnimation(trader?.total_return || 0, 1000, 2);
+  const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
 
   // Load trader details
   useEffect(() => {
@@ -45,8 +45,8 @@ export default function TraderProfile() {
         
         // For now, placeholder
         console.log('Fetch trader:', traderId);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }

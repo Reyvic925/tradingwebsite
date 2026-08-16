@@ -7,12 +7,12 @@ import { useEffect, useRef, useState } from 'react';
  * @param decimals - Number of decimal places
  * @returns Animated display value
  */
-export function usePnlAnimation(targetValue, duration = 1000, decimals = 2) {
-  const [displayValue, setDisplayValue] = useState(targetValue);
-  const animationRef = useRef(null);
+export function usePnlAnimation(targetValue: number, duration: number = 1000, decimals: number = 2): number {
+  const [displayValue, setDisplayValue] = useState<number>(targetValue);
+  const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (animationRef.current) {
+    if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);
     }
 
@@ -37,7 +37,7 @@ export function usePnlAnimation(targetValue, duration = 1000, decimals = 2) {
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationRef.current) {
+      if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
       }
     };
@@ -51,16 +51,16 @@ export function usePnlAnimation(targetValue, duration = 1000, decimals = 2) {
  * @returns Object with follows, summary, methods
  */
 export function useCopyTrading() {
-  const [follows, setFollows] = useState([]);
-  const [summary, setSummary] = useState({
+  const [follows, setFollows] = useState<any[]>([]);
+  const [summary, setSummary] = useState<Record<string, any>>({
     total_invested: 0,
     total_current: 0,
     total_pnl: 0,
     total_pnl_percent: 0,
     count: 0
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchFollows = async () => {
     try {
@@ -73,8 +73,9 @@ export function useCopyTrading() {
       if (!response.ok) throw new Error('Failed to fetch follows');
       const data = await response.json();
       setFollows(data);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -90,12 +91,12 @@ export function useCopyTrading() {
       if (!response.ok) throw new Error('Failed to fetch summary');
       const data = await response.json();
       setSummary(data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Summary error:', err);
     }
   };
 
-  const followTrader = async (traderId, allocatedAmount, settings = {}) => {
+  const followTrader = async (traderId: string | number, allocatedAmount: number, settings: Record<string, any> = {}) => {
     try {
       const response = await fetch('/api/copy-trades', {
         method: 'POST',
@@ -106,9 +107,9 @@ export function useCopyTrading() {
         body: JSON.stringify({
           trader_id: traderId,
           allocated_amount: allocatedAmount,
-          stop_loss_percent: settings.stopLoss || 20,
-          take_profit_percent: settings.takeProfit || 200,
-          leverage_multiplier: settings.leverage || 1
+          stop_loss_percent: (settings as any).stopLoss || 20,
+          take_profit_percent: (settings as any).takeProfit || 200,
+          leverage_multiplier: (settings as any).leverage || 1
         })
       });
       if (!response.ok) throw new Error('Failed to follow trader');
@@ -121,7 +122,7 @@ export function useCopyTrading() {
     }
   };
 
-  const updateFollow = async (followId, settings) => {
+  const updateFollow = async (followId: string, settings: Record<string, any>) => {
     try {
       const response = await fetch(`/api/copy-trades?id=${followId}`, {
         method: 'PUT',
@@ -130,9 +131,9 @@ export function useCopyTrading() {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
-          stop_loss_percent: settings.stopLoss,
-          take_profit_percent: settings.takeProfit,
-          leverage_multiplier: settings.leverage
+          stop_loss_percent: (settings as any).stopLoss,
+          take_profit_percent: (settings as any).takeProfit,
+          leverage_multiplier: (settings as any).leverage
         })
       });
       if (!response.ok) throw new Error('Failed to update follow');
@@ -144,7 +145,7 @@ export function useCopyTrading() {
     }
   };
 
-  const stopCopying = async (followId) => {
+  const stopCopying = async (followId: string) => {
     try {
       const response = await fetch(`/api/copy-trades?id=${followId}`, {
         method: 'DELETE',
@@ -156,7 +157,7 @@ export function useCopyTrading() {
       await fetchFollows();
       await fetchSummary();
       return { ok: true };
-    } catch (err) {
+    } catch (err: unknown) {
       throw err;
     }
   };
@@ -196,9 +197,9 @@ export function useCopyTrading() {
  * @returns Array of leaderboard entries
  */
 export function useLeaderboard() {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -208,8 +209,8 @@ export function useLeaderboard() {
         if (!response.ok) throw new Error('Failed to fetch leaderboard');
         const data = await response.json();
         setLeaderboard(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -230,10 +231,10 @@ export function useLeaderboard() {
  * @param traderId - Trader ID
  * @returns Array of trade logs
  */
-export function useTraderTrades(traderId) {
-  const [trades, setTrades] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export function useTraderTrades(traderId: string | null) {
+  const [trades, setTrades] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!traderId) return;
@@ -245,8 +246,8 @@ export function useTraderTrades(traderId) {
         if (!response.ok) throw new Error('Failed to fetch trades');
         const data = await response.json();
         setTrades(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -268,10 +269,10 @@ export function useTraderTrades(traderId) {
  * @param asset - Optional asset filter
  * @returns Array of traders
  */
-export function useTraders(session = null, asset = null) {
-  const [traders, setTraders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export function useTraders(session: string | null = null, asset: string | null = null) {
+  const [traders, setTraders] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTraders = async () => {
@@ -287,8 +288,8 @@ export function useTraders(session = null, asset = null) {
         if (!response.ok) throw new Error('Failed to fetch traders');
         const data = await response.json();
         setTraders(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -309,8 +310,8 @@ export function useTraders(session = null, asset = null) {
  * @returns Notifications and methods
  */
 export function useNotifications() {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -323,7 +324,7 @@ export function useNotifications() {
         if (!response.ok) return;
         const data = await response.json();
         setNotifications(data);
-        setUnreadCount(data.filter(n => !n.read).length);
+        setUnreadCount(data.filter((n: any) => !n.read).length);
       } catch (err) {
         console.error('Notification fetch error:', err);
       }
@@ -336,7 +337,7 @@ export function useNotifications() {
     return () => clearInterval(interval);
   }, []);
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (notificationId: string) => {
     try {
       const response = await fetch(`/api/notifications?id=${notificationId}`, {
         method: 'PUT',
@@ -345,15 +346,15 @@ export function useNotifications() {
         }
       });
       if (response.ok) {
-        setNotifications(prev =>
-          prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+        setNotifications((prev: any[]) =>
+          prev.map((n: any) => n.id === notificationId ? { ...n, read: true } : n)
         );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount((prev: number) => Math.max(0, prev - 1));
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Mark read error:', err);
     }
-  };
+  }
 
   return { notifications, unreadCount, markAsRead };
 }

@@ -21,7 +21,7 @@ import { formatMoney, formatPct } from '../lib/format';
 import type { Trader, UserFollow, LeaderboardEntry } from '../types';
 
 // Follow Modal Component
-function FollowModal({ trader, isOpen, onClose, onFollow }) {
+function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; isOpen: boolean; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [allocation, setAllocation] = useState(1000);
   const [stopLoss, setStopLoss] = useState(20);
   const [takeProfit, setTakeProfit] = useState(200);
@@ -168,7 +168,7 @@ function LeaderboardSection() {
         Top Traders
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(leaderboard || []).slice(0, 3).map((trader, idx) => (
+        {((leaderboard as any[]) || []).slice(0, 3).map((trader: any, idx: number) => (
           <div
             key={trader.id}
             className={`p-4 rounded-lg border backdrop-blur-sm transition ${
@@ -264,12 +264,12 @@ function PortfolioSummary() {
 }
 
 // Trader Card Component
-function TraderCard({ trader, onFollow }) {
-  const [showModal, setShowModal] = useState(false);
+function TraderCard({ trader, onFollow }: { trader: Trader; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
+  const [showModal, setShowModal] = useState<boolean>(false);
   const isProfit = trader.total_return >= 0;
 
-  const getSessionBadge = (sessionType) => {
-    const badges = {
+  const getSessionBadge = (sessionType: string) => {
+    const badges: Record<string, any> = {
       asia: { emoji: '🌙', label: 'Asia' },
       london: { emoji: '🇬🇧', label: 'London' },
       nyc: { emoji: '🗽', label: 'NYC' },
@@ -308,7 +308,7 @@ function TraderCard({ trader, onFollow }) {
         {/* Asset Focus Pills */}
         {trader.asset_focus && trader.asset_focus.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
-            {trader.asset_focus.slice(0, 3).map((asset, idx) => (
+            {(trader.asset_focus as string[]).slice(0, 3).map((asset: string, idx: number) => (
               <span
                 key={idx}
                 className="px-2 py-1 rounded-full bg-white/10 text-xs text-gray-300"
@@ -362,7 +362,7 @@ function TraderCard({ trader, onFollow }) {
 // My Positions Section
 function MyPositions() {
   const { follows, summary, stopCopying, loading } = useCopyTrading();
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
@@ -379,7 +379,7 @@ function MyPositions() {
 
   return (
     <div className="divide-y divide-white/5 rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
-      {follows.map((follow) => {
+      {((follows as any[]) || []).map((follow: UserFollow) => {
         const isProfit = (follow.pnl_percent || 0) >= 0;
         const nearStopLoss =
           (follow.pnl_percent || 0) <= -(follow.stop_loss_percent * 0.8);
@@ -466,10 +466,10 @@ function MyPositions() {
 }
 
 // Edit Follow Form Component
-function EditFollowForm({ follow, onClose }) {
-  const [stopLoss, setStopLoss] = useState(follow.stop_loss_percent);
-  const [takeProfit, setTakeProfit] = useState(follow.take_profit_percent);
-  const [leverage, setLeverage] = useState(follow.leverage_multiplier);
+function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () => void }) {
+  const [stopLoss, setStopLoss] = useState<number>(follow.stop_loss_percent);
+  const [takeProfit, setTakeProfit] = useState<number>(follow.take_profit_percent);
+  const [leverage, setLeverage] = useState<number>(follow.leverage_multiplier);
   const { updateFollow } = useCopyTrading();
   const [saving, setSaving] = useState(false);
 
@@ -570,7 +570,7 @@ export default function Social() {
         </div>
       ) : (
         <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {traders.map((trader) => (
+        {((traders as any[]) || []).map((trader: Trader) => (
             <TraderCard
               key={trader.id}
               trader={trader}

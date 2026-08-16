@@ -8,7 +8,7 @@
  * @param trader - Trader object with session_type
  * @returns boolean - true if trader should be active
  */
-export function isTraderEligible(trader) {
+export function isTraderEligible(trader: Record<string, any>): boolean {
   const now = new Date();
   const utcHours = now.getUTCHours();
   const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
@@ -46,7 +46,7 @@ export function isTraderEligible(trader) {
  * @param sessionType - Type of session
  * @returns object - { status: 'Live' | 'Closed', hoursUntilOpen?: number }
  */
-export function getMarketStatus(sessionType) {
+export function getMarketStatus(sessionType: string): Record<string, any> {
   const now = new Date();
   const utcHours = now.getUTCHours();
   const utcDay = now.getUTCDay();
@@ -76,7 +76,7 @@ export function getMarketStatus(sessionType) {
  * @param sessionType - Type of session
  * @returns string - Friendly session name
  */
-export function getSessionLabel(sessionType) {
+export function getSessionLabel(sessionType: string): string {
   switch (sessionType) {
     case 'asia':
       return 'Asia Session';
@@ -96,7 +96,7 @@ export function getSessionLabel(sessionType) {
  * @param trader - Trader with drift and volatility settings
  * @returns number - Change percentage
  */
-export function calculateMarketChange(trader) {
+export function calculateMarketChange(trader: Record<string, any>): number {
   const random = Math.random() * 2 - 1;
   
   // Random spike (2% chance of a 5% move)
@@ -115,7 +115,7 @@ export function calculateMarketChange(trader) {
  * @param entryPrice - Entry price for the position
  * @returns number - Quantity to trade
  */
-export function calculateTradeQuantity(pnlDelta, price, entryPrice) {
+export function calculateTradeQuantity(pnlDelta: number, price: number, entryPrice: number): number {
   const priceDiff = Math.abs(price - entryPrice);
   if (priceDiff === 0) return 0;
   
@@ -129,7 +129,7 @@ export function calculateTradeQuantity(pnlDelta, price, entryPrice) {
  * @param isProfit - Whether this is a profitable trade
  * @returns number - Entry price
  */
-export function generateRealisticEntryPrice(currentPrice, changePercent, isProfit) {
+export function generateRealisticEntryPrice(currentPrice: number, changePercent: number, isProfit: boolean): number {
   if (isProfit) {
     // For profit: bought at lower price
     return currentPrice * (1 - Math.abs(changePercent) * 0.8);
@@ -145,7 +145,7 @@ export function generateRealisticEntryPrice(currentPrice, changePercent, isProfi
  * @param symbol - Asset symbol (e.g., 'BTC-USD', 'AAPL')
  * @returns Promise<number> - Current price
  */
-export async function fetchAssetPrice(symbol) {
+export async function fetchAssetPrice(symbol: string): Promise<number> {
   try {
     // Try to fetch real price from API (implement based on your data source)
     // For now, return simulated price
@@ -161,9 +161,9 @@ export async function fetchAssetPrice(symbol) {
  * @param symbol - Asset symbol
  * @returns number - Simulated price
  */
-export function getSimulatedPrice(symbol) {
+export function getSimulatedPrice(symbol: string): number {
   // Deterministic simulation based on symbol
-  const hash = symbol.split('').reduce((acc, char) => {
+  const hash = symbol.split('').reduce((acc: number, char: string) => {
     return ((acc << 5) - acc) + char.charCodeAt(0);
   }, 0);
   
@@ -180,7 +180,7 @@ export function getSimulatedPrice(symbol) {
  * @param takeProfit - Take profit percentage
  * @returns object - { shouldNotify: boolean, reason?: string }
  */
-export function checkNotificationTrigger(pnlPercent, stopLoss, takeProfit) {
+export function checkNotificationTrigger(pnlPercent: number, stopLoss: number, takeProfit: number): Record<string, any> {
   if (pnlPercent <= -stopLoss) {
     return { shouldNotify: true, reason: 'stop_loss', message: `⚠️ Stop-Loss triggered at ${pnlPercent.toFixed(2)}%` };
   }
@@ -202,7 +202,7 @@ export function checkNotificationTrigger(pnlPercent, stopLoss, takeProfit) {
  * @param totalPnL - User's total profit/loss
  * @returns number - User level
  */
-export function calculateUserLevel(totalPnL) {
+export function calculateUserLevel(totalPnL: number): number {
   const level = Math.floor(Math.sqrt(Math.max(0, totalPnL) / 100)) + 1;
   return Math.min(level, 100); // Cap at level 100
 }
@@ -212,7 +212,7 @@ export function calculateUserLevel(totalPnL) {
  * @param userStats - User statistics
  * @returns string[] - Array of earned badge names
  */
-export function getAchievedBadges(userStats) {
+export function getAchievedBadges(userStats: Record<string, any>): string[] {
   const badges = [];
   
   if (userStats.totalFollows >= 1) badges.push('first_copy');
