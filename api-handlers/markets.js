@@ -2,57 +2,11 @@ import supabase from './db-client.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE, CRYPTO_PAIRS, FX_PAIRS, FUTURE_PAIRS } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
-import { normalizeAssetClass } from './live-market-data.js';
+import { normalizeAssetClass, fetchCoinGeckoQuotes } from './live-market-data.js';
 import yahooFinance from 'yahoo-finance2';
 
 const MARGIN_RATE = 0.1;
 const SKIP = new Set(['AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'JPM']);
-
-// Map our symbols to Binance symbols
-const BINANCE_SYMBOL_MAP = {
-  'BTCUSD': 'BTCUSDT',
-  'ETHUSD': 'ETHUSDT',
-  'SOLUSD': 'SOLUSDT',
-  'XRPUSD': 'XRPUSDT',
-  'ADAUSD': 'ADAUSDT',
-  'DOGEUSD': 'DOGEUSDT',
-  'BNBUSD': 'BNBUSDT',
-  'LINKUSD': 'LINKUSDT',
-  'AVAXUSD': 'AVAXUSDT',
-  'DOTUSD': 'DOTUSDT',
-  'MATICUSD': 'MATICUSDT',
-  'LTCUSD': 'LTCUSDT',
-  'TRXUSD': 'TRXUSDT',
-  'ATOMUSD': 'ATOMUSDT',
-  'BCHUSD': 'BCHUSDT',
-  'XLMUSD': 'XLMUSDT',
-  'XMRUSD': 'XMRUSDT',
-  'ZECUSD': 'ZECUSDT',
-  'ETCUSD': 'ETCUSDT',
-  'NEARUSD': 'NEARUSDT',
-  'ICPUSD': 'ICPUSDT',
-  'FILUSD': 'FILUSDT',
-  'ALGOUSD': 'ALGOUSDT',
-  'VETUSD': 'VETUSDT',
-  'UNIUSD': 'UNIUSDT',
-  'AAVEUSD': 'AAVEUSDT',
-  'COMPUSD': 'COMPUSDT',
-  'INJUSD': 'INJUSDT',
-  'ARBUSD': 'ARBUSDT',
-  'OPUSD': 'OPUSDT',
-  'APTUSD': 'APTUSDT',
-  'SUIUSD': 'SUIUSDT',
-  'TIAUSD': 'TIAUSDT',
-  'GALAUSD': 'GALAUSDT',
-  'SANDUSD': 'SANDUSDT',
-  'MANAUSD': 'MANAUSDT',
-  'AXSUSD': 'AXSUSDT',
-  'IMXUSD': 'IMXUSDT',
-  'GRTUSD': 'GRTUSDT',
-  'CRVUSD': 'CRVUSDT',
-  'PEPEUSD': 'PEPEUSDT',
-  'SHIBUSD': 'SHIBUSDT',
-};
 
 // Map our symbols to Yahoo Finance symbols for stocks, forex, futures
 const YAHOO_SYMBOL_MAP = {
@@ -354,39 +308,21 @@ const YAHOO_SYMBOL_MAP = {
   'YORW': 'YORW',
 };
 
-// Fetch live crypto prices from Binance
+// Fetch live crypto prices from CoinGecko
 async function fetchLiveCryptoPrices() {
   try {
-    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
-    if (!response.ok) throw new Error('Binance API error');
-    const data = await response.json();
-    
-    const priceMap = {};
-    data.forEach(ticker => {
-      const symbol = ticker.symbol;
-      // Find matching our symbol
-      for (const [ourSymbol, binanceSymbol] of Object.entries(BINANCE_SYMBOL_MAP)) {
-        if (binanceSymbol === symbol) {
-          const price = parseFloat(ticker.lastPrice);
-          const change = parseFloat(ticker.priceChangePercent);
-          const high = parseFloat(ticker.highPrice);
-          const low = parseFloat(ticker.lowPrice);
-          const volume = parseFloat(ticker.quoteVolume || '0');
-          
-          priceMap[ourSymbol] = {
-            price,
-            change_24h: change,
-            high_24h: high,
-            low_24h: low,
-            volume,
-          };
-          break;
-        }
-      }
-    });
-    return priceMap;
+    const quotes = await fetchCoinGeckoQuotes();
+    return Object.fromEntries(
+      Object.entries(quotes).map(([symbol, row]) => [symbol, {
+        price: Number(row.price || 0),
+        change_24h: Number(row.change_24h || 0),
+        high_24h: Number(row.high_24h || row.price || 0),
+        low_24h: Number(row.low_24h || row.price || 0),
+        volume: Number(row.volume || 0),
+      }])
+    );
   } catch (error) {
-    console.error('Failed to fetch Binance prices:', error.message);
+    console.error('Failed to fetch CoinGecko prices:', error.message);
     return {};
   }
 }

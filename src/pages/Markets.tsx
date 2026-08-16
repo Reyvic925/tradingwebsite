@@ -8,6 +8,11 @@ import IndexBoard from '../components/IndexBoard';
 
 const DEFAULT_FILTERS = [
   { id: 'all', label: 'All' },
+  { id: 'stocks', label: 'Stocks' },
+  { id: 'etf', label: 'ETFs' },
+  { id: 'forex', label: 'FX' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'futures', label: 'Futures' },
   { id: 'usa', label: 'USA' },
   { id: 'japan', label: 'Japan' },
   { id: 'canada', label: 'Canada' },
@@ -16,9 +21,6 @@ const DEFAULT_FILTERS = [
   { id: 'germany', label: 'Germany' },
   { id: 'france', label: 'France' },
   { id: 'india', label: 'India' },
-  { id: 'etf', label: 'US ETFs' },
-  { id: 'forex', label: 'FX' },
-  { id: 'crypto', label: 'Crypto' },
 ];
 
 const DEFAULT_REGION_FROM: Record<string, string> = {
@@ -44,6 +46,8 @@ export default function Markets() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [regionMapping, setRegionMapping] = useState(DEFAULT_REGION_FROM);
   const pageSize = 50;
+  const assetFilters = filters.filter((f) => ['all', 'stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
+  const regionFilters = filters.filter((f) => !['all', 'stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
 
   useEffect(() => {
     // Fetch market filters and region mapping from config
@@ -109,22 +113,35 @@ export default function Markets() {
           <h1 className="font-display text-4xl">Global markets</h1>
           <p className="mt-1 text-sm text-stone-500">{total.toLocaleString()} listed names · USA · Japan · Canada · UK · Europe · India</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {filters.map((f: any) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`rounded-sm px-3 py-1.5 text-[11px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400 text-[#1a1304]' : 'border border-white/10 text-stone-400'}`}
-            >
-              {f.label}
-            </button>
-          ))}
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search ticker or name"
-            className="min-w-[180px] rounded-sm border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none"
-          />
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {assetFilters.map((f: any) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`rounded-sm px-3 py-1.5 text-[11px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400 text-[#1a1304]' : 'border border-white/10 text-stone-400'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {regionFilters.map((f: any) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`rounded-sm px-3 py-1.5 text-[11px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400 text-[#1a1304]' : 'border border-white/10 text-stone-400'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search ticker or name"
+              className="min-w-[180px] rounded-sm border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none"
+            />
+          </div>
         </div>
       </div>
       <div className="mt-6">

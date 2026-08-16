@@ -141,7 +141,7 @@ function normalizeSymbolPair(base, liveValue) {
   return { price, change_24h: 0.1 + (Math.random() * 1.2), high_24h: price * 1.01, low_24h: price * 0.99, source: 'live' };
 }
 
-async function fetchCoinGeckoQuotes() {
+export async function fetchCoinGeckoQuotes() {
   const ids = Object.values(COIN_GECKO_IDS).join(',');
   if (!ids) return {};
 
