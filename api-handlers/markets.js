@@ -456,6 +456,7 @@ async function syncMarketAssetClasses() {
 }
 
 async function ensureUniverse() {
+  console.log('ensureUniverse() starting...');
   await syncMarketAssetClasses();
 
   // First, deduplicate any existing entries by symbol (keep highest volume)
@@ -481,11 +482,18 @@ async function ensureUniverse() {
   const have = new Set((existing || []).map((r) => r.symbol));
   const allUniverse = [...(UNIVERSE || []), ...(INTL_UNIVERSE || [])];
   const missing = allUniverse.filter((r) => !have.has(r.symbol) && !SKIP.has(r.symbol));
+  console.log(`Found ${missing.length} missing symbols to insert (${have.size} existing)`);
+  
   for (let i = 0; i < missing.length; i += 80) {
     const chunk = missing.slice(i, i + 80);
     const { error: iErr } = await supabase.from('markets').insert(chunk);
-    if (iErr) console.error('universe seed chunk failed', iErr.message);
+    if (iErr) {
+      console.error(`universe seed chunk ${i/80} failed:`, iErr.message);
+    } else {
+      console.log(`inserted chunk ${i/80 + 1}: ${chunk.length} rows`);
+    }
   }
+  console.log('ensureUniverse() completed');
 }
 
 async function fillPendingLimits(markets) {
@@ -641,13 +649,17 @@ export default async function handler(req, res) {
 
     try {
       const { count, error: countErr } = await supabase.from('markets').select('*', { count: 'exact', head: true });
+      console.log(`Markets table count: ${count}, error: ${countErr?.message}`);
       if (countErr && !isMissingSchemaError(countErr)) {
         throw countErr;
       }
       if (!count || count === 0) {
+        console.log('Markets table empty or missing, calling ensureUniverse()...');
         await ensureUniverse();
+        console.log('ensureUniverse() completed');
       }
     } catch (err) {
+      console.error('Error in ensureUniverse check:', err);
       if (!isMissingSchemaError(err)) throw err;
     }
 
@@ -674,7 +686,9 @@ export default async function handler(req, res) {
 
     query = query.range(offset, offset + limit - 1);
     const { data, error, count } = await query;
+    console.log(`Market query result: ${(data || []).length} rows returned, count=${count}, assetClass=${assetClass}`);
     if (error) {
+      console.error('Market query error:', error);
       if (isMissingSchemaError(error)) {
         return res.status(200).json({ items: [], total: 0, limit, offset });
       }
@@ -711,6 +725,7 @@ export default async function handler(req, res) {
       total: count || items.length,
       limit,
       offset,
+      debug: { count, itemsLength: items.length, assetClass }
     });
   } catch (err) {
     console.error('API error:', err);
