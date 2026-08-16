@@ -654,21 +654,10 @@ export default async function handler(req, res) {
     const q = String(params.q || '').trim();
     const assetClass = String(params.class || params.asset_class || 'all');
     const featured = params.featured === '1';
-    // Disabled tick updates - they were causing dual pricing and performance issues
-    const shouldTick = false;
     const limit = Math.min(500, Math.max(1, Number(params.limit) || (featured ? 12 : 120)));
     const offset = Math.max(0, Number(params.offset) || 0);
     const symbol = params.symbol ? String(params.symbol).toUpperCase() : '';
 
-    // Fetch live crypto prices from Binance for crypto assets only
-    const liveCryptoPrices = await fetchLiveCryptoPrices();
-    const allSymbols = (data || []).map(row => String(row.symbol || "").toUpperCase());
-    const nonCryptoSymbols = allSymbols.filter(sym => {
-      const row = (data || []).find(r => String(r.symbol || "").toUpperCase() === sym);
-      return row && row.asset_class !== "crypto";
-    });
-    const liveYahooPrices = nonCryptoSymbols.length > 0 ? await fetchLiveYahooPrices(nonCryptoSymbols) : {};
-    
     let query = supabase.from('markets').select('*', { count: 'exact' });
     if (assetClass && assetClass !== 'all') {
       const mapped = CLASS_MAP[assetClass] || [assetClass];
@@ -692,34 +681,27 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    // Apply live Binance prices to crypto assets
+    // Now fetch live prices based on actual data
+    const liveCryptoPrices = await fetchLiveCryptoPrices().catch(() => ({}));
+    const allSymbols = (data || []).map(row => String(row.symbol || "").toUpperCase());
+    const nonCryptoSymbols = allSymbols.filter(sym => {
+      const row = (data || []).find(r => String(r.symbol || "").toUpperCase() === sym);
+      return row && row.asset_class !== "crypto";
+    });
+    const liveYahooPrices = nonCryptoSymbols.length > 0 ? await fetchLiveYahooPrices(nonCryptoSymbols).catch(() => ({})) : {};
+
+    // Apply live prices to market data
     const items = (data || []).map((row) => {
       const sym = String(row.symbol || '').toUpperCase();
       const liveData = liveCryptoPrices[sym];
-      
-      // If it's a crypto asset and we have live data, use it
       const yahooData = liveYahooPrices[sym];
+      
       if (row.asset_class === 'crypto' && liveData) {
-        return {
-          ...row,
-          price: liveData.price,
-          change_24h: liveData.change_24h,
-          high_24h: liveData.high_24h,
-          low_24h: liveData.low_24h,
-          volume: liveData.volume,
-        };
+        return { ...row, price: liveData.price, change_24h: liveData.change_24h, high_24h: liveData.high_24h, low_24h: liveData.low_24h, volume: liveData.volume };
       }
       if (yahooData) {
-        return {
-          ...row,
-          price: yahooData.price,
-          change_24h: yahooData.change_24h,
-          high_24h: yahooData.high_24h,
-          low_24h: yahooData.low_24h,
-          volume: yahooData.volume,
-        };
+        return { ...row, price: yahooData.price, change_24h: yahooData.change_24h, high_24h: yahooData.high_24h, low_24h: yahooData.low_24h, volume: yahooData.volume };
       }
-      // Otherwise return database price
       return row;
     });
 
