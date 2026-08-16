@@ -218,6 +218,45 @@ function seedDemoWallet() {
   if (!wallet) {
     rows('wallets').push({ id: nextId('wallets'), user_id: DEMO_USER_ID, currency: 'USD', available: 100000, reserved: 0 });
   }
+  
+  // Seed demo traders table if empty
+  const tradersList = rows('traders');
+  if (tradersList.length === 0) {
+    tradersList.push(
+      { id: 1, name: 'Alex Chen', bio: 'Crypto futures specialist with 8+ years experience', avatar_url: 'https://i.pravatar.cc/150?img=11', asset_focus: ['BTC-USD', 'ETH-USD'], current_equity: 125000.00, total_return: 45.2, daily_return: 2.3, total_trades: 342, win_rate_trades: 68.5, max_drawdown: 12.3, volatility: 0.015, drift: 0.002, risk_score: 7, session_type: 'nyc', is_active: true, followers: 1250, created_at: new Date(), updated_at: new Date() },
+      { id: 2, name: 'Sarah Martinez', bio: 'Forex and indices trader, former hedge fund analyst', avatar_url: 'https://i.pravatar.cc/150?img=5', asset_focus: ['EUR-USD', 'GBP-USD', 'SPX500'], current_equity: 98000.00, total_return: 32.8, daily_return: 1.1, total_trades: 521, win_rate_trades: 62.3, max_drawdown: 15.7, volatility: 0.012, drift: 0.0015, risk_score: 6, session_type: 'london', is_active: true, followers: 890, created_at: new Date(), updated_at: new Date() },
+      { id: 3, name: 'Michael Wong', bio: 'Conservative long-term crypto investor', avatar_url: 'https://i.pravatar.cc/150?img=13', asset_focus: ['BTC-USD', 'ETH-USD', 'SOL-USD'], current_equity: 75000.00, total_return: 28.5, daily_return: 0.8, total_trades: 156, win_rate_trades: 71.2, max_drawdown: 8.9, volatility: 0.008, drift: 0.001, risk_score: 4, session_type: 'asia', is_active: true, followers: 2100, created_at: new Date(), updated_at: new Date() },
+      { id: 4, name: 'Emma Thompson', bio: 'High-frequency scalper specializing in volatile markets', avatar_url: 'https://i.pravatar.cc/150?img=9', asset_focus: ['NAS100', 'GOLD', 'BTC-USD'], current_equity: 110000.00, total_return: 52.1, daily_return: 3.2, total_trades: 1205, win_rate_trades: 58.9, max_drawdown: 22.4, volatility: 0.025, drift: 0.003, risk_score: 9, session_type: 'nyc', is_active: true, followers: 756, created_at: new Date(), updated_at: new Date() },
+      { id: 5, name: 'David Kim', bio: 'Balanced portfolio manager with focus on risk management', avatar_url: 'https://i.pravatar.cc/150?img=68', asset_focus: ['SPX500', 'EUR-USD', 'BTC-USD', 'ETH-USD'], current_equity: 88000.00, total_return: 35.6, daily_return: 1.5, total_trades: 423, win_rate_trades: 65.8, max_drawdown: 11.2, volatility: 0.01, drift: 0.0018, risk_score: 5, session_type: 'nyc', is_active: true, followers: 1450, created_at: new Date(), updated_at: new Date() }
+    );
+  }
+  
+  // Seed demo trader trades if empty
+  const tradesList = rows('trader_trades');
+  if (tradesList.length === 0) {
+    const now = Date.now();
+    for (let i = 1; i <= 5; i++) {
+      for (let j = 0; j < 10; j++) {
+        const isWin = Math.random() > 0.4;
+        tradesList.push({
+          id: nextId('trader_trades'),
+          trader_id: i,
+          symbol: ['BTC-USD', 'ETH-USD', 'EUR-USD', 'SPX500', 'GOLD'][Math.floor(Math.random() * 5)],
+          side: Math.random() > 0.5 ? 'buy' : 'sell',
+          entry_price: Math.random() * 50000 + 1000,
+          exit_price: null,
+          quantity: Math.random() * 10 + 0.1,
+          pnl: isWin ? Math.random() * 500 + 50 : -(Math.random() * 300 + 50),
+          pnl_percent: isWin ? Math.random() * 5 + 1 : -(Math.random() * 3 + 1),
+          status: j < 3 ? 'open' : 'closed',
+          opened_at: new Date(now - j * 3600000).toISOString(),
+          closed_at: j < 3 ? null : new Date(now - (j - 2) * 3600000).toISOString(),
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      }
+    }
+  }
 }
 
 const devClient = {
