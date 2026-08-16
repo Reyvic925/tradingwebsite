@@ -111,14 +111,31 @@ export type Txn = {
 export type Trader = {
   id: number;
   name: string;
-  country: string;
+  country?: string;
   avatar_url: string;
-  win_rate: number;
+  win_rate?: number;
   followers: number;
-  monthly_return: number;
+  monthly_return?: number;
   bio: string;
-  risk_level: string;
-  specialty: string;
+  risk_level?: string;
+  specialty?: string;
+  // New comprehensive fields
+  asset_focus?: string[];
+  current_equity: number;
+  total_return: number;
+  daily_return: number;
+  total_trades: number;
+  win_rate_trades: number;
+  max_drawdown: number;
+  volatility: number;
+  drift: number;
+  risk_score: number;
+  session_type: 'asia' | 'london' | 'nyc' | 'crypto';
+  session_start?: string;
+  session_end?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CopyTrade = {
@@ -128,6 +145,70 @@ export type CopyTrade = {
   allocated: number;
   pnl: number;
   status: string;
+};
+
+export type UserFollow = {
+  id: string;
+  user_id: string;
+  trader_id: number;
+  allocated_amount: number;
+  current_value: number;
+  pnl: number;
+  pnl_percent: number;
+  stop_loss_percent: number;
+  take_profit_percent: number;
+  leverage_multiplier: number;
+  is_copying: boolean;
+  followed_at: string;
+  updated_at?: string;
+  trader?: Trader;
+  trader_name?: string;
+};
+
+export type TradeLog = {
+  id: string;
+  trader_id: number;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  quantity: number;
+  entry_price: number;
+  exit_price?: number;
+  pnl?: number;
+  pnl_percent?: number;
+  status: 'OPEN' | 'CLOSED';
+  traded_at: string;
+  closed_at?: string;
+};
+
+export type TraderHistory = {
+  id: string;
+  trader_id: number;
+  snapshot_date: string;
+  equity: number;
+  daily_return?: number;
+};
+
+export type UserGameification = {
+  id: string;
+  user_id: string;
+  level: number;
+  experience_points: number;
+  badges: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type CopySummary = {
+  total_invested: number;
+  total_current: number;
+  total_pnl: number;
+  total_pnl_percent: number;
+  count: number;
+};
+
+export type LeaderboardEntry = Trader & {
+  rank: number;
+  medal?: 'gold' | 'silver' | 'bronze';
 };
 
 export type Notice = {

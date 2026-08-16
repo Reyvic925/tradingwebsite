@@ -1,16 +1,134 @@
 import supabase from './db-client.js';
+import { requireUser as authUser, first } from './helpers.js';
+
+async function requireAdmin(req) {
+  const user = await authUser(supabase, req);
+  if (!user) return null;
+  
+  // Check if user is admin (implement based on your auth system)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  
+  return profile?.role === 'admin' ? user : null;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    const { data, error } = await supabase.from('traders').select('*').order('monthly_return', { ascending: false });
-    if (error) throw error;
-    return res.status(200).json(data || []);
+    // GET: Fetch active traders, sorted by total_return
+    if (req.method === 'GET') {
+      const { session, asset } = req.query;
+      let query = supabase
+        .from('traders')
+        .select('*')
+        .eq('is_active', true)
+        .order('total_return', { ascending: false });
+      
+      if (session) {
+        query = query.eq('session_type', session);
+      }
+      
+      if (asset) {
+        // Filter by asset focus (requires PostgreSQL array contains)
+        query = query.contains('asset_focus', [asset]);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return res.status(200).json(data || []);
+    }
+
+    // POST: Create new trader (Admin only)
+    if (req.method === 'POST') {
+      const admin = await requireAdmin(req);
+      if (!admin) return res.status(403).json({ error: 'Admin access required' });
+
+      const {
+        name, bio, avatar_url, asset_focus, session_type,
+        drift, volatility, risk_score
+      } = req.body || {};
+
+      if (!name || !avatar_url) {
+        return res.status(400).json({ error: 'Name and avatar_url required' });
+      }
+
+      const { data, error } = await supabase
+        .from('traders')
+        .insert({
+          name,
+          bio: bio || '',
+          avatar_url,
+          asset_focus: asset_focus || ['BTC-USD', 'ETH-USD'],
+          current_equity: 10000.00,
+          total_return: 0.00,
+          daily_return: 0.00,
+          total_trades: 0,
+          win_rate_trades: 50.00,
+          max_drawdown: 0.00,
+          volatility: volatility || 0.005,
+          drift: drift || 0.001,
+          risk_score: Math.min(Math.max(risk_score || 5, 1), 10),
+          session_type: session_type || 'nyc',
+          is_active: true,
+          followers: 0
+        })
+        .select();
+      
+      if (error) throw error;
+      return res.status(201).json(first(data));
+    }
+
+    // PUT: Update trader (Admin only)
+    if (req.method === 'PUT') {
+      const admin = await requireAdmin(req);
+      if (!admin) return res.status(403).json({ error: 'Admin access required' });
+
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'Trader ID required' });
+
+      const updateData = { ...req.body };
+      delete updateData.id; // Prevent ID modification
+      
+      if (updateData.risk_score) {
+        updateData.risk_score = Math.min(Math.max(updateData.risk_score, 1), 10);
+      }
+
+      const { data, error } = await supabase
+        .from('traders')
+        .update({ ...updateData, updated_at: new Date() })
+        .eq('id', id)
+        .select();
+      
+      if (error) throw error;
+      return res.status(200).json(first(data));
+    }
+
+    // DELETE: Delete trader (Admin only)
+    if (req.method === 'DELETE') {
+      const admin = await requireAdmin(req);
+      if (!admin) return res.status(403).json({ error: 'Admin access required' });
+
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'Trader ID required' });
+
+      // Soft delete (mark as inactive)
+      const { error } = await supabase
+        .from('traders')
+        .update({ is_active: false, updated_at: new Date() })
+        .eq('id', id);
+      
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    }
+
+    res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('API error:', err);
     res.status(500).json({ error: err.message });

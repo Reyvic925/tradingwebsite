@@ -1,109 +1,591 @@
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import AppShell from '../components/AppShell';
-import { apiList, apiSend, asList } from '../lib/api';
+import {
+  useTraders,
+  useLeaderboard,
+  useCopyTrading,
+  usePnlAnimation,
+  useNotifications
+} from '../lib/copy-trading-hooks';
+import {
+  ChevronUp,
+  ChevronDown,
+  Crown,
+  TrendingUp,
+  AlertCircle,
+  Zap,
+  Plus,
+  X
+} from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
-import type { CopyTrade, Trader } from '../types';
+import type { Trader, UserFollow, LeaderboardEntry } from '../types';
 
-export default function Social() {
-  const [traders, setTraders] = useState<Trader[]>([]);
-  const [copies, setCopies] = useState<CopyTrade[]>([]);
-  const [alloc, setAlloc] = useState<Record<number, string>>({});
-  const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(true);
+// Follow Modal Component
+function FollowModal({ trader, isOpen, onClose, onFollow }) {
+  const [allocation, setAllocation] = useState(1000);
+  const [stopLoss, setStopLoss] = useState(20);
+  const [takeProfit, setTakeProfit] = useState(200);
+  const [leverage, setLeverage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  const handleFollow = async () => {
     try {
-      const [t, c] = await Promise.all([apiList<Trader>('/api/traders'), apiList<CopyTrade>('/api/copy-trades')]);
-      setTraders(asList(t));
-      setCopies(asList(c));
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : 'Failed');
+      setLoading(true);
+      await onFollow(trader.id, allocation, {
+        stopLoss,
+        takeProfit,
+        leverage
+      });
+      onClose();
+    } catch (error) {
+      console.error('Follow error:', error);
+      alert('Failed to follow trader');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  if (!isOpen) return null;
 
-  const follow = async (t: Trader) => {
-    const amt = Number(alloc[t.id] || 250);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-lg bg-gray-900 p-6 border border-white/10">
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-xl font-bold text-white">Copy {trader.name}</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
+          <div className="text-sm text-gray-400 mb-1">Current Equity</div>
+          <div className="text-2xl font-bold text-emerald-400">
+            {formatMoney(Number(trader.current_equity))}
+          </div>
+          <div className="text-sm text-gray-500 mt-1">
+            Return: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Allocation */}
+          <div>
+            <label className="text-sm text-gray-300 block mb-2">
+              Allocation: <span className="text-emerald-400">{formatMoney(allocation)}</span>
+            </label>
+            <input
+              type="range"
+              min="100"
+              max="10000"
+              step="100"
+              value={allocation}
+              onChange={(e) => setAllocation(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>$100</span>
+              <span>$10,000</span>
+            </div>
+          </div>
+
+          {/* Risk Settings */}
+          <div>
+            <label className="text-sm text-gray-300 block mb-2">Stop Loss (%)</label>
+            <input
+              type="number"
+              min="5"
+              max="100"
+              value={stopLoss}
+              onChange={(e) => setStopLoss(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300 block mb-2">Take Profit (%)</label>
+            <input
+              type="number"
+              min="10"
+              max="1000"
+              value={takeProfit}
+              onChange={(e) => setTakeProfit(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300 block mb-2">Leverage</label>
+            <select
+              value={leverage}
+              onChange={(e) => setLeverage(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
+            >
+              <option value={1}>1x (Conservative)</option>
+              <option value={2}>2x (Moderate)</option>
+              <option value={3}>3x (Aggressive)</option>
+              <option value={5}>5x (Expert)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 transition text-sm font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleFollow}
+            disabled={loading}
+            className="flex-1 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition text-sm font-semibold"
+          >
+            {loading ? 'Copying...' : 'Confirm Copy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Leaderboard Section
+function LeaderboardSection() {
+  const { leaderboard, loading } = useLeaderboard();
+
+  if (loading) {
+    return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
+  }
+
+  return (
+    <div className="mb-8">
+      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <Crown size={20} className="text-yellow-500" />
+        Top Traders
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {(leaderboard || []).slice(0, 3).map((trader, idx) => (
+          <div
+            key={trader.id}
+            className={`p-4 rounded-lg border backdrop-blur-sm transition ${
+              trader.medal === 'gold'
+                ? 'bg-yellow-500/10 border-yellow-500/30'
+                : trader.medal === 'silver'
+                ? 'bg-gray-400/10 border-gray-400/30'
+                : 'bg-orange-500/10 border-orange-500/30'
+            }`}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <img
+                  src={trader.avatar_url}
+                  alt={trader.name}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-white">{trader.name}</div>
+                  <div className="text-xs text-gray-400">{idx + 1}. {trader.medal === 'gold' ? '🥇 Gold' : trader.medal === 'silver' ? '🥈 Silver' : '🥉 Bronze'}</div>
+                </div>
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-400 mb-2">
+              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="text-gray-400">Win Rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
+              <div className="text-gray-400">Followers: <span className="text-white font-semibold">{trader.followers || 0}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Portfolio Summary Banner
+function PortfolioSummary() {
+  const { summary } = useCopyTrading();
+  const animatedPnL = usePnlAnimation(summary.total_pnl, 1000, 2);
+
+  const isPositive = summary.total_pnl >= 0;
+  const profitPercentage = Math.min(
+    (Math.abs(summary.total_pnl_percent) / 200) * 100,
+    100
+  );
+
+  return (
+    <div className="mb-8 p-6 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-white/10">
+      <h2 className="text-lg font-semibold text-white mb-4">Your Copy Portfolio</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Invested</div>
+          <div className="text-2xl font-bold text-white">{formatMoney(summary.total_invested)}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Current Value</div>
+          <div className="text-2xl font-bold text-white">{formatMoney(summary.total_current)}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total PnL</div>
+          <div className={`text-2xl font-bold flex items-center gap-2 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+            {formatMoney(animatedPnL)}
+            {isPositive ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-gray-400">Profit Progress</span>
+          <span className={isPositive ? 'text-emerald-400' : 'text-red-400'}>
+            {summary.total_pnl_percent >= 0 ? '+' : ''}{Number(summary.total_pnl_percent).toFixed(2)}%
+          </span>
+        </div>
+        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-1000 ${
+              isPositive ? 'bg-emerald-500' : 'bg-red-500'
+            }`}
+            style={{ width: `${profitPercentage}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="text-xs text-gray-400">
+        {summary.count} {summary.count === 1 ? 'trader' : 'traders'} copied
+      </div>
+    </div>
+  );
+}
+
+// Trader Card Component
+function TraderCard({ trader, onFollow }) {
+  const [showModal, setShowModal] = useState(false);
+  const isProfit = trader.total_return >= 0;
+
+  const getSessionBadge = (sessionType) => {
+    const badges = {
+      asia: { emoji: '🌙', label: 'Asia' },
+      london: { emoji: '🇬🇧', label: 'London' },
+      nyc: { emoji: '🗽', label: 'NYC' },
+      crypto: { emoji: '🔗', label: '24/7 Crypto' }
+    };
+    return badges[sessionType] || badges.nyc;
+  };
+
+  const badge = getSessionBadge(trader.session_type);
+
+  return (
+    <>
+      <div
+        className={`rounded-lg border p-5 backdrop-blur-sm transition hover:border-white/30 ${
+          isProfit
+            ? 'bg-emerald-500/5 border-emerald-500/20'
+            : 'bg-red-500/5 border-red-500/20'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={trader.avatar_url}
+              alt={trader.name}
+              className="h-12 w-12 rounded-full object-cover"
+            />
+            <div>
+              <div className="text-sm font-semibold text-white">{trader.name}</div>
+              <div className="text-xs text-gray-500">{badge.emoji} {badge.label}</div>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-400 mb-3 line-clamp-2">{trader.bio}</p>
+
+        {/* Asset Focus Pills */}
+        {trader.asset_focus && trader.asset_focus.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {trader.asset_focus.slice(0, 3).map((asset, idx) => (
+              <span
+                key={idx}
+                className="px-2 py-1 rounded-full bg-white/10 text-xs text-gray-300"
+              >
+                #{asset.split('-')[0]}
+              </span>
+            ))}
+            {trader.asset_focus.length > 3 && (
+              <span className="px-2 py-1 text-xs text-gray-400">+{trader.asset_focus.length - 3}</span>
+            )}
+          </div>
+        )}
+
+        {/* Metrics */}
+        <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
+          <div>
+            <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(1)}%
+            </div>
+            <div className="text-gray-500">Total Return</div>
+          </div>
+          <div>
+            <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades || 50).toFixed(0)}%</div>
+            <div className="text-gray-500">Win Rate</div>
+          </div>
+          <div>
+            <div className="font-mono font-bold text-white">{trader.followers || 0}</div>
+            <div className="text-gray-500">Followers</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowModal(true)}
+          className="w-full py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition text-sm font-semibold flex items-center justify-center gap-2"
+        >
+          <Plus size={16} />
+          Copy Trader
+        </button>
+      </div>
+
+      <FollowModal
+        trader={trader}
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onFollow={onFollow}
+      />
+    </>
+  );
+}
+
+// My Positions Section
+function MyPositions() {
+  const { follows, summary, stopCopying, loading } = useCopyTrading();
+  const [editingId, setEditingId] = useState(null);
+
+  if (loading) {
+    return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
+  }
+
+  if (follows.length === 0) {
+    return (
+      <div className="p-8 rounded-lg border border-dashed border-white/20 text-center">
+        <TrendingUp size={32} className="mx-auto mb-3 text-gray-600" />
+        <div className="text-sm text-gray-400">No active positions. Start copying a trader!</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-white/5 rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+      {follows.map((follow) => {
+        const isProfit = (follow.pnl_percent || 0) >= 0;
+        const nearStopLoss =
+          (follow.pnl_percent || 0) <= -(follow.stop_loss_percent * 0.8);
+
+        return (
+          <div key={follow.id} className="p-4 hover:bg-white/[0.03] transition">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <img
+                  src={follow.trader?.avatar_url}
+                  alt={follow.trader?.name}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-white">
+                    {follow.trader?.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {formatMoney(follow.allocated_amount)} allocated
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className={`text-sm font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isProfit ? '+' : ''}{formatMoney(follow.pnl)}
+                </div>
+                <div className={`text-xs ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isProfit ? '+' : ''}{Number(follow.pnl_percent || 0).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Risk Indicators */}
+            <div className="mb-3 flex items-center gap-2 text-xs">
+              {nearStopLoss && (
+                <div className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-1 rounded">
+                  <AlertCircle size={14} />
+                  <span>⚠️ Approaching Stop-Loss</span>
+                </div>
+              )}
+              <div className="text-gray-500">
+                SL: -{follow.stop_loss_percent}% | TP: +{follow.take_profit_percent}%
+              </div>
+            </div>
+
+            {/* Current Value */}
+            <div className="mb-3 text-xs text-gray-400">
+              Current Value: <span className="text-white font-semibold">{formatMoney(follow.current_value)}</span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditingId(editingId === follow.id ? null : follow.id)}
+                className="text-xs px-3 py-1 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 transition"
+              >
+                {editingId === follow.id ? 'Done' : 'Edit Risk'}
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Stop copying this trader?')) {
+                    stopCopying(follow.id);
+                  }
+                }}
+                className="text-xs px-3 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
+              >
+                Stop
+              </button>
+            </div>
+
+            {/* Edit Form (shown when editing) */}
+            {editingId === follow.id && (
+              <EditFollowForm
+                follow={follow}
+                onClose={() => setEditingId(null)}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Edit Follow Form Component
+function EditFollowForm({ follow, onClose }) {
+  const [stopLoss, setStopLoss] = useState(follow.stop_loss_percent);
+  const [takeProfit, setTakeProfit] = useState(follow.take_profit_percent);
+  const [leverage, setLeverage] = useState(follow.leverage_multiplier);
+  const { updateFollow } = useCopyTrading();
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     try {
-      await apiSend('/api/copy-trades', 'POST', { trader_id: t.id, allocated: amt });
-      setMsg(`Now copying ${t.name}`);
-      load();
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : 'Unable to allocate');
+      setSaving(true);
+      await updateFollow(follow.id, {
+        stopLoss,
+        takeProfit,
+        leverage
+      });
+      onClose();
+    } catch (error) {
+      alert('Failed to update settings');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const stop = async (id: number) => {
-    await apiSend('/api/copy-trades', 'DELETE', { id });
-    load();
-  };
+  return (
+    <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Stop Loss (%)</label>
+        <input
+          type="number"
+          value={stopLoss}
+          onChange={(e) => setStopLoss(Number(e.target.value))}
+          className="w-full px-2 py-1 rounded bg-white/10 border border-white/20 text-white text-xs"
+        />
+      </div>
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Take Profit (%)</label>
+        <input
+          type="number"
+          value={takeProfit}
+          onChange={(e) => setTakeProfit(Number(e.target.value))}
+          className="w-full px-2 py-1 rounded bg-white/10 border border-white/20 text-white text-xs"
+        />
+      </div>
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Leverage</label>
+        <select
+          value={leverage}
+          onChange={(e) => setLeverage(Number(e.target.value))}
+          className="w-full px-2 py-1 rounded bg-white/10 border border-white/20 text-white text-xs"
+        >
+          <option value={1}>1x</option>
+          <option value={2}>2x</option>
+          <option value={3}>3x</option>
+          <option value={5}>5x</option>
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 px-2 py-1 text-xs rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Main Social Component
+export default function Social() {
+  const { traders, loading: tradersLoading } = useTraders();
+  const { followTrader } = useCopyTrading();
 
   return (
     <AppShell>
-      <div className="text-[11px] uppercase tracking-[0.24em] text-amber-300/70">Copy desk</div>
-      <h1 className="font-display text-4xl">Social trading</h1>
-      <p className="mt-2 max-w-xl text-sm text-stone-400">Allocate capital to lead traders using a risk-managed copy allocation. Strategy metrics are illustrative and never guaranteed; all trading remains subject to market risk.</p>
-      {msg && <div className="mt-4 text-sm text-amber-200">{msg}</div>}
-      {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {traders.map((t) => (
-          <article key={t.id} className="rounded-md border border-white/8 bg-white/[0.02] p-5">
-            <div className="flex items-center gap-3">
-              <img src={t.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />
-              <div>
-                <div className="text-stone-50">{t.name}</div>
-                <div className="text-[11px] uppercase tracking-widest text-stone-500">{t.country} · {t.specialty}</div>
-              </div>
-            </div>
-            <p className="mt-3 text-sm text-stone-400">{t.bio}</p>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-              <div>
-                <div className="font-mono text-emerald-400">{formatPct(Number(t.monthly_return))}</div>
-                <div className="text-stone-600">30d</div>
-              </div>
-              <div>
-                <div className="font-mono">{t.win_rate}%</div>
-                <div className="text-stone-600">Win</div>
-              </div>
-              <div>
-                <div className="font-mono">{t.followers}</div>
-                <div className="text-stone-600">Followers</div>
-              </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <input
-                value={alloc[t.id] ?? '250'}
-                onChange={(e) => setAlloc((s) => ({ ...s, [t.id]: e.target.value }))}
-                className="flex-1 rounded-sm border border-white/10 bg-black/40 px-2 py-2 font-mono text-sm outline-none"
-              />
-              <button onClick={() => follow(t)} className="rounded-sm bg-amber-400 px-3 text-xs font-semibold uppercase tracking-widest text-[#1a1304]">Copy</button>
-            </div>
-          </article>
-        ))}
+      <div className="mb-8">
+        <div className="text-xs uppercase tracking-widest text-amber-300/70 mb-2">Copy Desk</div>
+        <h1 className="text-3xl font-bold text-white mb-2">Social Trading</h1>
+        <p className="text-sm text-gray-400 max-w-2xl">
+          Copy successful traders automatically. Allocate capital with full control over risk management. Real-time PnL tracking with stop-loss and take-profit automation.
+        </p>
       </div>
 
-      <h2 className="mt-12 text-sm uppercase tracking-[0.18em] text-stone-400">Your copies</h2>
-      <div className="mt-2 text-xs text-stone-500">Performance and win-rate figures are for reference only and should not be interpreted as a promise of returns.</div>
-      <div className="mt-4 divide-y divide-white/5 rounded-md border border-white/5">
-        {copies.map((c) => (
-          <div key={c.id} className="flex items-center justify-between px-5 py-3 text-sm">
-            <div>
-              <div>{c.trader_name}</div>
-              <div className="text-[11px] text-stone-500">{formatMoney(Number(c.allocated))} allocated · {c.status}</div>
-            </div>
-            {c.status === 'active' && (
-              <button onClick={() => stop(c.id)} className="text-xs text-rose-300">Stop</button>
-            )}
-          </div>
-        ))}
-        {!copies.length && <div className="px-5 py-8 text-sm text-stone-500">You are not copying anyone yet.</div>}
-      </div>
+      {/* Portfolio Summary */}
+      <PortfolioSummary />
+
+      {/* Leaderboard */}
+      <LeaderboardSection />
+
+      {/* Traders Grid */}
+      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <Zap size={20} className="text-yellow-500" />
+        Available Traders
+      </h2>
+
+      {tradersLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-64 animate-pulse rounded-lg bg-white/5" />
+          ))}
+        </div>
+      ) : (
+        <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {traders.map((trader) => (
+            <TraderCard
+              key={trader.id}
+              trader={trader}
+              onFollow={followTrader}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* My Positions */}
+      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2 mt-12">
+        <TrendingUp size={20} className="text-emerald-500" />
+        Your Active Copies
+      </h2>
+      <MyPositions />
     </AppShell>
   );
 }
