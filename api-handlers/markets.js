@@ -725,16 +725,45 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    // Now fetch live prices based on actual data
-    const liveCryptoPrices = await fetchLiveCryptoPrices().catch(() => ({}));
+    // Fetch live prices from external APIs (Binance + Yahoo Finance) with timeout
+    let liveCryptoPrices = {};
+    let liveYahooPrices = {};
+    
     const allSymbols = (data || []).map(row => String(row.symbol || "").toUpperCase());
+    const cryptoSymbols = allSymbols.filter(sym => {
+      const row = (data || []).find(r => String(r.symbol || "").toUpperCase() === sym);
+      return row && row.asset_class === "crypto";
+    });
     const nonCryptoSymbols = allSymbols.filter(sym => {
       const row = (data || []).find(r => String(r.symbol || "").toUpperCase() === sym);
       return row && row.asset_class !== "crypto";
     });
-    const liveYahooPrices = nonCryptoSymbols.length > 0 ? await fetchLiveYahooPrices(nonCryptoSymbols).catch(() => ({})) : {};
+    
+    // Fetch crypto prices from Binance
+    if (cryptoSymbols.length > 0) {
+      try {
+        liveCryptoPrices = await Promise.race([
+          fetchLiveCryptoPrices(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Binance timeout')), 8000))
+        ]);
+      } catch (err) {
+        console.error('Binance fetch failed:', err.message);
+      }
+    }
+    
+    // Fetch stock/forex/futures prices from Yahoo Finance
+    if (nonCryptoSymbols.length > 0) {
+      try {
+        liveYahooPrices = await Promise.race([
+          fetchLiveYahooPrices(nonCryptoSymbols),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo timeout')), 8000))
+        ]);
+      } catch (err) {
+        console.error('Yahoo Finance fetch failed:', err.message);
+      }
+    }
 
-    // Apply live prices to market data
+    // Apply LIVE prices only (no database fallback)
     const items = (data || []).map((row) => {
       const sym = String(row.symbol || '').toUpperCase();
       const liveData = liveCryptoPrices[sym];
@@ -746,6 +775,7 @@ export default async function handler(req, res) {
       if (yahooData) {
         return { ...row, price: yahooData.price, change_24h: yahooData.change_24h, high_24h: yahooData.high_24h, low_24h: yahooData.low_24h, volume: yahooData.volume };
       }
+      // No fallback - return database row as-is (live price not available)
       return row;
     });
 
