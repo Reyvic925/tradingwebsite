@@ -7,7 +7,6 @@ import type { Market } from '../types';
 import IndexBoard from '../components/IndexBoard';
 
 const DEFAULT_FILTERS = [
-  { id: 'all', label: 'All' },
   { id: 'stocks', label: 'Stocks' },
   { id: 'etf', label: 'ETFs' },
   { id: 'forex', label: 'FX' },
@@ -37,7 +36,7 @@ const DEFAULT_REGION_FROM: Record<string, string> = {
 export default function Markets() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [total, setTotal] = useState(0);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('stocks');
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(0);
@@ -46,8 +45,8 @@ export default function Markets() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [regionMapping, setRegionMapping] = useState(DEFAULT_REGION_FROM);
   const pageSize = 50;
-  const assetFilters = filters.filter((f) => ['all', 'stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
-  const regionFilters = filters.filter((f) => !['all', 'stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
+  const assetFilters = filters.filter((f) => ['stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
+  const regionFilters = filters.filter((f) => !['stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
 
   useEffect(() => {
     // Fetch market filters and region mapping from config

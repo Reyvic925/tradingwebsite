@@ -15,7 +15,7 @@ export default function Trade() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [watch, setWatch] = useState<{ id: number; market_id: number; symbol: string }[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [filter, setFilter] = useState<'all' | 'stock' | 'forex' | 'crypto' | 'futures'>('all');
+  const [filter, setFilter] = useState<'stock' | 'forex' | 'crypto' | 'futures'>('stock');
   const [search, setSearch] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [otype, setOtype] = useState<'market' | 'limit'>('market');
@@ -105,7 +105,6 @@ export default function Trade() {
   }, [positions.length, markets.length]);
 
   const FILTERS = [
-    { id: 'all', label: 'All' },
     { id: 'stock', label: 'Stocks' },
     { id: 'forex', label: 'Forex' },
     { id: 'crypto', label: 'Crypto' },
