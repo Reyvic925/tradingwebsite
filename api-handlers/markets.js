@@ -1,6 +1,6 @@
 import supabase from './db-client.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
-import { UNIVERSE } from './universe-data.js';
+import { UNIVERSE, CRYPTO_PAIRS, FX_PAIRS, FUTURE_PAIRS } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
 import { normalizeAssetClass } from './live-market-data.js';
 import yahooFinance from 'yahoo-finance2';
@@ -479,7 +479,7 @@ async function ensureUniverse() {
   const { data: existing, error } = await supabase.from('markets').select('symbol');
   if (error) throw error;
   const have = new Set((existing || []).map((r) => r.symbol));
-  const allUniverse = [...(UNIVERSE || []), ...(INTL_UNIVERSE || [])];
+  const allUniverse = [...(UNIVERSE || []), ...(INTL_UNIVERSE || []), ...(CRYPTO_PAIRS || []), ...(FX_PAIRS || []), ...(FUTURE_PAIRS || [])];
   const missing = allUniverse.filter((r) => !have.has(r.symbol) && !SKIP.has(r.symbol));
   console.log(`Found ${missing.length} missing symbols to insert (${have.size} existing)`);
   
