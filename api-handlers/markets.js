@@ -3,7 +3,6 @@ import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
 import { normalizeAssetClass } from './live-market-data.js';
-import fetch from 'node-fetch';
 import yahooFinance from 'yahoo-finance2';
 
 const MARGIN_RATE = 0.1;
