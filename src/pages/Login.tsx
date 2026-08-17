@@ -21,6 +21,7 @@ export default function Login() {
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [otp, setOtp] = useState('');
   const [confirmationNote, setConfirmationNote] = useState('');
+  const confirmationRedirectUrl = `${window.location.origin}/login?mode=signup`;
 
   useEffect(() => {
     const ref = params.get('ref');
@@ -48,15 +49,15 @@ export default function Login() {
         const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/login` },
+          options: { data: { full_name: fullName }, emailRedirectTo: confirmationRedirectUrl },
         });
         if (err) throw err;
-        if (!data.session) {
-          setAwaitingConfirmation(true);
-          setConfirmationNote(`We sent a verification code to ${email}.`);
-          return;
+        if (data.session) {
+          await supabase.auth.signOut({ scope: 'local' });
         }
-        await finishAuthentication(true);
+        setAwaitingConfirmation(true);
+        setConfirmationNote(`We sent a six-digit code and a confirmation link to ${email}.`);
+        return;
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
@@ -76,7 +77,7 @@ export default function Login() {
     if (!/^\d{6}$/.test(token)) return setError('Enter the 6-digit code from your email.');
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+      const { error: err } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
       if (err) throw err;
       await finishAuthentication(true);
     } catch (err: unknown) {
@@ -90,7 +91,7 @@ export default function Login() {
     setError('');
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/login` } });
+      const { error: err } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: confirmationRedirectUrl } });
       if (err) throw err;
       setConfirmationNote(`A new verification code was sent to ${email}.`);
     } catch (err: unknown) {
@@ -109,7 +110,7 @@ export default function Login() {
         <div className="glass rounded-md p-7">
           <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Private access</div>
           <h1 className="mt-2 font-display text-4xl">{awaitingConfirmation ? 'Verify your email' : isSignUp ? 'Open an account' : 'Welcome back'}</h1>
-          <p className="mt-2 text-sm text-stone-400">{awaitingConfirmation ? `Enter the six-digit code sent to ${email}.` : 'Institutional rails. Retail-ready onboarding in under a minute.'}</p>
+          <p className="mt-2 text-sm text-stone-400">{awaitingConfirmation ? `Enter the six-digit code sent to ${email}, or use the confirmation link in that email.` : 'Institutional rails. Retail-ready onboarding in under a minute.'}</p>
 
           {awaitingConfirmation ? (
             <form onSubmit={verifyOtp} className="mt-6 space-y-3">

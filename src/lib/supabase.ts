@@ -57,6 +57,7 @@ if (url && anon) {
   };
 
   let memorySession: unknown | null = readDemoSession();
+  let pendingDemoSignup = false;
 
   const placeholder = {
     auth: {
@@ -74,10 +75,24 @@ if (url && anon) {
         return { data: { session: memorySession, user: demoUser }, error: null };
       },
       async signUp(_creds: unknown) {
+        // Match Supabase when its Confirm email setting is enabled: registration
+        // creates the user but grants no session until its email is verified.
+        pendingDemoSignup = true;
+        return { data: { session: null, user: demoUser }, error: null };
+      },
+      async verifyOtp({ token, type }: { token?: string; type?: string }) {
+        if (!pendingDemoSignup || type !== 'signup' || token !== '123456') {
+          return { data: { session: null, user: null }, error: new Error('Invalid or expired verification code.') };
+        }
+        pendingDemoSignup = false;
         memorySession = newDemoSession();
         writeDemoSession(memorySession);
         notify('SIGNED_IN', memorySession);
         return { data: { session: memorySession, user: demoUser }, error: null };
+      },
+      async resend({ type }: { type?: string }) {
+        if (type !== 'signup' || !pendingDemoSignup) return { error: new Error('No pending email confirmation.') };
+        return { error: null };
       },
       async signInWithIdToken(_opts: unknown) {
         memorySession = newDemoSession();
