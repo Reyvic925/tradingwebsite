@@ -15,6 +15,33 @@ function appUrl() {
   return '';
 }
 
+function emailHtml({ title, body, actionUrl }) {
+  const safeTitle = escapeHtml(title);
+  const safeBody = escapeHtml(body).replace(/\n/g, '<br>');
+  const logoUrl = appUrl() ? `${appUrl()}/favicon.svg` : null;
+  const action = actionUrl
+    ? `<tr><td style="padding:0 36px 32px"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;background:#d4af37;border-radius:4px;color:#1a1304;font-size:14px;font-weight:700;letter-spacing:.04em;padding:13px 20px;text-decoration:none">View your account</a></td></tr>`
+    : '';
+
+  return `<!doctype html>
+<html lang="en"><body style="margin:0;background:#f4f1ea;color:#211d17;font-family:Arial,Helvetica,sans-serif">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f1ea;padding:32px 12px"><tr><td align="center">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e6dfd2;border-radius:8px;overflow:hidden">
+      <tr><td style="background:#090b10;padding:26px 36px">
+        <table role="presentation" cellspacing="0" cellpadding="0"><tr>
+          <td>${logoUrl ? `<img src="${escapeHtml(logoUrl)}" width="36" height="36" alt="The Prime Markets" style="display:block;border:0;border-radius:4px" />` : ''}</td>
+          <td style="padding-left:${logoUrl ? '12px' : '0'};color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em">The Prime Markets</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:36px 36px 18px"><h1 style="margin:0;color:#211d17;font-size:24px;line-height:1.3">${safeTitle}</h1></td></tr>
+      <tr><td style="padding:0 36px 28px;color:#61594e;font-size:15px;line-height:1.65">${safeBody}</td></tr>
+      ${action}
+      <tr><td style="border-top:1px solid #eee8dd;padding:20px 36px;color:#8a8175;font-size:12px;line-height:1.5">This is an automated account notification from The Prime Markets. Please do not reply to this email.</td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
 async function recipientEmail(supabase, userId) {
   const { data: profiles } = await supabase
     .from('profiles')
@@ -38,8 +65,6 @@ async function sendEmail(supabase, { user_id, title, body }) {
     const to = await recipientEmail(supabase, user_id);
     if (!to) return { skipped: true, reason: 'recipient email was not found' };
 
-    const safeTitle = escapeHtml(title);
-    const safeBody = escapeHtml(body).replace(/\n/g, '<br>');
     const dashboardUrl = appUrl() ? `${appUrl()}/app` : null;
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',
@@ -52,7 +77,7 @@ async function sendEmail(supabase, { user_id, title, body }) {
         to: [to],
         subject: title,
         text: `${title}\n\n${body}${dashboardUrl ? `\n\nView your account: ${dashboardUrl}` : ''}`,
-        html: `<main style="font-family:Arial,sans-serif;line-height:1.5;color:#1c1917"><h2>${safeTitle}</h2><p>${safeBody}</p>${dashboardUrl ? `<p><a href="${escapeHtml(dashboardUrl)}">View your account</a></p>` : ''}</main>`,
+        html: emailHtml({ title, body, actionUrl: dashboardUrl }),
       }),
     });
     if (!response.ok) throw new Error(`Resend returned ${response.status}: ${await response.text()}`);

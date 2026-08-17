@@ -22,6 +22,15 @@ const BLOCKCHAIN_API = process.env.BLOCKCHAIN_API; // optional custom provider b
 const CRON_SECRET = process.env.CRON_SECRET;
 const DRY_RUN = (process.env.DRY_RUN || '').toLowerCase() === 'true';
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   // It's valid to run in read-only / dry-run without Supabase credentials; warn via logs when used.
 }
@@ -59,6 +68,8 @@ async function sendResendDepositEmail(userId, title, body) {
     if (!to) return;
 
     const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+    const dashboardUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/app` : '';
+    const logoUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/favicon.svg` : '';
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -66,7 +77,8 @@ async function sendResendDepositEmail(userId, title, body) {
         from,
         to: [to],
         subject: title,
-        text: `${title}\n\n${body}${appUrl ? `\n\nView your account: ${appUrl.replace(/\/$/, '')}/app` : ''}`,
+        text: `${title}\n\n${body}${dashboardUrl ? `\n\nView your account: ${dashboardUrl}` : ''}`,
+        html: `<!doctype html><html><body style="margin:0;background:#f4f1ea;color:#211d17;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #e6dfd2;border-radius:8px"><tr><td style="background:#090b10;padding:26px 36px;color:#fff;font-size:18px;font-weight:700">${logoUrl ? `<img src="${escapeHtml(logoUrl)}" width="36" height="36" alt="The Prime Markets" style="vertical-align:middle;border-radius:4px;margin-right:12px" />` : ''}The Prime Markets</td></tr><tr><td style="padding:36px"><h1 style="margin:0 0 16px;font-size:24px">${escapeHtml(title)}</h1><p style="color:#61594e;font-size:15px;line-height:1.65">${escapeHtml(body)}</p>${dashboardUrl ? `<p><a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;background:#d4af37;border-radius:4px;color:#1a1304;font-weight:700;padding:13px 20px;text-decoration:none">View your account</a></p>` : ''}</td></tr><tr><td style="border-top:1px solid #eee8dd;padding:20px 36px;color:#8a8175;font-size:12px">Automated account notification. Please do not reply.</td></tr></table></td></tr></table></body></html>`,
       }),
     });
     if (!response.ok) console.error('[deposit-detector] Resend delivery failed:', response.status, await response.text());
