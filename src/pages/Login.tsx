@@ -81,7 +81,12 @@ export default function Login() {
       if (err) throw err;
       await finishAuthentication(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not verify that code.');
+      const message = err instanceof Error ? err.message : 'Could not verify that code.';
+      if (/expired|invalid/i.test(message)) {
+        setError('That code or link is no longer valid. Resend the confirmation, then use only the newest code or link.');
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
@@ -93,7 +98,8 @@ export default function Login() {
     try {
       const { error: err } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: confirmationRedirectUrl } });
       if (err) throw err;
-      setConfirmationNote(`A new verification code was sent to ${email}.`);
+      setOtp('');
+      setConfirmationNote(`A new verification code and confirmation link were sent to ${email}. Previous codes and links no longer work.`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not resend the code.');
     } finally {
