@@ -5,20 +5,13 @@ type Props = { to?: string; compact?: boolean; className?: string };
 
 export default function Logo({ to = '/', compact = false, className = '' }: Props) {
   const inner = (
-    <>
-      <span className="grid h-8 w-8 place-items-center rounded-sm bg-gradient-to-br from-amber-200 to-amber-600 text-[#1a1304] shadow-[0_0_20px_rgba(212,175,55,0.3)] sm:h-9 sm:w-9">
-        <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M4 16l5-6 4 4 7-9" />
-          <path d="M15 5h5v5" />
-        </svg>
-      </span>
-      <div className="leading-tight">
-        <div className="font-display text-lg tracking-wide text-stone-50 sm:text-xl">{BRAND.name}</div>
-        {!compact && (
-          <div className="text-[9px] uppercase tracking-[0.32em] text-amber-300/80">{BRAND.product}</div>
-        )}
-      </div>
-    </>
+    <span className={`relative block h-9 overflow-hidden rounded-sm bg-white sm:h-10 ${compact ? 'w-36 sm:w-40' : 'w-44 sm:w-56'}`}>
+      <img
+        src="/favicon.png"
+        alt={BRAND.name}
+        className={`absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2 ${compact ? 'w-72 sm:w-80' : 'w-[22rem] sm:w-[28rem]'}`}
+      />
+    </span>
   );
 
   if (to.startsWith('#')) {
