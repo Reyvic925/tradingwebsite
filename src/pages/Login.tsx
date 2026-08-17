@@ -18,13 +18,24 @@ export default function Login() {
   const [referral, setReferral] = useState(params.get('ref') || '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [confirmationNote, setConfirmationNote] = useState('');
 
   useEffect(() => {
     const ref = params.get('ref');
     if (ref) persistReferral(ref);
   }, [params]);
 
-  if (!loading && user) return <Navigate to="/app" replace />;
+  if (!loading && user && !awaitingConfirmation) return <Navigate to="/app" replace />;
+
+  const finishAuthentication = async (isNewAccount = false) => {
+    await bootstrapProfile(isNewAccount ? { full_name: fullName, referred_by: referral || null } : undefined);
+    const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
+    const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
+    const role = String(profile?.role || '').toLowerCase();
+    navigate(role === 'admin' ? '/admin/dashboard' : '/app');
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,23 +45,56 @@ export default function Login() {
     setBusy(true);
     try {
       if (isSignUp) {
-        const { error: err } = await supabase.auth.signUp({ email, password });
+        const { data, error: err } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName } },
+        });
         if (err) throw err;
-        const { error: sErr } = await supabase.auth.signInWithPassword({ email, password });
-        if (sErr) throw sErr;
-        await bootstrapProfile({ full_name: fullName, referred_by: referral || null });
+        if (!data.session) {
+          setAwaitingConfirmation(true);
+          setConfirmationNote(`We sent a verification code to ${email}.`);
+          return;
+        }
+        await finishAuthentication(true);
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
-        await bootstrapProfile();
+        await finishAuthentication();
       }
-
-      const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
-      const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
-      const role = String(profile?.role || '').toLowerCase();
-      navigate(role === 'admin' ? '/admin/dashboard' : '/app');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const token = otp.replace(/\s/g, '');
+    if (!/^\d{6}$/.test(token)) return setError('Enter the 6-digit code from your email.');
+    setBusy(true);
+    try {
+      const { error: err } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+      if (err) throw err;
+      await finishAuthentication(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not verify that code.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendConfirmation = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const { error: err } = await supabase.auth.resend({ type: 'signup', email });
+      if (err) throw err;
+      setConfirmationNote(`A new verification code was sent to ${email}.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not resend the code.');
     } finally {
       setBusy(false);
     }
@@ -64,9 +108,30 @@ export default function Login() {
         <div className="mb-8 flex justify-center"><Logo /></div>
         <div className="glass rounded-md p-7">
           <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Private access</div>
-          <h1 className="mt-2 font-display text-4xl">{isSignUp ? 'Open an account' : 'Welcome back'}</h1>
-          <p className="mt-2 text-sm text-stone-400">Institutional rails. Retail-ready onboarding in under a minute.</p>
+          <h1 className="mt-2 font-display text-4xl">{awaitingConfirmation ? 'Verify your email' : isSignUp ? 'Open an account' : 'Welcome back'}</h1>
+          <p className="mt-2 text-sm text-stone-400">{awaitingConfirmation ? `Enter the six-digit code sent to ${email}.` : 'Institutional rails. Retail-ready onboarding in under a minute.'}</p>
 
+          {awaitingConfirmation ? (
+            <form onSubmit={verifyOtp} className="mt-6 space-y-3">
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="6-digit code"
+                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-center font-mono text-lg tracking-[0.45em] outline-none focus:border-amber-400/50"
+              />
+              {confirmationNote && <div className="text-center text-xs text-stone-400">{confirmationNote}</div>}
+              {error && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
+              <button disabled={busy} className="w-full rounded-sm bg-amber-400 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304] disabled:opacity-60">
+                {busy ? 'Please wait…' : 'Verify email'}
+              </button>
+              <button type="button" disabled={busy} onClick={resendConfirmation} className="w-full text-center text-sm text-amber-300 disabled:opacity-60">Resend code</button>
+              <button type="button" disabled={busy} onClick={() => { setAwaitingConfirmation(false); setOtp(''); setError(''); }} className="w-full text-center text-sm text-stone-400 disabled:opacity-60">Use a different email</button>
+            </form>
+          ) : (
+          <>
           <form onSubmit={submit} className="mt-6 space-y-3">
             {isSignUp && (
               <input
@@ -119,6 +184,8 @@ export default function Login() {
             {isSignUp ? 'Already have an account? Sign in' : `New to ${BRAND.name}? Create an account`}
           </button>
           <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>
+          </>
+          )}
         </div>
       </div>
     </div>

@@ -88,7 +88,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const markAll = async () => {
     await apiSend('/api/notifications', 'PUT', { all: true });
-    load();
+    setNotes((current) => current.map((note) => ({ ...note, read: true })));
+  };
+
+  const markRead = async (id: number) => {
+    const target = notes.find((note) => note.id === id);
+    if (!target || target.read) return;
+    await apiSend('/api/notifications', 'PUT', { id });
+    setNotes((current) => current.map((note) => note.id === id ? { ...note, read: true } : note));
   };
 
   return (
@@ -137,7 +144,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="font-mono text-sm text-stone-100">{formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0))}</div>
             </div>
             <div className="relative">
-              <button onClick={() => setShowNotes((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-sm border border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowNotes((v) => !v)}
+                aria-expanded={showNotes}
+                aria-controls="account-alerts"
+                aria-label={unread > 0 ? `Open alerts, ${unread} unread` : 'Open alerts'}
+                className="relative grid h-9 w-9 place-items-center rounded-sm border border-white/10 transition hover:border-amber-300/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+              >
                 <Bell size={16} />
                 {unread > 0 && (
                   <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-amber-400 px-1 text-[9px] font-bold text-[#1a1304]">
@@ -146,21 +160,47 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               </button>
               {showNotes && (
-                <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-md border border-white/10 bg-[#0c1017] shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-[11px] uppercase tracking-widest text-stone-500">
-                    Alerts
-                    <button onClick={markAll} className="text-amber-300">Mark read</button>
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close alerts"
+                    onClick={() => setShowNotes(false)}
+                    className="fixed inset-0 z-40 bg-black/50 sm:hidden"
+                  />
+                  <section
+                    id="account-alerts"
+                    aria-label="Account alerts"
+                    className="fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-hidden rounded-md border border-white/10 bg-[#0c1017] shadow-2xl sm:absolute sm:right-0 sm:left-auto sm:top-auto sm:z-50 sm:mt-2 sm:max-h-none sm:w-80"
+                  >
+                  <div className="flex items-center justify-between border-b border-white/5 px-3 py-3 text-[11px] uppercase tracking-widest text-stone-500">
+                    <span>Alerts</span>
+                    <div className="flex items-center gap-3">
+                      {unread > 0 && <button type="button" onClick={markAll} className="text-amber-300 hover:text-amber-200">Mark all read</button>}
+                      <button type="button" onClick={() => setShowNotes(false)} className="text-stone-400 hover:text-stone-100" aria-label="Close alerts"><X size={16} /></button>
+                    </div>
                   </div>
-                  <div className="max-h-80 overflow-auto">
+                  <div className="max-h-[calc(100dvh-9.5rem)] overflow-auto sm:max-h-80">
                     {notes.length === 0 && <div className="p-4 text-sm text-stone-500">No alerts yet.</div>}
                     {notes.map((n) => (
-                      <div key={n.id} className={`border-b border-white/5 px-3 py-3 ${n.read ? 'opacity-60' : ''}`}>
-                        <div className="text-sm text-stone-100">{n.title}</div>
-                        <div className="mt-1 text-xs text-stone-500">{n.body}</div>
-                      </div>
+                      <button
+                        type="button"
+                        key={n.id}
+                        onClick={() => markRead(n.id)}
+                        className={`block w-full border-b border-white/5 px-3 py-3 text-left transition hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-amber-300/60 ${n.read ? 'opacity-60' : ''}`}
+                        aria-label={n.read ? n.title : `Mark alert as read: ${n.title}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!n.read && <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />}
+                          <div className={n.read ? '' : 'min-w-0'}>
+                            <div className="text-sm text-stone-100">{n.title}</div>
+                            <div className="mt-1 text-xs leading-5 text-stone-500">{n.body}</div>
+                          </div>
+                        </div>
+                      </button>
                     ))}
                   </div>
-                </div>
+                  </section>
+                </>
               )}
             </div>
             <Link to="/app/profile" className="flex items-center gap-2 text-sm text-stone-300">
