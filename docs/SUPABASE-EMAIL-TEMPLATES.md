@@ -14,7 +14,7 @@ Use this template for the website's signup flow. It provides the six-digit token
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background:#ffffff;border:1px solid #e8e0d6;border-radius:12px">
       <tr><td style="background:#0b0f1a;padding:28px 36px;border-radius:12px 12px 0 0">
         <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-          <td><img src="https://YOUR-DOMAIN.com/favicon.png" width="220" height="52" alt="The Prime Markets" style="display:block;border:0;object-fit:cover;object-position:center" /></td>
+          <td><img src="https://YOUR-DOMAIN.com/favicon.svg" width="38" height="38" alt="The Prime Markets" style="display:block;border:0;border-radius:6px" /></td>
           <td style="padding-left:12px;color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-0.3px">The Prime Markets</td>
         </tr></table>
       </td></tr>
@@ -33,7 +33,7 @@ Use this template for the website's signup flow. It provides the six-digit token
 </body></html>
 ```
 
-Replace `YOUR-DOMAIN.com` with the deployed website domain. The supplied `favicon.png` is now the logo used by the website and every email layout.
+Replace `YOUR-DOMAIN.com` with the deployed website domain. The original logo is a native SVG and is used by the website and every email layout.
 
 ## Other Supabase Auth templates
 
