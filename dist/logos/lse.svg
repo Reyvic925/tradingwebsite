@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <rect width="200" height="40" rx="4" fill="#111"/>
+  <circle cx="18" cy="20" r="9" fill="#C8102E"/>
+  <text x="14" y="24" fill="#fff" font-family="Georgia,serif" font-size="10" font-weight="700">L</text>
+  <text x="34" y="18" fill="#F5F5F5" font-family="Georgia,serif" font-size="11" font-weight="600">LONDON STOCK</text>
+  <text x="34" y="30" fill="#C8102E" font-family="Georgia,serif" font-size="11" font-weight="700" letter-spacing="1.5">EXCHANGE</text>
+</svg>

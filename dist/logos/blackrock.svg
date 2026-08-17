@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 40" fill="none">
+  <rect width="180" height="40" rx="4" fill="#111"/>
+  <path d="M14 28V12h7.4c4.2 0 6.8 2.2 6.8 5.4 0 2.2-1.2 3.9-3.3 4.7l4 5.9h-5.2l-3.5-5.3H19V28h-5zm5-9.2h2.4c1.7 0 2.7-.8 2.7-2.1s-1-2.1-2.7-2.1H19v4.2z" fill="#F4B400"/>
+  <text x="36" y="25" fill="#F2F2F2" font-family="Georgia,serif" font-size="14" font-weight="600" letter-spacing="1">BlackRock</text>
+</svg>
