@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, firstOpenPosition } from './helpers.js';
 import { UNIVERSE, CRYPTO_PAIRS, FX_PAIRS, FUTURE_PAIRS } from './universe-data.js';
 import { INTL_UNIVERSE, CLASS_MAP } from './intl-universe.js';
@@ -522,7 +523,7 @@ async function fillPendingLimits(markets) {
       }
     }
 
-    await supabase.from('notifications').insert({
+    await createNotification(supabase, {
       user_id: order.user_id,
       title: `Limit ${order.side.toUpperCase()} ${order.symbol} filled`,
       body: `${qty} filled at ${fillPrice}`,

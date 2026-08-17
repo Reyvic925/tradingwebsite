@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { cors, getProfileRow } from './helpers.js';
 import { listKycSubmissions, updateKycSubmission, logAdminAction } from './admin-helpers.js';
 import { requireAdmin } from './auth-admin.js';
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
       }
 
       try {
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: existing.user_id,
           title: approved ? 'Identity verified' : 'KYC application rejected',
           body: approved

@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, firstOpenPosition, first, findById, requireUser as authUser } from './helpers.js';
 
 async function requireUser(req) {
@@ -128,7 +129,7 @@ export default async function handler(req, res) {
           .eq('id', existing.id)
           .select();
         if (pErr) throw pErr;
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: user.id,
           title: `Filled ${side.toUpperCase()} ${market.symbol}`,
           body: `${qty} @ ${fillPrice} — position increased`,
@@ -184,7 +185,7 @@ export default async function handler(req, res) {
           newPos = first(created);
         }
 
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: user.id,
           title: `Closed ${existing.side} ${market.symbol}`,
           body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD`,
@@ -212,7 +213,7 @@ export default async function handler(req, res) {
         .select();
       if (pErr) throw pErr;
 
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         title: `Opened ${side === 'buy' ? 'LONG' : 'SHORT'} ${market.symbol}`,
         body: `${qty} @ ${fillPrice} · margin ${margin.toFixed(2)} USD`,

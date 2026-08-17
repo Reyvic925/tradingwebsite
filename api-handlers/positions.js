@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, first, findById, requireUser as authUser } from './helpers.js';
 
 async function requireUser(req) {
@@ -49,7 +50,7 @@ async function markToMarket(userId) {
           closed_at: new Date().toISOString(),
         })
         .eq('id', pos.id);
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: userId,
         title: `${reason === 'stop-loss' ? 'Stop-loss' : 'Take-profit'} hit on ${pos.symbol}`,
         body: `Position closed at ${price}. P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD`,
@@ -150,7 +151,7 @@ export default async function handler(req, res) {
         filled_price: price,
       });
 
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         title: `Closed ${pos.symbol}`,
         body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD at ${price}`,

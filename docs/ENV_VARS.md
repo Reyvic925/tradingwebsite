@@ -18,6 +18,11 @@ SUPABASE_URL, SUPABASE_KEY (or SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY)
 - Purpose: Credentials to connect to Supabase (database + auth). Use service role key for server-only operations that require elevated privileges.
 - Usage: Set both values in server environment; prefer using separate keys for client vs server contexts.
 
+RESEND_API_KEY, RESEND_FROM_EMAIL, APP_URL
+- Purpose: Send transactional account alerts through Resend. `RESEND_FROM_EMAIL` must use a sender/domain verified in Resend, such as `Apex Prime <no-reply@yourdomain.com>`.
+- Usage: Set these only in the server/Vercel environment. Alerts still appear in-app if Resend is not configured or delivery fails.
+- Supabase Auth OTP/confirmation: configure the same Resend account under Supabase Dashboard -> Authentication -> SMTP Settings. The website's signup flow uses Supabase Auth, which must retain control of confirmation-token generation and verification.
+
 BLOCKCHAIN_API_KEY
 - Purpose: API key for any blockchain node/rpc provider (e.g., Infura, Alchemy, QuickNode) used for on-server deposit generation or chain queries.
 - Usage: Keep server-side only. If using provider-specific env names, map them into BLOCKCHAIN_API_KEY or use provider-specific variables.

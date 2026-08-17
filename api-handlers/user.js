@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { first, requireUser as authUser, getProfileRow } from './helpers.js';
 import cryptoKeys from './crypto-keys.js';
 import { logAdminAction } from './admin-helpers.js';
@@ -190,7 +191,7 @@ export default async function handler(req, res) {
         filled_price: price,
       });
 
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         title: `Closed ${pos.symbol}`,
         body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD at ${price}`,

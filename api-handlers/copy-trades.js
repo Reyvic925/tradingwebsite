@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, first, findById, requireUser as authUser } from './helpers.js';
 
 async function requireUser(req) {
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
         .eq('id', trader_id);
 
       // Create notification
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         trader_id,
         title: `Now copying ${trader.name}`,
@@ -193,7 +194,7 @@ export default async function handler(req, res) {
 
       const trader = first(traderData);
       if (trader) {
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: user.id,
           trader_id: follow.trader_id,
           title: `Stopped copying ${trader.name}`,

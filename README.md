@@ -69,8 +69,13 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `NEXT_PUBLIC_SUPABASE_URL` | API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | API |
 | `SUPABASE_SERVICE_ROLE_KEY` | API |
+| `RESEND_API_KEY` | API — transactional alert emails |
+| `RESEND_FROM_EMAIL` | API — verified no-reply sender |
+| `APP_URL` | API — email links |
 | `VITE_GOOGLE_CLIENT_ID` | optional |
 | `VITE_GOOGLE_AUTH_PROXY` | optional |
+
+For signup confirmation/OTP emails, configure Resend SMTP in Supabase Authentication settings with the same verified no-reply sender. The application uses Resend directly for account and trading alerts.
 
 ## Demo
 
@@ -125,5 +130,4 @@ or with query string:
 Notes
 - Per-market admin tunables supported: markets.hidden_drift and markets.volatility (decimal values). hidden_drift biases the expected drift per tick; volatility scales random shocks.
 - A convenience verification script is available at scripts/tick_once.js to run a single tick locally and confirm a price_history row is inserted (it requires SUPABASE credentials as documented in the Environment section).
-
 

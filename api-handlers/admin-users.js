@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { requireAdmin } from './auth-admin.js';
 import { buildUserDirectoryEntry, dedupeProfiles, filterActiveProfiles, mergeAuthUserProfile } from './admin-user-utils.js';
 
@@ -100,7 +101,7 @@ export default async function handler(req, res) {
       // Deposit/withdrawal history is handled through the deposit approval and withdrawal flows.
 
       try {
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: userId,
           title: action === 'add' ? 'Admin balance added' : 'Admin balance adjusted',
           body: action === 'add' ? `Admin added $${delta.toFixed(2)} to your available balance.` : `Admin subtracted $${delta.toFixed(2)} from your available balance.${reason ? ` Reason: ${reason}` : ''}`,

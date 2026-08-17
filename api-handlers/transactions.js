@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, first, requireUser as authUser } from './helpers.js';
 
 async function requireUser(req) {
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
         .select();
       if (error) throw error;
 
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         title: type === 'deposit' ? 'Deposit credited' : 'Withdrawal sent',
         body: `${type === 'deposit' ? '+' : '-'}$${amt.toFixed(2)} via ${method || 'transfer'} · ${ref}`,

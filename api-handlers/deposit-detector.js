@@ -48,6 +48,33 @@ async function fetchSupabase(path, options = {}) {
   }
 }
 
+async function sendResendDepositEmail(userId, title, body) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from || !SUPABASE_URL || !SUPABASE_KEY) return;
+
+  try {
+    const profiles = await fetchSupabase(`profiles?user_id=eq.${encodeURIComponent(userId)}&select=email&limit=1`);
+    const to = profiles.data?.[0]?.email;
+    if (!to) return;
+
+    const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: title,
+        text: `${title}\n\n${body}${appUrl ? `\n\nView your account: ${appUrl.replace(/\/$/, '')}/app` : ''}`,
+      }),
+    });
+    if (!response.ok) console.error('[deposit-detector] Resend delivery failed:', response.status, await response.text());
+  } catch (err) {
+    console.error('[deposit-detector] Resend delivery failed:', err.message);
+  }
+}
+
 function okJson(res, obj) {
   res.setHeader('Content-Type', 'application/json');
   res.statusCode = 200;
@@ -180,6 +207,7 @@ async function creditDeposit({ user_id, amount, currency = 'ETH', tx_hash, times
       read: false
     };
     await fetchSupabase('notifications', { method: 'POST', body: notif });
+    await sendResendDepositEmail(user_id, notif.title, notif.body);
   } catch (err) {
     console.warn('Failed to create notification:', err.message);
   }

@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import cryptoKeys from './crypto-keys.js';
 import { getOrCreateWallet, getProfileRow, getUsdWallet } from './helpers.js';
 import registrationWallet from './registration-wallet.js';
@@ -149,7 +150,7 @@ export default async function handler(req, res) {
             // Don't fail registration if wallets fail
           }
 
-          await supabase.from('notifications').insert({
+          await createNotification(supabase, {
             user_id: user.id,
             title: 'Welcome to Apex Prime Broker',
             body: 'Your account is ready. Complete KYC and deposit to start trading.',
@@ -175,7 +176,7 @@ export default async function handler(req, res) {
               if (rw) {
                 await supabase.from('wallets').update({ available: Number(rw.available) + 25 }).eq('id', rw.id);
               }
-              await supabase.from('notifications').insert({
+              await createNotification(supabase, {
                 user_id: referrer.user_id,
                 title: 'Referral bonus credited',
                 body: `${fullName} joined with your code. $25 has been added to your wallet.`,

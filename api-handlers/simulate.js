@@ -7,6 +7,7 @@
  */
 
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import {
   isTraderEligible,
   calculateMarketChange,
@@ -204,7 +205,7 @@ export default async function handler(req, res) {
             console.log(`[CRON] ${riskCheck.reason.toUpperCase()} for user follow ${follow.id}: ${followPnLPercent.toFixed(2)}%`);
 
             // Create notification
-            await supabase.from('notifications').insert({
+            await createNotification(supabase, {
               user_id: follow.user_id,
               trader_id: follow.trader_id,
               title: riskCheck.reason === 'stop_loss' ? '⚠️ Stop-Loss Triggered' : '🎉 Take-Profit Reached',

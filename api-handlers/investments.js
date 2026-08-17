@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { getUsdWallet, first, findById, requireUser as authUser } from './helpers.js';
 
 async function requireUser(req) {
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
               status: 'completed',
               reference: `INV-${inv.id}`,
             });
-            await supabase.from('notifications').insert({
+            await createNotification(supabase, {
               user_id: user.id,
               title: `${plan.name} plan matured`,
               body: `Payout of $${payout.toFixed(2)} credited to your wallet.`,
@@ -147,7 +148,7 @@ export default async function handler(req, res) {
         reference: `INV-${created.id}`,
       });
 
-      await supabase.from('notifications').insert({
+      await createNotification(supabase, {
         user_id: user.id,
         title: `Subscribed to ${plan.name}`,
         body: `$${amt.toFixed(2)} allocated for ${plan.duration_days} days with a ${plan.total_return}% total-return target.`,

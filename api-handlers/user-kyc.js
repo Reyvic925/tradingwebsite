@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { createNotification } from './notification-service.js';
 import { cors, requireUser as requireUserHelper, getProfileRow } from './helpers.js';
 import { insertKycSubmission } from './admin-helpers.js';
 
@@ -148,7 +149,7 @@ export default async function handler(req, res) {
         console.error('[user-kyc] profile update failed', e?.message || e);
       }
       try {
-        await supabase.from('notifications').insert({
+        await createNotification(supabase, {
           user_id: user.id,
           title: 'KYC application submitted',
           body: 'Your identity documents were received and are under review. You will be notified once a decision is made.',
