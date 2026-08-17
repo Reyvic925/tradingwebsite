@@ -48,7 +48,7 @@ export default function Login() {
         const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName } },
+          options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/login` },
         });
         if (err) throw err;
         if (!data.session) {
@@ -90,7 +90,7 @@ export default function Login() {
     setError('');
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.resend({ type: 'signup', email });
+      const { error: err } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/login` } });
       if (err) throw err;
       setConfirmationNote(`A new verification code was sent to ${email}.`);
     } catch (err: unknown) {
