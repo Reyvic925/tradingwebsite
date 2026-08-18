@@ -104,33 +104,7 @@ export default function InvestmentModal({ investment, plan, onClose, onRefresh }
               <PrimaryPerformanceChart investment={investment} plan={plan} />
               <IndicatorBar investment={investment} plan={plan} daysElapsed={daysElapsed} />
 
-              <div className="rounded-2xl border border-[#2a2e39] bg-[#121922] p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-stone-500">Gains & losses</div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Live</div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                    <div className="text-[9px] uppercase tracking-[0.22em] text-stone-500">Invested</div>
-                    <div className="mt-2 font-mono text-sm text-amber-200">{formatMoney(principal)}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                    <div className="text-[9px] uppercase tracking-[0.22em] text-stone-500">Current</div>
-                    <div className="mt-2 font-mono text-sm text-emerald-300">{formatMoney(principal + earned)}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                    <div className="text-[9px] uppercase tracking-[0.22em] text-stone-500">P&L</div>
-                    <div className={`mt-2 font-mono text-sm ${pnlPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                      {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-                    <div className="text-[9px] uppercase tracking-[0.22em] text-stone-500">Maturity</div>
-                    <div className="mt-2 font-mono text-sm text-stone-200">{daysRemaining}d</div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <aside className="bg-[#101720]/90 p-5">
