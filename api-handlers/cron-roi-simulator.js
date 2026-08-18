@@ -121,6 +121,7 @@ export default async function handler(req, res) {
         const newValue = Math.max(0.01, tick.newValue);
         const updateData = {
           current_value: newValue,
+          earned: newValue - Number(investment.amount || 0),
           days_elapsed: tick.daysElapsed,
           updated_at: new Date().toISOString(),
         };

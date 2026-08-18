@@ -6,44 +6,6 @@ async function requireUser(req) {
   return authUser(supabase, req);
 }
 
-export function computePlanProgress(inv, plan) {
-  if (inv.status !== 'active') return { ...inv, earned: Number(inv.earned || 0), days_elapsed: Number(inv.days_elapsed || 0), status: inv.status || 'active' };
-
-  const amount = Number(inv.amount || 0);
-  const totalReturn = Number(plan.total_return || 0) / 100;
-  const durationDays = Math.max(1, Number(plan.duration_days || 1));
-  const start = new Date(inv.start_date).getTime();
-  const now = Date.now();
-  const elapsedDays = Math.min(durationDays, Math.max(0, Math.floor((now - start) / 86400000)));
-  const progress = Math.min(1, elapsedDays / durationDays);
-  const earned = amount * totalReturn * progress;
-  const ended = elapsedDays >= durationDays;
-
-  return { ...inv, earned, days_elapsed: elapsedDays, status: ended ? 'completed' : 'active' };
-}
-
-export function simulateInvestmentStep(inv, plan) {
-  const amount = Number(inv.amount || 0);
-  const totalReturn = Number(plan.total_return || 0) / 100;
-  const durationDays = Math.max(1, Number(plan.duration_days || 1));
-  const start = new Date(inv.start_date).getTime();
-  const elapsedDays = Math.min(durationDays, Math.max(0, Math.floor((Date.now() - start) / 86400000)));
-  const progress = Math.min(1, elapsedDays / durationDays);
-  const swing = (Math.random() * 2 - 1) * 0.25;
-  const earned = amount * totalReturn * progress * (1 + swing);
-  const signed = Math.random() > 0.5 ? 1 : -1;
-  const realized = amount * totalReturn * progress + (amount * (totalReturn * 0.18) * signed * (1 - progress));
-  return {
-    earned: Math.max(-amount, Math.min(amount * (totalReturn * 1.2), Number.isFinite(realized) ? realized : earned)),
-    days_elapsed: elapsedDays,
-    status: elapsedDays >= durationDays ? 'completed' : 'active',
-  };
-}
-
-function accrue(inv, plan) {
-  return computePlanProgress(inv, plan);
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -95,41 +57,13 @@ export default async function handler(req, res) {
       if (error) throw error;
       const { data: plans } = await supabase.from('plans').select('*');
       const byId = Object.fromEntries((plans || []).map((p) => [p.id, p]));
-      const out = [];
-      for (const inv of investments || []) {
-        const plan = byId[inv.plan_id];
-        if (!plan) {
-          out.push(inv);
-          continue;
-        }
-        const next = accrue(inv, plan);
-        if (next.earned !== Number(inv.earned) || next.status !== inv.status) {
-          if (next.status === 'completed' && inv.status !== 'completed') {
-            const payout = Number(inv.amount) + Number(next.earned);
-            const wallet = await getUsdWallet(supabase, user.id);
-            if (wallet) {
-              await supabase.from('wallets').update({ available: Number(wallet.available) + payout }).eq('id', wallet.id);
-            }
-            await supabase.from('transactions').insert({
-              user_id: user.id,
-              type: 'investment_payout',
-              amount: payout,
-              currency: 'USD',
-              method: 'plan',
-              status: 'completed',
-              reference: `INV-${inv.id}`,
-            });
-            await createNotification(supabase, {
-              user_id: user.id,
-              title: `${plan.name} plan matured`,
-              body: `Payout of $${payout.toFixed(2)} credited to your wallet.`,
-              read: false,
-            });
-          }
-          await supabase.from('investments').update({ earned: next.earned, status: next.status }).eq('id', inv.id);
-        }
-        out.push({ ...next, plan });
-      }
+      // ROI values are advanced exclusively by /api/cron/roi. A read request
+      // must never change balances, payouts, or accrued value; doing so caused
+      // the allocation list and investment detail to disagree.
+      const out = (investments || []).map((inv) => ({
+        ...inv,
+        plan: byId[inv.plan_id],
+      }));
       return res.status(200).json(out);
     }
 
@@ -159,6 +93,7 @@ export default async function handler(req, res) {
           plan_id,
           plan_name: plan.name,
           amount: amt,
+          current_value: amt,
           daily_rate: plan.daily_rate,
           duration_days: plan.duration_days,
           start_date: start.toISOString(),

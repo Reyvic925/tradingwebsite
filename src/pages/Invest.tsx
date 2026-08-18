@@ -145,7 +145,7 @@ export default function Invest() {
                     </div>
                   </td>
                   <td className="px-3 py-3 font-mono">{formatMoney(Number(i.amount))}</td>
-                  <td className="px-3 py-3 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</td>
+                  <td className={`px-3 py-3 font-mono ${Number(i.current_value || i.amount) - Number(i.amount) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(i.current_value || i.amount) - Number(i.amount))}</td>
                   <td className="px-3 py-3 text-stone-500">{new Date(i.end_date).toLocaleDateString()}</td>
                   <td className="px-5 py-3 capitalize text-amber-200">{i.status}</td>
                 </tr>
@@ -179,7 +179,7 @@ export default function Invest() {
                 </div>
                 <div>
                   <div className="text-[9px] uppercase tracking-widest text-stone-500">Accrued</div>
-                  <div className="mt-1 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</div>
+                  <div className={`mt-1 font-mono ${Number(i.current_value || i.amount) - Number(i.amount) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(i.current_value || i.amount) - Number(i.amount))}</div>
                 </div>
                 <div className="col-span-2">
                   <div className="text-[9px] uppercase tracking-widest text-stone-500">Ends</div>
