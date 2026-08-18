@@ -15,8 +15,9 @@ export default function Invest() {
   const [busy, setBusy] = useState<number | null>(null);
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
 
-  const load = async () => {
+  const load = async (showLoading = true) => {
     try {
+      if (showLoading) setLoading(true);
       const [p, i, w] = await Promise.all([
         apiList<Plan>('/api/plans'),
         apiList<Investment>('/api/investments'),
@@ -28,13 +29,13 @@ export default function Invest() {
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : 'Failed to load plans');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-    const timer = setInterval(() => load(false), 10000); // Auto-refresh every 10 seconds
+    void load();
+    const timer = setInterval(() => { void load(false); }, 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -134,7 +135,7 @@ export default function Invest() {
           investment={selectedInvestment}
           plan={plans.find((p) => p.id === selectedInvestment.plan_id) || null}
           onClose={() => setSelectedInvestment(null)}
-          onRefresh={() => load(false)}
+          onRefresh={() => { void load(false); }}
         />
       )}
     </AppShell>
