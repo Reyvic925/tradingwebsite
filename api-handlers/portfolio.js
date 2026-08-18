@@ -5,13 +5,19 @@ async function requireUser(req) {
   return authUser(supabase, req);
 }
 
-function calculateInvestmentROI(investment, transactions = []) {
+export function calculateInvestmentROI(investment, transactions = []) {
+  const principal = Number(investment.amount || 0);
+  const rawCurrent = Number(investment.current_value);
+  const hasCurrentValue = Number.isFinite(rawCurrent) && investment.current_value !== null && investment.current_value !== undefined && rawCurrent >= 0;
+  const currentValue = hasCurrentValue ? rawCurrent : principal + Number(investment.earned || 0);
+
   const roiTransactions = (transactions || [])
     .filter((t) => t.type === 'gain' || t.type === 'loss')
-    .reduce((sum, t) => sum + (t.type === 'gain' ? t.amount : -t.amount), 0);
-  
-  const totalGain = roiTransactions + (Number(investment.current_value || 0) - Number(investment.amount || 0));
-  return ((totalGain / Number(investment.amount || 1)) * 100).toFixed(2);
+    .reduce((sum, t) => sum + (t.type === 'gain' ? Number(t.amount || 0) : -Number(t.amount || 0)), 0);
+
+  const totalGain = roiTransactions + (currentValue - principal);
+  const base = principal > 0 ? principal : 1;
+  return ((totalGain / base) * 100).toFixed(2);
 }
 
 function calculatePortfolioStats(investments = []) {
@@ -80,13 +86,17 @@ export default async function handler(req, res) {
       const hasPendingWithdrawal = (withdrawals || []).some((w) => w.investment_id === inv.id && w.status === 'pending');
       const hasConfirmedWithdrawal = (withdrawals || []).some((w) => w.investment_id === inv.id && ['approved', 'completed'].includes(w.status));
 
+      const liveCurrentValue = Number.isFinite(Number(inv.current_value)) && Number(inv.current_value) > 0
+        ? Number(inv.current_value)
+        : Number(inv.amount || 0) + Number(inv.earned || 0);
+
       return {
         id: inv.id,
         fundId: inv.plan_name,
         fundName: inv.plan_name,
         planName: inv.plan_name,
         initialAmount: inv.amount,
-        currentValue: inv.current_value,
+        currentValue: liveCurrentValue,
         roi: parseFloat(roi),
         startDate: inv.start_date,
         endDate: inv.end_date,
