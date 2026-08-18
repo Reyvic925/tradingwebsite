@@ -85,10 +85,19 @@ if (url && anon) {
         pendingDemoSignup = true;
         return { data: { session: null, user: demoUser }, error: null };
       },
-      async verifyOtp({ token, type }: { token?: string; type?: string }) {
-        if (!pendingDemoSignup || type !== 'signup' || token !== '123456') {
+      async verifyOtp({ token, token_hash, type, email }: { token?: string; token_hash?: string; type?: string; email?: string }) {
+        // Support both direct OTP (token) and email link verification (token_hash)
+        const verificationCode = token_hash || token;
+        
+        if (!pendingDemoSignup || type !== 'email' || !verificationCode) {
           return { data: { session: null, user: null }, error: new Error('Invalid or expired verification code.') };
         }
+        
+        // In demo mode, accept 12345678 (8 digits per current Supabase docs)
+        if (verificationCode !== '12345678') {
+          return { data: { session: null, user: null }, error: new Error('Invalid or expired verification code.') };
+        }
+        
         pendingDemoSignup = false;
         memorySession = newDemoSession();
         writeDemoSession(memorySession);

@@ -16,12 +16,16 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [referral, setReferral] = useState(params.get('ref') || '');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [otp, setOtp] = useState('');
   const [confirmationNote, setConfirmationNote] = useState('');
-  const confirmationRedirectUrl = `${window.location.origin}/login?mode=signup`;
+  // Use canonical domain instead of window.location.origin to avoid www/non-www inconsistencies
+  // This ensures all confirmation emails link to the same canonical URL
+  const confirmationRedirectUrl = typeof window !== 'undefined' && window.location.hostname.includes('localhost')
+    ? `${window.location.origin}`
+    : 'https://theprimemarkets.com';
   const confirmedSignup = params.get('confirmed') === '1' || isSignupConfirmationCallback;
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export default function Login() {
           await supabase.auth.signOut({ scope: 'local' });
         }
         setAwaitingConfirmation(true);
-        setConfirmationNote(`We sent a six-digit code and a confirmation link to ${email}.`);
+        setConfirmationNote(`We sent an 8-digit code and a confirmation link to ${email}.`);
         return;
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
@@ -86,16 +90,17 @@ export default function Login() {
     e.preventDefault();
     setError('');
     const token = otp.replace(/\s/g, '');
-    if (!/^\d{6}$/.test(token)) return setError('Enter the 6-digit code from your email.');
+    // Supabase sends 8-digit OTP tokens
+    if (!/^\d{8}$/.test(token)) return setError('Enter the 8-digit code from your email.');
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+      const { error: err } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
       if (err) throw err;
       await finishAuthentication(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not verify that code.';
       if (/expired|invalid/i.test(message)) {
-        setError('That verification code is expired or was already used. Resend the confirmation and use either its new code or its link—not both.');
+        setError('That verification code is expired or was already used. Resend the confirmation email for a new code and link.');
       } else {
         setError(message);
       }
@@ -128,17 +133,17 @@ export default function Login() {
         <div className="glass rounded-md p-7">
           <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Private access</div>
           <h1 className="mt-2 font-display text-4xl">{awaitingConfirmation ? 'Verify your email' : isSignUp ? 'Open an account' : 'Welcome back'}</h1>
-          <p className="mt-2 text-sm text-stone-400">{awaitingConfirmation ? `Enter the six-digit code sent to ${email}, or use the confirmation link in that email.` : 'Institutional rails. Retail-ready onboarding in under a minute.'}</p>
+          <p className="mt-2 text-sm text-stone-400">{awaitingConfirmation ? `Enter the 8-digit code sent to ${email}, or click the confirmation link in that email.` : 'Institutional rails. Retail-ready onboarding in under a minute.'}</p>
 
           {awaitingConfirmation ? (
             <form onSubmit={verifyOtp} className="mt-6 space-y-3">
               <input
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={8}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="6-digit code"
+                placeholder="8-digit code"
                 className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-center font-mono text-lg tracking-[0.45em] outline-none focus:border-amber-400/50"
               />
               {confirmationNote && <div className="text-center text-xs text-stone-400">{confirmationNote}</div>}

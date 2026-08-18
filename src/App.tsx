@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
+import AuthConfirm from './pages/AuthConfirm';
 import Dashboard from './pages/Dashboard';
 import Trade from './pages/Trade';
 import Markets from './pages/Markets';
@@ -32,6 +33,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/confirm" element={<AuthConfirm />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
           <Route path="/source" element={<Source />} />
