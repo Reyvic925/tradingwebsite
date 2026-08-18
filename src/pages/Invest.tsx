@@ -97,52 +97,90 @@ export default function Invest() {
       </div>
 
       <h2 className="mt-12 text-sm uppercase tracking-[0.18em] text-stone-400">Your allocations</h2>
-      <div className="mt-4 overflow-hidden rounded-md border border-white/5">
-        <table className="w-full text-left text-sm">
-          <thead className="text-[10px] uppercase tracking-widest text-stone-500">
-            <tr>
-              <th className="px-5 py-3">Plan</th>
-              <th className="px-3 py-3">Principal</th>
-              <th className="px-3 py-3">Accrued</th>
-              <th className="px-3 py-3">Ends</th>
-              <th className="px-5 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {investments.map((i) => (
-              <tr
-                key={i.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedInvestment(i)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    setSelectedInvestment(i);
-                  }
-                }}
-                className="cursor-pointer border-t border-white/5 transition-all duration-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none"
-                aria-label={`Open investment details for ${i.plan_name}`}
-              >
-                <td className="px-5 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>{i.plan_name}</span>
-                    <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-200">
-                      Open
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-3 font-mono">{formatMoney(Number(i.amount))}</td>
-                <td className="px-3 py-3 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</td>
-                <td className="px-3 py-3 text-stone-500">{new Date(i.end_date).toLocaleDateString()}</td>
-                <td className="px-5 py-3 capitalize text-amber-200">{i.status}</td>
+      <div className="mt-4 overflow-x-auto rounded-md border border-white/5">
+        <div className="hidden md:block">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead className="text-[10px] uppercase tracking-widest text-stone-500">
+              <tr>
+                <th className="px-5 py-3">Plan</th>
+                <th className="px-3 py-3">Principal</th>
+                <th className="px-3 py-3">Accrued</th>
+                <th className="px-3 py-3">Ends</th>
+                <th className="px-5 py-3">Status</th>
               </tr>
-            ))}
-            {!investments.length && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-stone-500">No active plans.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {investments.map((i) => (
+                <tr
+                  key={i.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedInvestment(i)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedInvestment(i);
+                    }
+                  }}
+                  className="cursor-pointer border-t border-white/5 transition-all duration-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                  aria-label={`Open investment details for ${i.plan_name}`}
+                >
+                  <td className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{i.plan_name}</span>
+                      <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-200">
+                        Open
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 font-mono">{formatMoney(Number(i.amount))}</td>
+                  <td className="px-3 py-3 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</td>
+                  <td className="px-3 py-3 text-stone-500">{new Date(i.end_date).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 capitalize text-amber-200">{i.status}</td>
+                </tr>
+              ))}
+              {!investments.length && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-stone-500">No active plans.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="space-y-3 p-3 md:hidden">
+          {investments.map((i) => (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => setSelectedInvestment(i)}
+              className="w-full rounded-md border border-white/5 bg-white/[0.02] p-3 text-left transition hover:bg-white/5"
+              aria-label={`Open investment details for ${i.plan_name}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-white">{i.plan_name}</span>
+                <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-200">
+                  {i.status}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone-400">
+                <div>
+                  <div className="text-[9px] uppercase tracking-widest text-stone-500">Principal</div>
+                  <div className="mt-1 font-mono text-stone-200">{formatMoney(Number(i.amount))}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-widest text-stone-500">Accrued</div>
+                  <div className="mt-1 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</div>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-[9px] uppercase tracking-widest text-stone-500">Ends</div>
+                  <div className="mt-1 text-stone-200">{new Date(i.end_date).toLocaleDateString()}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+          {!investments.length && (
+            <div className="px-3 py-8 text-center text-stone-500">No active plans.</div>
+          )}
+        </div>
       </div>
 
       {/* Investment Detail Modal */}

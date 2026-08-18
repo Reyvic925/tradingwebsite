@@ -5,5 +5,9 @@
       "source": "/((?!api/|videos/|images/|logos/|downloads/|favicon.svg|assets/).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    { "path": "/api/simulate", "schedule": "* * * * *" },
+    { "path": "/api/cron/tick", "schedule": "*/5 * * * *" }
   ]
 }
