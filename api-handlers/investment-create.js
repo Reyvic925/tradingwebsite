@@ -16,8 +16,37 @@ export default async function handler(req, res) {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    // GET user's investments with portfolio summary
+    // GET a user's investments. Supplying ?id= returns the complete ledger for
+    // one investment, which powers the Invest detail screen without a portfolio
+    // endpoint.
     if (req.method === 'GET') {
+      const requestedId = req.query?.id;
+      if (requestedId) {
+        const { data: investment, error: investmentError } = await supabase
+          .from('investments')
+          .select('*')
+          .eq('id', requestedId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (investmentError) throw investmentError;
+        if (!investment) return res.status(404).json({ error: 'Investment not found' });
+
+        const [{ data: tier }, { data: transactions }, { data: withdrawals }, { data: profile }] = await Promise.all([
+          supabase.from('investment_tiers').select('*').eq('id', investment.tier_id).maybeSingle(),
+          supabase.from('investment_transactions').select('*').eq('investment_id', investment.id).order('created_at', { ascending: true }),
+          supabase.from('withdrawals').select('status').eq('investment_id', investment.id).eq('user_id', user.id),
+          supabase.from('profiles').select('tier, locked_balance').eq('user_id', user.id).maybeSingle(),
+        ]);
+
+        return res.status(200).json({
+          investment: { ...investment, tier_details: tier },
+          transactions: transactions || [],
+          userTier: profile?.tier || 'Member',
+          lockedBalance: Number(profile?.locked_balance || 0),
+          withdrawalPending: (withdrawals || []).some((withdrawal) => withdrawal.status === 'pending'),
+        });
+      }
+
       const { data: investments } = await supabase
         .from('investments')
         .select('*')
