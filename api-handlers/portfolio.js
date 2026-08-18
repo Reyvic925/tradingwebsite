@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     // Get all investment transactions and gain logs
     const invIds = (investments || []).map((inv) => inv.id);
     const { data: transactions } = invIds.length 
-      ? await supabase.from('investment_transactions').select('*').in('investment_id', invIds)
+      ? await supabase.from('investment_transactions').select('*').in('investment_id', invIds).order('created_at', { ascending: true })
       : { data: [] };
 
     const { data: gainLogs } = await supabase.from('user_gain_logs').select('*').eq('user_id', user.id).order('logged_at', { ascending: false }).limit(20);
@@ -105,7 +105,10 @@ export default async function handler(req, res) {
         roiWithdrawalPending: hasPendingWithdrawal,
         roiWithdrawalConfirmed: hasConfirmedWithdrawal,
         transactionCount: invTransactions.length,
-        lastTransactions: invTransactions.slice(-5),
+        // Keep the complete investment ledger. The detail view builds its chart and
+        // activity feed from this ordered series, while the portfolio list only
+        // consumes its count and summary fields.
+        lastTransactions: invTransactions,
         tier: tiersById[inv.tier_id],
       };
     });

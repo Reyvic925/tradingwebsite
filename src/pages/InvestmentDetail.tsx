@@ -1,181 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarRange, CircleDollarSign, TrendingUp, WalletCards } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, LockKeyhole, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet } from '../lib/api';
 import { formatMoney } from '../lib/format';
 
-type PortfolioInvestment = {
-  id: number;
-  planName?: string;
-  fundName?: string;
-  initialAmount?: number;
-  currentValue?: number;
-  roi?: number;
-  startDate?: string;
-  endDate?: string;
-  status?: string;
-  lastTransactions?: Array<{
-    id?: number;
-    type?: string;
-    amount?: number;
-    description?: string;
-    created_at?: string;
-    logged_at?: string;
-  }>;
-};
+type Transaction = { id?: number; type?: string; amount?: number; description?: string; created_at?: string; logged_at?: string };
+type Investment = { id: number; planName?: string; fundName?: string; initialAmount?: number; currentValue?: number; startDate?: string; endDate?: string; status?: string; roiWithdrawn?: boolean; roiWithdrawalPending?: boolean; tier?: { duration_days?: number; roi_min?: number; roi_max?: number; volatility_min?: number; volatility_max?: number }; lastTransactions?: Transaction[] };
+type Portfolio = { investments?: Investment[]; userInfo?: { tier?: string; lockedBalance?: number } };
+type Tab = 'activity' | 'withdrawal' | 'simulation';
+
+const dateLabel = (value?: string, time = false) => value ? new Date(value).toLocaleString(undefined, time ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }) : '—';
+const signedAmount = (tx: Transaction) => ['loss', 'roi_loss'].includes(tx.type || '') ? -Number(tx.amount || 0) : Number(tx.amount || 0);
 
 export default function InvestmentDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [investment, setInvestment] = useState<PortfolioInvestment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true);
-        setError('');
-        const data = await apiGet<{ investments?: PortfolioInvestment[] }>('/api/portfolio');
-        const match = (data?.investments || []).find((item) => String(item.id) === String(id));
-        if (!match) {
-          setError('Investment not found');
-          setInvestment(null);
-          return;
-        }
-        setInvestment(match);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load investment');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void load();
-  }, [id]);
-
-  const summary = useMemo(() => {
-    if (!investment) return null;
-    const principal = Number(investment.initialAmount || 0);
-    const current = Number(investment.currentValue ?? principal);
-    const roi = Number(investment.roi || 0);
-    return {
-      principal,
-      current,
-      roi,
-      pnl: current - principal,
-    };
-  }, [investment]);
-
-  if (loading) {
-    return (
-      <AppShell>
-        <div className="mt-8 h-48 animate-pulse rounded-md bg-white/5" />
-      </AppShell>
-    );
-  }
-
-  if (error || !investment || !summary) {
-    return (
-      <AppShell>
-        <div className="max-w-xl rounded-md border border-rose-500/25 bg-rose-500/10 p-5 text-rose-100">
-          <div className="text-sm">{error || 'Investment not found.'}</div>
-          <button onClick={() => navigate('/app/invest')} className="mt-4 rounded-sm bg-rose-500/15 px-3 py-2 text-xs uppercase tracking-widest text-rose-100">
-            Back to investments
-          </button>
-        </div>
-      </AppShell>
-    );
-  }
-
-  const label = investment.planName || investment.fundName || 'Investment';
-  const transactions = investment.lastTransactions || [];
-
-  return (
-    <AppShell>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <button onClick={() => navigate('/app/invest')} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-widest text-stone-200">
-          <ArrowLeft size={14} /> Back
-        </button>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Investment</div>
-          <div className="font-display text-3xl">{label}</div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard icon={CircleDollarSign} label="Principal" value={formatMoney(summary.principal)} accent="amber" />
-        <StatCard icon={WalletCards} label="Current value" value={formatMoney(summary.current)} accent="emerald" />
-        <StatCard icon={TrendingUp} label="ROI" value={`${summary.roi.toFixed(2)}%`} accent="sky" />
-        <StatCard icon={CalendarRange} label="Status" value={investment.status || 'active'} accent="violet" />
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-md border border-white/10 bg-[#0a0f17] p-5">
-          <div className="mb-4 text-[10px] uppercase tracking-[0.2em] text-stone-500">Transaction history</div>
-          <div className="space-y-3">
-            {transactions.length ? transactions.map((tx, index) => (
-              <div key={`${tx.id ?? tx.type ?? 'tx'}-${index}`} className="rounded-sm border border-white/10 bg-white/[0.02] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium text-stone-200">{tx.description || tx.type || 'Transaction'}</div>
-                  <div className={`font-mono text-sm ${Number(tx.amount || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    {Number(tx.amount || 0) >= 0 ? '+' : '-'}{formatMoney(Math.abs(Number(tx.amount || 0)))}
-                  </div>
-                </div>
-                <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-stone-500">
-                  {tx.type || 'entry'} • {new Date(tx.created_at || tx.logged_at || Date.now()).toLocaleString()}
-                </div>
-              </div>
-            )) : <div className="rounded-sm border border-dashed border-white/10 p-5 text-sm text-stone-500">No transaction history yet.</div>}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-white/10 bg-[#0a0f17] p-5">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Investment facts</div>
-          <div className="mt-4 space-y-3 text-sm text-stone-300">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span>Principal</span>
-              <span className="font-mono text-white">{formatMoney(summary.principal)}</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span>Current value</span>
-              <span className="font-mono text-white">{formatMoney(summary.current)}</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span>P&amp;L</span>
-              <span className={`font-mono ${summary.pnl >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatMoney(summary.pnl)}</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span>Started</span>
-              <span className="font-mono text-white">{investment.startDate ? new Date(investment.startDate).toLocaleDateString() : '—'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Maturity</span>
-              <span className="font-mono text-white">{investment.endDate ? new Date(investment.endDate).toLocaleDateString() : '—'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </AppShell>
-  );
+  const { id } = useParams(); const navigate = useNavigate();
+  const [investment, setInvestment] = useState<Investment | null>(null); const [userTier, setUserTier] = useState('Member'); const [lockedBalance, setLockedBalance] = useState(0);
+  const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [tab, setTab] = useState<Tab>('activity'); const [flash, setFlash] = useState<'gain' | 'loss' | null>(null);
+  const lastValue = useRef<number | null>(null);
+  useEffect(() => { let active = true; let flashTimer: ReturnType<typeof setTimeout> | undefined; const load = async (initial = false) => { try { if (initial) setLoading(true); const data = await apiGet<Portfolio>('/api/portfolio'); const match = (data.investments || []).find((item) => String(item.id) === String(id)); if (!active) return; if (!match) { setInvestment(null); setError('Investment not found'); return; } const nextValue = Number(match.currentValue ?? match.initialAmount ?? 0); if (lastValue.current !== null && lastValue.current !== nextValue) { setFlash(nextValue > lastValue.current ? 'gain' : 'loss'); clearTimeout(flashTimer); flashTimer = setTimeout(() => active && setFlash(null), 1250); } lastValue.current = nextValue; setInvestment(match); setUserTier(data.userInfo?.tier || 'Member'); setLockedBalance(Number(data.userInfo?.lockedBalance || 0)); setError(''); } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Failed to load investment'); } finally { if (active && initial) setLoading(false); } }; void load(true); const poll = setInterval(() => void load(), 10000); return () => { active = false; clearInterval(poll); clearTimeout(flashTimer); }; }, [id]);
+  const summary = useMemo(() => { if (!investment) return null; const principal = Number(investment.initialAmount || 0); const current = Number(investment.currentValue ?? principal); const pnl = current - principal; const start = investment.startDate ? new Date(investment.startDate).getTime() : Date.now(); const end = investment.endDate ? new Date(investment.endDate).getTime() : start; const progress = investment.status === 'active' ? Math.min(100, Math.max(0, ((Date.now() - start) / Math.max(1, end - start)) * 100)) : 100; const duration = Math.max(1, Math.ceil((end - start) / 86400000)); return { principal, current, pnl, roi: principal ? pnl / principal * 100 : 0, progress, duration, elapsed: Math.min(duration, Math.floor(duration * progress / 100)) }; }, [investment]);
+  const transactions = useMemo(() => [...(investment?.lastTransactions || [])].sort((a, b) => new Date(b.created_at || b.logged_at || 0).getTime() - new Date(a.created_at || a.logged_at || 0).getTime()), [investment]);
+  const chart = useMemo(() => { if (!investment || !summary) return []; let value = summary.principal; const points = [{ label: dateLabel(investment.startDate), value }]; [...transactions].reverse().forEach((tx) => { value += signedAmount(tx); points.push({ label: dateLabel(tx.created_at || tx.logged_at, true), value: Number(value.toFixed(2)) }); }); if (!transactions.length || value !== summary.current) points.push({ label: 'Live', value: summary.current }); return points; }, [investment, summary, transactions]);
+  if (loading) return <AppShell><div className="mt-8 h-96 animate-pulse rounded-xl bg-white/5" /></AppShell>;
+  if (error || !investment || !summary) return <AppShell><div className="max-w-xl rounded-md border border-rose-500/25 bg-rose-500/10 p-5 text-rose-100"><div className="text-sm">{error || 'Investment not found.'}</div><button onClick={() => navigate('/app/invest')} className="mt-4 rounded-sm bg-rose-500/15 px-3 py-2 text-xs uppercase tracking-widest">Back to investments</button></div></AppShell>;
+  const live = investment.status === 'active'; const positive = summary.pnl >= 0; const plan = investment.planName || investment.fundName || 'Investment';
+  return <AppShell><section className="overflow-hidden rounded-xl border border-white/10 bg-[#080d15]"><header className="border-b border-white/10 bg-gradient-to-br from-amber-400/15 via-[#101a2a] to-[#080d15] p-5 sm:p-8"><button onClick={() => navigate('/app/invest')} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-stone-300 hover:text-white"><ArrowLeft size={15} /> Back to investments</button><div className="mt-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><div className="inline-flex rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200">{plan}</div><h1 className="mt-3 font-display text-3xl sm:text-4xl">Investment #{investment.id}</h1></div><div className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] ${live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'}`}><span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-emerald-300' : 'bg-sky-300'}`} />{live ? 'Live' : 'Matured'}</div></div></header><div className="p-5 sm:p-8"><div className={`rounded-xl border p-6 text-center transition-colors duration-300 ${flash === 'gain' ? 'border-emerald-300/50 bg-emerald-400/10' : flash === 'loss' ? 'border-rose-300/50 bg-rose-400/10' : 'border-white/10 bg-white/[0.025]'}`}><div className="text-[10px] uppercase tracking-[0.25em] text-stone-500">Live value</div><div className="mt-3 font-mono text-4xl font-bold tracking-tight text-white sm:text-6xl">{formatMoney(summary.current)}</div><div className={`mt-3 inline-flex items-center gap-1 font-mono text-sm ${positive ? 'text-emerald-300' : 'text-rose-300'}`}>{positive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}{positive ? '+' : '-'}{formatMoney(Math.abs(summary.pnl))} ({summary.roi.toFixed(2)}%)</div><div className="mt-3 text-xs text-stone-500">Initial deposit: {formatMoney(summary.principal)}</div></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={TrendingUp} label="ROI (total)" value={`${summary.roi.toFixed(2)}%`} tone={positive ? 'text-emerald-300' : 'text-rose-300'} /><Metric icon={Clock3} label="Duration elapsed" value={`Day ${summary.elapsed} of ${summary.duration}`} sub={`${summary.progress.toFixed(0)}% complete`} /><Metric icon={CalendarClock} label="Maturity date" value={dateLabel(investment.endDate, true)} /><Metric icon={WalletCards} label="Current tier" value={userTier} /></div><Chart data={chart} principal={summary.principal} /><div className="mt-6 rounded-xl border border-white/10 bg-white/[0.025] p-4 sm:p-5"><div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-stone-500"><span>{live ? 'Maturity progress' : 'Maturity status'}</span><span>{live ? `${summary.progress.toFixed(1)}%` : 'Completed'}</span></div>{live ? <><div className="mt-3 h-3 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-emerald-400" style={{ width: `${summary.progress}%` }} /></div><div className="mt-2 flex justify-between text-xs text-stone-500"><span>{dateLabel(investment.startDate)}</span><span>{dateLabel(investment.endDate)}</span></div></> : <div className="mt-3 flex items-center gap-2 text-sm text-emerald-300"><CheckCircle2 size={18} /> Funds successfully matured.</div>}</div></div></section><section className="mt-6 rounded-xl border border-white/10 bg-[#080d15] p-4 sm:p-6"><div className="flex gap-1 overflow-x-auto border-b border-white/10">{(['activity', 'withdrawal', 'simulation'] as Tab[]).map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap px-3 py-3 text-xs uppercase tracking-widest ${tab === item ? 'border-b-2 border-amber-300 text-amber-200' : 'text-stone-500 hover:text-stone-200'}`}>{item === 'activity' ? 'Transaction log' : item === 'withdrawal' ? 'Withdrawal status' : 'Simulation details'}</button>)}</div>{tab === 'activity' && <Activity transactions={transactions} currentValue={summary.current} />}{tab === 'withdrawal' && <Withdrawal live={live} withdrawn={Boolean(investment.roiWithdrawn)} pending={Boolean(investment.roiWithdrawalPending)} locked={lockedBalance} onWithdraw={() => navigate('/app/wallet')} />}{tab === 'simulation' && <Simulation investment={investment} latest={transactions[0]} />}</section></AppShell>;
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: typeof CircleDollarSign; label: string; value: string; accent: 'amber' | 'emerald' | 'sky' | 'violet'; }) {
-  const palette = {
-    amber: 'border-amber-400/20 bg-amber-400/5 text-amber-200',
-    emerald: 'border-emerald-400/20 bg-emerald-400/5 text-emerald-200',
-    sky: 'border-sky-400/20 bg-sky-400/5 text-sky-200',
-    violet: 'border-violet-400/20 bg-violet-400/5 text-violet-200',
-  };
-
-  return (
-    <div className={`rounded-md border p-4 ${palette[accent]}`}>
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-[0.2em] text-stone-300">{label}</div>
-        <Icon size={16} />
-      </div>
-      <div className="mt-3 text-xl font-display">{value}</div>
-    </div>
-  );
-}
+function Metric({ icon: Icon, label, value, sub, tone = 'text-white' }: { icon: typeof TrendingUp; label: string; value: string; sub?: string; tone?: string }) { return <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4"><div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-stone-500"><span>{label}</span><Icon size={15} /></div><div className={`mt-3 font-mono text-lg ${tone}`}>{value}</div>{sub && <div className="mt-1 text-xs text-stone-500">{sub}</div>}</div>; }
+function Chart({ data, principal }: { data: Array<{ label: string; value: number }>; principal: number }) { return <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.025] p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><div className="text-[10px] uppercase tracking-[0.22em] text-stone-500">Performance</div><div className="mt-1 text-sm text-stone-300">Investment value over time</div></div><div className="text-xs text-stone-500">Break-even: {formatMoney(principal)}</div></div><div className="h-64"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="investmentValue" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#fbbf24" stopOpacity={0.4} /><stop offset="100%" stopColor="#fbbf24" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#ffffff" strokeOpacity={0.06} vertical={false} /><XAxis dataKey="label" hide /><YAxis width={72} tickFormatter={(v) => `$${Number(v).toLocaleString()}`} tick={{ fill: '#78716c', fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: '#101722', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8 }} formatter={(value) => [formatMoney(Number(value ?? 0)), 'Value']} /><ReferenceLine y={principal} stroke="#94a3b8" strokeDasharray="4 4" /><Area type="monotone" dataKey="value" stroke="#fbbf24" strokeWidth={2} fill="url(#investmentValue)" /></AreaChart></ResponsiveContainer></div></div>; }
+function Activity({ transactions, currentValue }: { transactions: Transaction[]; currentValue: number }) { return <div className="mt-5">{transactions.length ? <div className="space-y-2">{transactions.map((tx, i) => { const amount = signedAmount(tx); return <div key={`${tx.id || 'tx'}-${i}`} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm sm:grid-cols-[1.3fr_1fr_0.7fr]"><div><div className="font-medium text-stone-200">{tx.description || tx.type || 'Transaction'}</div><div className="mt-1 text-xs text-stone-500">{dateLabel(tx.created_at || tx.logged_at, true)}</div></div><div className={`self-center font-mono ${amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{amount >= 0 ? '+' : '-'}{formatMoney(Math.abs(amount))}</div><div className="hidden self-center text-right font-mono text-xs text-stone-500 sm:block">Live: {formatMoney(currentValue)}</div></div>; })}</div> : <div className="py-8 text-center text-sm text-stone-500">No simulation ticks have been recorded yet.</div>}</div>; }
+function Withdrawal({ live, withdrawn, pending, locked, onWithdraw }: { live: boolean; withdrawn: boolean; pending: boolean; locked: number; onWithdraw: () => void }) { if (live) return <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-stone-400"><LockKeyhole className="mb-3 text-stone-500" size={20} />ROI can be withdrawn upon maturity.</div>; if (withdrawn) return <div className="mt-5 rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-5 text-sm text-emerald-200"><CheckCircle2 className="mb-3" size={20} />ROI withdrawal has been requested or completed.</div>; return <div className="mt-5 rounded-lg border border-amber-400/20 bg-amber-400/5 p-5"><div className="text-sm text-stone-300">Matured funds are awaiting release.</div><div className="mt-2 font-mono text-2xl text-white">{formatMoney(locked)}</div>{pending ? <div className="mt-3 text-xs text-amber-200">Withdrawal request is awaiting approval.</div> : <button onClick={onWithdraw} className="mt-4 rounded-md bg-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-widest text-[#201707]">Open wallet to withdraw</button>}</div>; }
+function Simulation({ investment, latest }: { investment: Investment; latest?: Transaction }) { const tier = investment.tier; return <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-white/10 bg-white/[0.02] p-4"><div className="text-[10px] uppercase tracking-widest text-stone-500">Projected ROI range</div><div className="mt-2 font-mono text-lg text-white">{tier?.roi_min ?? '—'}% – {tier?.roi_max ?? '—'}%</div></div><div className="rounded-lg border border-white/10 bg-white/[0.02] p-4"><div className="text-[10px] uppercase tracking-widest text-stone-500">Volatility range</div><div className="mt-2 font-mono text-lg text-white">{tier?.volatility_min ?? '—'}% – {tier?.volatility_max ?? '—'}%</div></div><div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 sm:col-span-2"><div className="text-[10px] uppercase tracking-widest text-stone-500">Latest simulation step</div><div className="mt-2 text-sm text-stone-300">{latest ? `${latest.description || latest.type || 'ROI update'} · ${dateLabel(latest.created_at || latest.logged_at, true)}` : 'The first simulation step has not been recorded yet.'}</div></div></div>; }
