@@ -70,6 +70,7 @@ export default async function handler(req, res) {
 
     const { data: planRows } = await supabase.from('plans').select('*');
     const plansById = Object.fromEntries((planRows || []).map((plan) => [String(plan.id), plan]));
+    const tickFractionDays = 5 / (24 * 60);
 
     for (const investment of activeInvestments || []) {
       const plan = plansById[String(investment.plan_id)];
@@ -78,21 +79,23 @@ export default async function handler(req, res) {
       const amount = Number(investment.amount || 0);
       const durationDays = Math.max(1, Number(plan.duration_days || 1));
       const totalReturn = Number(plan.total_return || 0) / 100;
-      const start = new Date(investment.start_date).getTime();
-      const elapsedDays = Math.min(durationDays, Math.max(0, Math.floor((Date.now() - start) / 86400000)));
-      const progress = Math.min(1, elapsedDays / durationDays);
+      const previousElapsedDays = Math.min(durationDays, Math.max(0, Number(investment.days_elapsed || 0)));
+      const nextElapsedDays = Math.min(durationDays, previousElapsedDays + tickFractionDays);
+      const progress = Math.min(1, nextElapsedDays / durationDays);
       const variance = (Math.random() * 2 - 1) * 0.18;
-      const earned = amount * totalReturn * progress * (1 + variance);
-      const status = elapsedDays >= durationDays ? 'completed' : 'active';
+      const earnedBase = amount * totalReturn * progress * (1 + variance);
+      const finalEarned = progress >= 1 ? amount * totalReturn : earnedBase;
+      const status = progress >= 1 ? 'completed' : 'active';
 
       await supabase.from('investments').update({
-        earned: Math.max(0, Number(earned.toFixed(2))),
+        earned: Math.max(0, Number(finalEarned.toFixed(2))),
         status,
+        days_elapsed: Number(nextElapsedDays.toFixed(6)),
       }).eq('id', investment.id);
 
       if (status === 'completed') {
         const wallet = await supabase.from('wallets').select('*').eq('user_id', investment.user_id).limit(1).maybeSingle();
-        const payout = amount + Number(earned.toFixed(2));
+        const payout = amount + Number(finalEarned.toFixed(2));
         if (wallet.data) {
           await supabase.from('wallets').update({ available: Number(wallet.data.available || 0) + payout }).eq('id', wallet.data.id);
         }
