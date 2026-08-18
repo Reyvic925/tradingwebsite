@@ -26,6 +26,7 @@ import IndexBoard from '../components/IndexBoard';
 import type { Feature, Market, Partner, Plan, Stat, Testimonial } from '../types';
 import { formatPct, formatPrice } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
+import { isSignupConfirmationCallback } from '../lib/supabase';
 
 const PARTNER_LOGOS: Record<string, string> = {
   JPMorgan: '/logos/jpmorgan.svg',
@@ -213,9 +214,9 @@ export default function Landing() {
   const partnerLoop = useMemo(() => [...partners, ...partners], [partners]);
 
   // Supabase uses the configured Site URL when a requested email redirect URL is
-  // absent from its allow-list. Accept that safe fallback instead of leaving a
-  // newly verified user on the public page at `/#access_token=...`.
-  if (!authLoading && user) return <Navigate to="/app" replace />;
+  // absent from its allow-list. Confirmation should still end at sign-in rather
+  // than silently authenticating the user into their dashboard.
+  if (!authLoading && user && isSignupConfirmationCallback) return <Navigate to="/login?confirmed=1" replace />;
 
   return (
     <div id="top" className="bg-[#05070b] text-stone-100">

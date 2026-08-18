@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+// Capture this before the Supabase client consumes the URL fragment. It lets the
+// UI distinguish an email-confirmation callback from an ordinary signed-in visit.
+export const isSignupConfirmationCallback = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type') === 'signup';
+
 const missingMsg = 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.';
 
 let supabase: any;

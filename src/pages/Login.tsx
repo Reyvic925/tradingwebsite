@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import supabase from '../lib/supabase';
+import supabase, { isSignupConfirmationCallback } from '../lib/supabase';
 import { signInWithGoogle } from '../lib/googleAuth';
 import { apiGet, bootstrapProfile, persistReferral } from '../lib/api';
 import { BRAND } from '../lib/brand';
@@ -22,13 +22,25 @@ export default function Login() {
   const [otp, setOtp] = useState('');
   const [confirmationNote, setConfirmationNote] = useState('');
   const confirmationRedirectUrl = `${window.location.origin}/login?mode=signup`;
+  const confirmedSignup = params.get('confirmed') === '1' || isSignupConfirmationCallback;
 
   useEffect(() => {
     const ref = params.get('ref');
     if (ref) persistReferral(ref);
   }, [params]);
 
-  if (!loading && user && !awaitingConfirmation) return <Navigate to="/app" replace />;
+  useEffect(() => {
+    if (!confirmedSignup) return;
+
+    // A confirmation link gives Supabase a temporary browser session. The
+    // product flow requires an explicit password sign-in after confirmation.
+    setIsSignUp(false);
+    setAwaitingConfirmation(false);
+    setConfirmationNote('Email confirmed. Sign in with your email and password to continue.');
+    if (user) void supabase.auth.signOut({ scope: 'local' });
+  }, [confirmedSignup, user]);
+
+  if (!loading && user && !awaitingConfirmation && !confirmedSignup) return <Navigate to="/app" replace />;
 
   const finishAuthentication = async (isNewAccount = false) => {
     await bootstrapProfile(isNewAccount ? { full_name: fullName, referred_by: referral || null } : undefined);
@@ -83,7 +95,7 @@ export default function Login() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Could not verify that code.';
       if (/expired|invalid/i.test(message)) {
-        setError('That code or link is no longer valid. Resend the confirmation, then use only the newest code or link.');
+        setError('That verification code is expired or was already used. Resend the confirmation and use either its new code or its link—not both.');
       } else {
         setError(message);
       }
