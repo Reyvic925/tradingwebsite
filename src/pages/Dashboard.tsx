@@ -5,6 +5,20 @@ import { apiGet, apiList, asList, bootstrapProfile } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
 import type { Investment, Market, Position, Profile, Txn, Wallet } from '../types';
 
+type PortfolioSummary = {
+  availableBalance: number;
+  lockedBalance: number;
+  reservedBalance: number;
+  totalInvested: number;
+  totalCurrent: number;
+  totalPnl: number;
+  activeInvestments: number;
+  completedInvestments: number;
+  positionsCount: number;
+  gains: number;
+  losses: number;
+};
+
 export default function Dashboard() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -12,6 +26,7 @@ export default function Dashboard() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [txns, setTxns] = useState<Txn[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -22,18 +37,20 @@ export default function Dashboard() {
         if (prof.profile) setProfile(prof.profile as Profile);
         if (prof.wallet) setWallet(prof.wallet as Wallet);
       }
-      const [w, pos, mkt, tx, inv] = await Promise.all([
+      const [w, pos, mkt, tx, inv, pf] = await Promise.all([
         apiGet<Wallet>('/api/wallet').catch(() => null),
         apiList<Position>('/api/positions'),
         apiList<Market>('/api/markets?featured=1&limit=12&tick=1'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
+        apiGet<PortfolioSummary>('/api/portfolio').catch(() => null),
       ]);
       if (w && !('error' in (w as object))) setWallet(w);
       setPositions(asList(pos));
       setMarkets(asList(mkt));
       setTxns(asList<Txn>(tx).slice(0, 6));
       setInvestments(asList(inv));
+      if (pf) setPortfolio(pf);
       setError('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load desk');
@@ -79,9 +96,9 @@ export default function Dashboard() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Equity', value: formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0)) },
-          { label: 'Available', value: formatMoney(Number(wallet?.available || 0)) },
-          { label: 'Open P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
-          { label: 'Active plans', value: String(investments.filter((i) => i.status === 'active').length) },
+          { label: 'Available balance', value: formatMoney(Number(portfolio?.availableBalance ?? wallet?.available ?? 0)) },
+          { label: 'Locked (investments)', value: formatMoney(Number(portfolio?.lockedBalance ?? 0)), tone: 'text-amber-400' },
+          { label: 'Total P&L', value: formatMoney(Number(portfolio?.totalPnl ?? pnl)), tone: Number(portfolio?.totalPnl ?? pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400' },
         ].map((c) => (
           <div key={c.label} className="rounded-md border border-white/5 bg-white/[0.02] p-5">
             <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{c.label}</div>
@@ -93,7 +110,9 @@ export default function Dashboard() {
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-md border border-white/5">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
-            <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2>
+            <div>
+              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions ({portfolio?.gains || 0} gains, {portfolio?.losses || 0} losses)</h2>
+            </div>
             <Link to="/app/trade" className="text-xs text-amber-300">Desk →</Link>
           </div>
           <div className="overflow-x-auto">
@@ -130,9 +149,19 @@ export default function Dashboard() {
         </div>
 
         <div className="rounded-md border border-white/5">
-          <div className="border-b border-white/5 px-5 py-3 text-sm uppercase tracking-[0.16em] text-stone-400">Tape movers</div>
+          <div className="border-b border-white/5 px-5 py-3 text-sm uppercase tracking-[0.16em] text-stone-400">Investments & tape</div>
+          {portfolio && (portfolio.activeInvestments > 0 || portfolio.completedInvestments > 0) && (
+            <div className="border-b border-white/5 px-5 py-3 text-xs">
+              <div className="mb-2 rounded bg-amber-500/10 p-2 text-amber-200">
+                <strong>{portfolio.activeInvestments}</strong> active {portfolio.activeInvestments === 1 ? 'plan' : 'plans'} • <strong>{portfolio.completedInvestments}</strong> completed
+              </div>
+              <Link to="/app/invest" className="text-amber-300 hover:underline text-xs">
+                View allocations →
+              </Link>
+            </div>
+          )}
           <div className="divide-y divide-white/5">
-            {markets.slice(0, 7).map((m) => (
+            {markets.slice(0, 6).map((m) => (
               <Link key={m.id} to={`/app/trade/${encodeURIComponent(m.symbol)}`} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03]">
                 <div>
                   <div className="font-mono text-sm">{m.symbol}</div>

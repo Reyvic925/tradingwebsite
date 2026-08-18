@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Trade from './pages/Trade';
 import Markets from './pages/Markets';
 import Invest from './pages/Invest';
+import InvestmentDetail from './pages/InvestmentDetail';
 import Wallet from './pages/Wallet';
 import Social from './pages/Social';
 import Referrals from './pages/Referrals';
@@ -26,6 +27,7 @@ import AdminCryptoKeys from './pages/AdminCryptoKeys';
 import AdminKyc from './pages/AdminKyc';
 import AdminDeposits from './pages/AdminDeposits';
 import AdminWithdrawals from './pages/AdminWithdrawals';
+import ROIApprovals from './pages/admin/ROIApprovals';
 
 export default function App() {
   return (
@@ -91,6 +93,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Invest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/invest/:id"
+            element={
+              <ProtectedRoute>
+                <InvestmentDetail />
               </ProtectedRoute>
             }
           />
@@ -195,6 +205,14 @@ export default function App() {
             element={
               <AdminRoute>
                 <AdminWithdrawals />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/app/admin/roi-approvals"
+            element={
+              <AdminRoute>
+                <ROIApprovals />
               </AdminRoute>
             }
           />

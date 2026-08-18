@@ -95,6 +95,25 @@ export type Investment = {
   earned: number;
   days_elapsed?: number;
   plan?: Plan;
+  tier_id?: number;
+  current_value?: number;
+  mature_at?: string;
+};
+
+export type InvestmentTier = {
+  id?: number;
+  name: string;
+  tier_level: number;
+  percent_return: number;
+  duration_days: number;
+  min_investment: number;
+  max_investment: number;
+  roi_min: number;
+  roi_max: number;
+  volatility_min: number;
+  volatility_max: number;
+  simulation_enabled?: boolean;
+  created_at?: string;
 };
 
 export type Txn = {

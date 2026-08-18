@@ -172,32 +172,118 @@ create table if not exists watchlist (
   symbol text
 );
 
-create table if not exists investments (
+-- Investment tier system (replaces simple plans)
+create table if not exists investment_tiers (
   id serial primary key,
-  user_id text,
-  plan_id integer,
-  plan_name text,
-  amount numeric,
-  daily_rate numeric,
-  duration_days integer,
-  start_date timestamptz,
-  end_date timestamptz,
-  status text,
-  earned numeric,
-  days_elapsed numeric default 0
-);
-
-create table if not exists transactions (
-  id serial primary key,
-  user_id text,
-  type text,
-  amount numeric,
-  currency text,
-  method text,
-  status text,
-  reference text,
+  name text unique not null,
+  tier_level integer not null,
+  percent_return numeric not null,
+  duration_days integer not null,
+  min_investment numeric not null,
+  max_investment numeric not null,
+  roi_min numeric default 15,
+  roi_max numeric default 22,
+  volatility_min numeric default 5,
+  volatility_max numeric default 10,
+  simulation_enabled boolean default true,
   created_at timestamptz default now()
 );
+
+create table if not exists investments (
+  id serial primary key,
+  user_id text not null,
+  plan_id integer,
+  tier_id integer references investment_tiers(id),
+  plan_name text,
+  amount numeric not null,
+  current_value numeric default 0,
+  daily_rate numeric,
+  duration_days integer,
+  start_date timestamptz not null default now(),
+  end_date timestamptz not null,
+  mature_at timestamptz,
+  status text default 'active',
+  earned numeric default 0,
+  days_elapsed numeric default 0,
+  roi_withdrawn boolean default false,
+  roi_withdrawal_pending boolean default false,
+  roi_withdrawn_amount numeric default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_investments_user_status on investments (user_id, status);
+create index if not exists idx_investments_end_date on investments (end_date);
+
+create table if not exists user_gain_logs (
+  id serial primary key,
+  user_id text not null,
+  investment_id integer references investments(id),
+  gain_type text,
+  value numeric not null,
+  message text,
+  logged_at timestamptz default now()
+);
+
+create index if not exists idx_user_gain_logs_user on user_gain_logs (user_id);
+
+create table if not exists investment_transactions (
+  id serial primary key,
+  investment_id integer not null references investments(id) on delete cascade,
+  user_id text not null,
+  type text not null,
+  amount numeric not null,
+  description text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_investment_transactions_investment on investment_transactions (investment_id);
+
+create table if not exists withdrawal_configs (
+  id serial primary key,
+  key text unique not null,
+  value text not null,
+  updated_at timestamptz default now()
+);
+
+create table if not exists withdrawals (
+  id serial primary key,
+  user_id text not null,
+  investment_id integer references investments(id),
+  type text default 'roi',
+  amount numeric default 0,
+  reserved_amount numeric default 0,
+  currency text default 'USD',
+  network text,
+  wallet_address text,
+  fee_stage text default 'pending',
+  status text default 'pending',
+  activation_fee_amount numeric default 0,
+  activation_fee_paid numeric default 0,
+  deducted_from_available boolean default false,
+  from_locked_balance boolean default false,
+  created_at timestamptz default now(),
+  approved_at timestamptz,
+  processed_at timestamptz,
+  processed_by text
+);
+
+create index if not exists idx_withdrawals_user_status on withdrawals (user_id, status);
+create index if not exists idx_withdrawals_investment on withdrawals (investment_id);
+
+alter table profiles add column if not exists tier text default 'Starter';
+alter table profiles add column if not exists locked_balance numeric default 0;
+alter table wallets add column if not exists locked_balance numeric default 0;
+
+create table if not exists config (
+  id serial primary key,
+  key text unique not null,
+  value jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_config_key on config (key);
 
 create table if not exists referrals (
   id serial primary key,

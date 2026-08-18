@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import InvestmentModal from '../components/InvestmentModal';
+import InvestmentTierSelector from '../components/InvestmentTierSelector';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Investment, Plan, Wallet } from '../types';
 
 export default function Invest() {
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -96,6 +99,14 @@ export default function Invest() {
         ))}
       </div>
 
+      {/* Investment Tier Selector */}
+      <div className="mt-12">
+        <InvestmentTierSelector 
+          wallet_available={Number(wallet?.available || 0)} 
+          onInvestmentCreated={() => void load(false)}
+        />
+      </div>
+
       <h2 className="mt-12 text-sm uppercase tracking-[0.18em] text-stone-400">Your allocations</h2>
       <div className="mt-4 overflow-x-auto rounded-md border border-white/5">
         <div className="hidden md:block">
@@ -115,11 +126,11 @@ export default function Invest() {
                   key={i.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setSelectedInvestment(i)}
+                  onClick={() => navigate(`/app/invest/${i.id}`)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      setSelectedInvestment(i);
+                      navigate(`/app/invest/${i.id}`);
                     }
                   }}
                   className="cursor-pointer border-t border-white/5 transition-all duration-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none"
@@ -151,7 +162,7 @@ export default function Invest() {
             <button
               key={i.id}
               type="button"
-              onClick={() => setSelectedInvestment(i)}
+              onClick={() => navigate(`/app/invest/${i.id}`)}
               className="w-full rounded-md border border-white/5 bg-white/[0.02] p-3 text-left transition hover:bg-white/5"
               aria-label={`Open investment details for ${i.plan_name}`}
             >

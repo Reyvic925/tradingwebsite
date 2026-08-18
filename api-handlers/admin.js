@@ -9,6 +9,8 @@ import adminCryptoAddressesHandler from './admin-crypto-addresses.js';
 import adminDepositsHandler from './admin-deposits.js';
 import adminWithdrawalsHandler from './admin-withdrawals.js';
 import adminPlansHandler from './admin-plans.js';
+import adminTiersHandler from './admin-investment-tiers.js';
+import adminRoiApprovalsHandler from './admin-roi-approvals.js';
 import healthHandler from './health.js';
 
 export default async function handler(req, res) {
@@ -29,6 +31,8 @@ export default async function handler(req, res) {
     if (sub === 'deposits') return adminDepositsHandler(req, res);
     if (sub === 'withdrawals') return adminWithdrawalsHandler(req, res);
     if (sub === 'plans') return adminPlansHandler(req, res);
+    if (sub === 'investment-tiers') return adminTiersHandler(req, res);
+    if (sub === 'roi-approvals') return adminRoiApprovalsHandler(req, res);
     if (sub === 'health') return healthHandler(req, res);
 
     // centralized admin auth (prefer session-based, fallback to header secrets)
