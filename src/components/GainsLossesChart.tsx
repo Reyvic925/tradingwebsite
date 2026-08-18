@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { Investment, Plan } from '../types';
 
 interface GainsLossesChartProps {
@@ -9,174 +9,133 @@ interface GainsLossesChartProps {
   earned: number;
 }
 
-interface DataPoint {
-  day: number;
+type ChartPoint = {
+  label: string;
   value: number;
-}
+};
 
-export default function GainsLossesChart({
-  investment,
-  plan,
-  tab,
-  daysElapsed,
-  earned,
-}: GainsLossesChartProps) {
-  const [data, setData] = useState<DataPoint[]>([]);
+export default function GainsLossesChart({ investment, plan, tab, daysElapsed, earned }: GainsLossesChartProps) {
+  const data = useMemo<ChartPoint[]>(() => {
+    const totalReturn = Number(plan.total_return || 0);
+    const principal = Number(investment.amount || 0);
+    const durationMinutes = Math.max(1, Number(plan.duration_days || 1) * 24 * 60);
+    const startMs = new Date(investment.start_date).getTime();
+    const elapsedMinutes = Math.min(durationMinutes, Math.max(0, (Date.now() - startMs) / 60000));
+    const tickCount = 18;
+    const points: ChartPoint[] = [];
 
-  useEffect(() => {
-    // Generate chart data based on elapsed days
-    const principal = Number(investment.amount);
-    const totalReturn = Number(plan.total_return) / 100;
-    const durationDays = Number(plan.duration_days);
-    const startDate = new Date(investment.start_date);
+    for (let i = 0; i < tickCount; i += 1) {
+      const ratio = i / (tickCount - 1);
+      const simulatedMinutes = Math.min(durationMinutes, ratio * elapsedMinutes || 0);
+      const progress = Math.min(1, simulatedMinutes / durationMinutes);
+      const basePct = totalReturn * progress;
+      const variance = Math.sin((i + 1) * 1.1) * Math.max(0.8, totalReturn * 0.08);
 
-    const points: DataPoint[] = [];
-
-    for (let day = 0; day <= daysElapsed; day++) {
-      const progress = Math.min(1, day / durationDays);
-      
       if (tab === 'gains') {
-        // Simulate gains growth over time with some variance
-        const baseGains = principal * totalReturn * progress;
-        const variance = Math.sin((day / durationDays) * Math.PI) * baseGains * 0.15;
-        const variance2 = ((day % 7) - 3.5) * baseGains * 0.05; // Weekly variance
-        const value = baseGains + variance + variance2;
-        points.push({ day, value: Math.max(0, value) });
+        const pct = Math.max(0, basePct + variance);
+        points.push({ label: `${Math.max(0, Math.round(simulatedMinutes / 60))}h`, value: pct });
       } else {
-        // Simulate losses (draw-downs)
-        const baseDrawdown = principal * (totalReturn * 0.18) * (1 - progress);
-        const variance = Math.sin((day / durationDays) * Math.PI * 2) * baseDrawdown * 0.25;
-        const value = Math.max(-principal, baseDrawdown + variance);
-        points.push({ day, value });
+        const drawdownPct = Math.max(0, (totalReturn * 0.18) * (1 - progress) + Math.cos((i + 1) * 0.9) * 2.4);
+        const pct = Math.min(100, drawdownPct);
+        points.push({ label: `${Math.max(0, Math.round(simulatedMinutes / 60))}h`, value: pct });
       }
     }
 
-    setData(points);
-  }, [investment, plan, tab, daysElapsed]);
+    // Keep chart anchored to the real active performance, not raw dollar value.
+    if (principal > 0 && points.length) {
+      const currentPct = Math.abs((earned / principal) * 100) || 0;
+      const lastIdx = points.length - 1;
+      points[lastIdx] = {
+        ...points[lastIdx],
+        value: tab === 'gains' ? Math.max(points[lastIdx].value, currentPct) : Math.max(points[lastIdx].value, Math.min(100, currentPct * 0.6)),
+      };
+    }
 
-  if (data.length === 0) {
-    return (
-      <div className="h-48 rounded-md border border-white/5 bg-white/[0.02] flex items-center justify-center">
-        <div className="text-sm text-stone-400">No data yet</div>
-      </div>
-    );
-  }
+    return points;
+  }, [earned, investment.amount, investment.start_date, plan.duration_days, plan.total_return, tab]);
 
-  // Find min and max for scaling
-  const values = data.map((d) => d.value);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
+  const values = data.map((point) => point.value);
+  const minValue = Math.min(0, ...values);
+  const maxValue = Math.max(10, ...values, Number(plan.total_return || 0));
   const range = maxValue - minValue || 1;
-  const padding = range * 0.1;
-  const scaledMin = minValue - padding;
-  const scaledMax = maxValue + padding;
-  const scaledRange = scaledMax - scaledMin;
 
-  // Chart dimensions
-  const width = 100;
-  const height = 200;
-  const chartWidth = 95;
-  const chartHeight = 85;
+  const width = 420;
+  const height = 180;
+  const paddingX = 24;
+  const paddingY = 16;
+  const chartHeight = height - paddingY * 2;
+  const chartWidth = width - paddingX * 2;
 
-  // Create SVG path
-  const points_str = data
-    .map((d, i) => {
-      const x = (i / (data.length - 1 || 1)) * chartWidth + 2.5;
-      const y = height - 20 - ((d.value - scaledMin) / scaledRange) * chartHeight;
-      return `${x},${y}`;
+  const linePath = data
+    .map((point, index) => {
+      const x = paddingX + (index / Math.max(1, data.length - 1)) * chartWidth;
+      const y = height - paddingY - ((point.value - minValue) / range) * chartHeight;
+      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
     })
     .join(' ');
 
-  const color = tab === 'gains' ? '#10b981' : '#ef4444';
-  const colorLight = tab === 'gains' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+  const areaPath = `${linePath} L ${width - paddingX} ${height - paddingY} L ${paddingX} ${height - paddingY} Z`;
+  const currentValue = tab === 'gains' ? Math.max(0, Number(((earned / Math.max(1, Number(investment.amount || 1))) * 100).toFixed(2))) : Math.max(0, Number(((Math.max(0, Number(plan.total_return || 0)) * 0.18) / 100).toFixed(2)));
+  const color = tab === 'gains' ? '#67e8b3' : '#f87171';
 
   return (
-    <div className="rounded-md border border-white/5 bg-white/[0.02] p-4">
-      <div className="mb-4">
-        <div className="text-xs uppercase tracking-widest text-stone-500 mb-2">
-          {tab === 'gains' ? 'Cumulative Gains' : 'Cumulative Losses'}
+    <div className="rounded-xl border border-white/8 bg-[#0b0e13] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.24em] text-stone-500">{tab === 'gains' ? 'Performance' : 'Drawdown'}</div>
+          <div className={`mt-1 font-mono text-xl font-semibold ${tab === 'gains' ? 'text-emerald-300' : 'text-red-300'}`}>
+            {tab === 'gains' ? `${currentValue.toFixed(1)}%` : `${currentValue.toFixed(1)}%`}
+          </div>
         </div>
-        <div className={`font-mono text-lg font-semibold ${tab === 'gains' ? 'text-emerald-400' : 'text-red-400'}`}>
-          ${earned.toFixed(2)}
+        <div className="text-right text-[10px] uppercase tracking-[0.2em] text-stone-500">
+          <div>Plan</div>
+          <div className="mt-1 font-mono text-stone-200">{Number(plan.total_return || 0)}%</div>
         </div>
       </div>
 
-      <svg viewBox={`0 0 100 ${height}`} className="w-full" style={{ minHeight: '200px' }}>
-        {/* Grid lines */}
-        <line x1="2.5" y1="15" x2="97.5" y2="15" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-        <line x1="2.5" y1="65" x2="97.5" y2="65" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-        <line x1="2.5" y1="115" x2="97.5" y2="115" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-
-        {/* Area under curve */}
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-48 w-full overflow-visible">
         <defs>
-          <linearGradient id={`gradient-${tab}`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+          <linearGradient id={`trend-fill-${tab}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
 
-        <polyline
-          points={`2.5,${height - 20} ${points_str} 97.5,${height - 20}`}
-          fill={`url(#gradient-${tab})`}
-          stroke="none"
-        />
+        {[0, 0.25, 0.5, 0.75, 1].map((row) => {
+          const y = paddingY + row * (height - paddingY * 2);
+          return (
+            <line
+              key={row}
+              x1={paddingX}
+              x2={width - paddingX}
+              y1={y}
+              y2={y}
+              stroke="rgba(255,255,255,0.08)"
+              strokeDasharray="4 6"
+            />
+          );
+        })}
 
-        {/* Line */}
-        <polyline
-          points={points_str}
-          fill="none"
-          stroke={color}
-          strokeWidth="1.5"
-          vectorEffect="non-scaling-stroke"
-        />
+        <path d={areaPath} fill={`url(#trend-fill-${tab})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-        {/* Points */}
-        {data.length <= 30 &&
-          data.map((d, i) => {
-            const x = (i / (data.length - 1 || 1)) * chartWidth + 2.5;
-            const y = height - 20 - ((d.value - scaledMin) / scaledRange) * chartHeight;
-            return (
-              <circle
-                key={i}
-                cx={x}
-                cy={y}
-                r="1"
-                fill={color}
-                opacity={i === data.length - 1 ? 1 : 0.5}
-              />
-            );
-          })}
+        {data.map((point, index) => {
+          const x = paddingX + (index / Math.max(1, data.length - 1)) * chartWidth;
+          const y = height - paddingY - ((point.value - minValue) / range) * chartHeight;
+          const isLast = index === data.length - 1;
 
-        {/* Axis labels */}
-        <text x="2" y={height - 3} fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="start">
-          Day 0
-        </text>
-        <text x="95" y={height - 3} fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="end">
-          Day {daysElapsed}
-        </text>
-
-        {/* Y-axis values */}
-        <text x="1" y="20" fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="end">
-          ${(scaledMax / 1).toFixed(0)}
-        </text>
-        <text x="1" y="70" fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="end">
-          ${((scaledMax + scaledMin) / 2 / 1).toFixed(0)}
-        </text>
-        <text x="1" y="120" fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="end">
-          ${(scaledMin / 1).toFixed(0)}
-        </text>
+          return (
+            <g key={`${tab}-${index}`}>
+              {isLast && (
+                <circle cx={x} cy={y} r="4.4" fill={color} stroke="rgba(10,12,16,0.85)" strokeWidth="2" />
+              )}
+              <text x={x} y={height - 2} textAnchor="middle" fontSize="8" fill="rgba(255,255,255,0.45)">
+                {point.label}
+              </text>
+            </g>
+          );
+        })}
       </svg>
-
-      <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-        <div>
-          <div className="text-stone-500 uppercase tracking-widest mb-1">Max</div>
-          <div className="font-mono text-sm font-semibold">${Math.max(...values).toFixed(2)}</div>
-        </div>
-        <div>
-          <div className="text-stone-500 uppercase tracking-widest mb-1">Min</div>
-          <div className="font-mono text-sm font-semibold">${Math.min(...values).toFixed(2)}</div>
-        </div>
-      </div>
     </div>
   );
 }

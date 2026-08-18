@@ -112,10 +112,26 @@ export default function Invest() {
             {investments.map((i) => (
               <tr
                 key={i.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedInvestment(i)}
-                className="border-t border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedInvestment(i);
+                  }
+                }}
+                className="cursor-pointer border-t border-white/5 transition-all duration-200 hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                aria-label={`Open investment details for ${i.plan_name}`}
               >
-                <td className="px-5 py-3">{i.plan_name}</td>
+                <td className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{i.plan_name}</span>
+                    <span className="inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-amber-200">
+                      Open
+                    </span>
+                  </div>
+                </td>
                 <td className="px-3 py-3 font-mono">{formatMoney(Number(i.amount))}</td>
                 <td className="px-3 py-3 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</td>
                 <td className="px-3 py-3 text-stone-500">{new Date(i.end_date).toLocaleDateString()}</td>
