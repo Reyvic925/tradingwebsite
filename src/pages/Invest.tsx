@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AppShell from '../components/AppShell';
+import InvestmentModal from '../components/InvestmentModal';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Investment, Plan, Wallet } from '../types';
@@ -12,6 +13,7 @@ export default function Invest() {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
 
   const load = async () => {
     try {
@@ -32,6 +34,8 @@ export default function Invest() {
 
   useEffect(() => {
     load();
+    const timer = setInterval(() => load(false), 10000); // Auto-refresh every 10 seconds
+    return () => clearInterval(timer);
   }, []);
 
   const subscribe = async (plan: Plan) => {
@@ -105,7 +109,11 @@ export default function Invest() {
           </thead>
           <tbody>
             {investments.map((i) => (
-              <tr key={i.id} className="border-t border-white/5">
+              <tr
+                key={i.id}
+                onClick={() => setSelectedInvestment(i)}
+                className="border-t border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+              >
                 <td className="px-5 py-3">{i.plan_name}</td>
                 <td className="px-3 py-3 font-mono">{formatMoney(Number(i.amount))}</td>
                 <td className="px-3 py-3 font-mono text-emerald-400">{formatMoney(Number(i.earned))}</td>
@@ -119,6 +127,16 @@ export default function Invest() {
           </tbody>
         </table>
       </div>
+
+      {/* Investment Detail Modal */}
+      {selectedInvestment && (
+        <InvestmentModal
+          investment={selectedInvestment}
+          plan={plans.find((p) => p.id === selectedInvestment.plan_id) || null}
+          onClose={() => setSelectedInvestment(null)}
+          onRefresh={() => load(false)}
+        />
+      )}
     </AppShell>
   );
 }
