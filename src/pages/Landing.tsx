@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import {
   ArrowRight,
@@ -25,6 +25,7 @@ import LiveTicker from '../components/LiveTicker';
 import IndexBoard from '../components/IndexBoard';
 import type { Feature, Market, Partner, Plan, Stat, Testimonial } from '../types';
 import { formatPct, formatPrice } from '../lib/format';
+import { useAuth } from '../contexts/AuthContext';
 
 const PARTNER_LOGOS: Record<string, string> = {
   JPMorgan: '/logos/jpmorgan.svg',
@@ -137,6 +138,7 @@ const fallbackFeatures: Feature[] = [
 ];
 
 export default function Landing() {
+  const { user, loading: authLoading } = useAuth();
   const [features, setFeatures] = useState<Feature[]>(fallbackFeatures);
   const [partners, setPartners] = useState<Partner[]>(fallbackPartners);
   const [stats, setStats] = useState<Stat[]>([]);
@@ -209,6 +211,11 @@ export default function Landing() {
   }, []);
 
   const partnerLoop = useMemo(() => [...partners, ...partners], [partners]);
+
+  // Supabase uses the configured Site URL when a requested email redirect URL is
+  // absent from its allow-list. Accept that safe fallback instead of leaving a
+  // newly verified user on the public page at `/#access_token=...`.
+  if (!authLoading && user) return <Navigate to="/app" replace />;
 
   return (
     <div id="top" className="bg-[#05070b] text-stone-100">

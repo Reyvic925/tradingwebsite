@@ -35,6 +35,15 @@ Use this template for the website's signup flow. It provides the six-digit token
 
 Replace `YOUR-DOMAIN.com` with the deployed website domain. The original logo is a native SVG and is used by the website and every email layout.
 
+## Required redirect configuration
+
+In **Supabase Dashboard → Authentication → URL Configuration**, add the exact callback URLs used by the app to **Redirect URLs**:
+
+- `https://YOUR-DOMAIN.com/login`
+- `http://localhost:3000/login` (local development)
+
+Set **Site URL** to the deployed site origin, for example `https://YOUR-DOMAIN.com`. If the `/login` URL is missing from the allow-list, Supabase ignores `emailRedirectTo` and sends the confirmation to the Site URL instead. The application also accepts that root-URL fallback and forwards a verified session into the app.
+
 ## Other Supabase Auth templates
 
 Use the same wrapper above for **Invite user**, **Magic link**, **Change email address**, and **Reset password**. Their call-to-action button should use `{{ .ConfirmationURL }}` rather than `{{ .Token }}`. For **Reauthentication**, use the OTP card with `{{ .Token }}`.
