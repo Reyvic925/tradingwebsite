@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, ArrowUpRight, Clock3, DollarSign, TrendingUp } from 'lucide-react';
+import { Activity, Clock3, TrendingUp } from 'lucide-react';
 import { formatMoney } from '../lib/format';
 import type { Investment, Plan } from '../types';
 import IndicatorBar from './IndicatorBar';
@@ -158,20 +158,6 @@ export default function InvestmentModal({ investment, plan, onClose, onRefresh }
                       <span className="text-stone-400">Ends</span>
                       <span className="font-mono text-stone-200">{new Date(investment.end_date).toLocaleDateString()}</span>
                     </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#2a2e39] bg-white/[0.02] p-4">
-                  <div className="text-[9px] uppercase tracking-[0.28em] text-stone-500">Actions</div>
-                  <div className="mt-4 space-y-3">
-                    <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-400 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-white shadow-[0_10px_25px_rgba(59,130,246,0.35)] hover:brightness-110">
-                      <ArrowUpRight size={14} />
-                      Reinvest
-                    </button>
-                    <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-200 hover:bg-white/10">
-                      <DollarSign size={14} />
-                      Withdraw
-                    </button>
                   </div>
                 </div>
 

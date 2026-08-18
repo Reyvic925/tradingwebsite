@@ -86,11 +86,23 @@ export default async function handler(req, res) {
         tickMinutes: 5,
       });
 
-      await supabase.from('investments').update({
-        earned: currentTick.earned,
-        status: currentTick.status,
-        days_elapsed: currentTick.days_elapsed,
-      }).eq('id', investment.id);
+      try {
+        await supabase.from('investments').update({
+          earned: currentTick.earned,
+          status: currentTick.status,
+          days_elapsed: currentTick.days_elapsed,
+        }).eq('id', investment.id);
+      } catch (error) {
+        const message = String(error?.message || error || '');
+        if (/days_elapsed|column .*days_elapsed/i.test(message)) {
+          await supabase.from('investments').update({
+            earned: currentTick.earned,
+            status: currentTick.status,
+          }).eq('id', investment.id);
+        } else {
+          throw error;
+        }
+      }
 
       if (currentTick.status === 'completed') {
         const wallet = await supabase.from('wallets').select('*').eq('user_id', investment.user_id).limit(1).maybeSingle();

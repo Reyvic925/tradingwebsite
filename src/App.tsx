@@ -14,6 +14,7 @@ import Referrals from './pages/Referrals';
 import History from './pages/History';
 import Profile from './pages/Profile';
 import KycSubmit from './pages/KycSubmit';
+import GainsLosses from './pages/GainsLosses';
 import Source from './pages/Source';
 import AdminRoute from './guards/AdminRoute';
 import AdminLogin from './pages/admin/Login';
@@ -122,6 +123,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <History />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/gains-losses"
+            element={
+              <ProtectedRoute>
+                <GainsLosses />
               </ProtectedRoute>
             }
           />

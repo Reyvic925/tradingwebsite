@@ -183,7 +183,8 @@ create table if not exists investments (
   start_date timestamptz,
   end_date timestamptz,
   status text,
-  earned numeric
+  earned numeric,
+  days_elapsed numeric default 0
 );
 
 create table if not exists transactions (

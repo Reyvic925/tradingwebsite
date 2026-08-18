@@ -6,6 +6,7 @@ import {
   LineChart,
   PiggyBank,
   History,
+  BarChart3,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -32,6 +33,7 @@ const nav = [
   { to: '/app/social', label: 'Social', icon: Users },
   { to: '/app/referrals', label: 'Referrals', icon: Share2 },
   { to: '/app/history', label: 'History', icon: History },
+  { to: '/app/gains-losses', label: 'Gains & Losses', icon: BarChart3 },
   { to: '/app/kyc', label: 'KYC', icon: ShieldCheck },
   { to: '/app/profile', label: 'Profile', icon: UserRound },
 ];
