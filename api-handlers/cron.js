@@ -2,6 +2,7 @@ import supabase from './db-client.js';
 import { fillPendingLimits, applyTick } from './markets.js';
 import { insertPriceHistory } from './admin-helpers.js';
 import { fetchLiveMarketSnapshot, blendLiveQuote } from './live-market-data.js';
+import { calculateInvestmentTick } from './investment-tick.js';
 
 // Cron endpoint: /api/cron/tick
 export default async function handler(req, res) {
@@ -70,32 +71,30 @@ export default async function handler(req, res) {
 
     const { data: planRows } = await supabase.from('plans').select('*');
     const plansById = Object.fromEntries((planRows || []).map((plan) => [String(plan.id), plan]));
-    const tickFractionDays = 5 / (24 * 60);
 
     for (const investment of activeInvestments || []) {
       const plan = plansById[String(investment.plan_id)];
       if (!plan) continue;
 
-      const amount = Number(investment.amount || 0);
-      const durationDays = Math.max(1, Number(plan.duration_days || 1));
-      const totalReturn = Number(plan.total_return || 0) / 100;
-      const previousElapsedDays = Math.min(durationDays, Math.max(0, Number(investment.days_elapsed || 0)));
-      const nextElapsedDays = Math.min(durationDays, previousElapsedDays + tickFractionDays);
-      const progress = Math.min(1, nextElapsedDays / durationDays);
-      const variance = (Math.random() * 2 - 1) * 0.18;
-      const earnedBase = amount * totalReturn * progress * (1 + variance);
-      const finalEarned = progress >= 1 ? amount * totalReturn : earnedBase;
-      const status = progress >= 1 ? 'completed' : 'active';
+      const previousEarned = Number(investment.earned || 0);
+      const currentTick = calculateInvestmentTick({
+        amount: Number(investment.amount || 0),
+        totalReturn: Number(plan.total_return || 0),
+        durationDays: Number(plan.duration_days || 1),
+        previousEarned,
+        daysElapsed: Number(investment.days_elapsed || 0),
+        tickMinutes: 5,
+      });
 
       await supabase.from('investments').update({
-        earned: Math.max(0, Number(finalEarned.toFixed(2))),
-        status,
-        days_elapsed: Number(nextElapsedDays.toFixed(6)),
+        earned: currentTick.earned,
+        status: currentTick.status,
+        days_elapsed: currentTick.days_elapsed,
       }).eq('id', investment.id);
 
-      if (status === 'completed') {
+      if (currentTick.status === 'completed') {
         const wallet = await supabase.from('wallets').select('*').eq('user_id', investment.user_id).limit(1).maybeSingle();
-        const payout = amount + Number(finalEarned.toFixed(2));
+        const payout = Number(investment.amount || 0) + currentTick.earned;
         if (wallet.data) {
           await supabase.from('wallets').update({ available: Number(wallet.data.available || 0) + payout }).eq('id', wallet.data.id);
         }
