@@ -73,9 +73,7 @@ export default async function handler(req, res) {
 
   try {
     const secret = process.env.CRON_SECRET;
-    const authorization = String(req.headers.authorization || '');
-    const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-    const provided = (req.headers['x-cron-secret'] || bearerToken || req.query?.cron_secret || '').toString();
+    const provided = (req.headers['x-cron-secret'] || req.query?.cron_secret || '').toString();
 
     if (!secret || provided !== secret) {
       return res.status(401).json({ error: 'Invalid or missing cron secret' });
