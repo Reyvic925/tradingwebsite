@@ -46,15 +46,47 @@ export default async function handler(req, res) {
   await ensureBody(req);
 
   const urlPath = parse(req.url || '').pathname || '/';
-  const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['ticker']
+  const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['api','cron','roi'] or ['ticker']
 
   if (parts[0] === 'api') parts.shift();
 
   const name = parts[0] || 'landing';
-  const handlerPath = path.join(process.cwd(), 'api-handlers', `${name}.js`);
+  let nestedName = null;
+
+  if (name === 'cron' && parts[1]) {
+    nestedName = parts[1];
+  }
+
+  const handlerCandidates = [];
+  if (nestedName) {
+    handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}-${nestedName}.js`));
+    handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}-${nestedName}-simulator.js`));
+    if (nestedName === 'roi') {
+      handlerCandidates.push(path.join(process.cwd(), 'api-handlers', 'cron-roi-simulator.js'));
+    }
+  }
+  handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}.js`));
+
+  let resolvedHandlerPath = null;
+  let lastImportError = null;
+
+  for (const candidatePath of handlerCandidates) {
+    try {
+      const moduleUrl = pathToFileURL(candidatePath).href;
+      await import(moduleUrl);
+      resolvedHandlerPath = candidatePath;
+      break;
+    } catch (err) {
+      lastImportError = err;
+    }
+  }
+
+  if (!resolvedHandlerPath) {
+    throw lastImportError || new Error('Handler not found');
+  }
 
   try {
-    const moduleUrl = pathToFileURL(handlerPath).href;
+    const moduleUrl = pathToFileURL(resolvedHandlerPath).href;
     const handlerModule = await import(moduleUrl);
     const fn = handlerModule?.default || handlerModule?.handler || handlerModule;
     if (typeof fn === 'function') {
