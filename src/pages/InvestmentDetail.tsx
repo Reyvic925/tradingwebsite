@@ -7,7 +7,7 @@ import { apiGet } from '../lib/api';
 import { formatMoney } from '../lib/format';
 
 type Transaction = { id?: number; type?: string; amount?: number; description?: string; created_at?: string; logged_at?: string };
-type Investment = { id: number; planName?: string; fundName?: string; plan_name?: string; initialAmount?: number; amount?: number; currentValue?: number; current_value?: number; startDate?: string; start_date?: string; endDate?: string; end_date?: string; status?: string; roiWithdrawn?: boolean; roi_withdrawn?: boolean; roiWithdrawalPending?: boolean; tier?: { duration_days?: number; roi_min?: number; roi_max?: number; volatility_min?: number; volatility_max?: number }; tier_details?: { duration_days?: number; roi_min?: number; roi_max?: number; volatility_min?: number; volatility_max?: number }; lastTransactions?: Transaction[] };
+type Investment = { id: number; planName?: string; fundName?: string; plan_name?: string; initialAmount?: number; amount?: number; currentValue?: number; current_value?: number; startDate?: string; start_date?: string; endDate?: string; end_date?: string; status?: string; roiWithdrawn?: boolean; roi_withdrawn?: boolean; roiWithdrawalPending?: boolean; tier?: { duration_days?: number; roi_min?: number; roi_max?: number; volatility_min?: number; volatility_max?: number }; tier_details?: { duration_days?: number; roi_min?: number; roi_max?: number; volatility_min?: number; volatility_max?: number }; plan?: { name?: string; duration_days?: number; total_return?: number }; lastTransactions?: Transaction[] };
 type InvestmentDetailResponse = { investment: Investment; transactions: Transaction[]; userTier?: string; lockedBalance?: number; withdrawalPending?: boolean };
 type Tab = 'activity' | 'withdrawal' | 'simulation';
 
@@ -15,7 +15,8 @@ const dateLabel = (value?: string, time = false) => value ? new Date(value).toLo
 const signedAmount = (tx: Transaction) => ['loss', 'roi_loss'].includes(tx.type || '') ? -Number(tx.amount || 0) : Number(tx.amount || 0);
 const isSimulationTick = (tx: Transaction) => ['gain', 'loss', 'roi_gain', 'roi_loss'].includes(tx.type || '');
 function normalizeInvestment(investment: Investment, transactions: Transaction[], withdrawalPending = false): Investment {
-  return { ...investment, planName: investment.planName || investment.plan_name, initialAmount: investment.initialAmount ?? investment.amount, currentValue: investment.currentValue ?? investment.current_value, startDate: investment.startDate || investment.start_date, endDate: investment.endDate || investment.end_date, roiWithdrawn: investment.roiWithdrawn ?? investment.roi_withdrawn, roiWithdrawalPending: investment.roiWithdrawalPending ?? withdrawalPending, tier: investment.tier || investment.tier_details, lastTransactions: transactions };
+  const planTier = investment.plan ? { duration_days: investment.plan.duration_days, roi_min: Number(investment.plan.total_return || 0) * 0.9, roi_max: Number(investment.plan.total_return || 0) * 1.1, volatility_min: 2, volatility_max: 6 } : undefined;
+  return { ...investment, planName: investment.planName || investment.plan_name || investment.plan?.name, initialAmount: investment.initialAmount ?? investment.amount, currentValue: investment.currentValue ?? investment.current_value, startDate: investment.startDate || investment.start_date, endDate: investment.endDate || investment.end_date, roiWithdrawn: investment.roiWithdrawn ?? investment.roi_withdrawn, roiWithdrawalPending: investment.roiWithdrawalPending ?? withdrawalPending, tier: investment.tier || investment.tier_details || planTier, lastTransactions: transactions };
 }
 
 export default function InvestmentDetail() {

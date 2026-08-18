@@ -66,9 +66,12 @@ export default async function handler(req, res) {
         if (investmentError) throw investmentError;
         if (!investment) return res.status(404).json({ error: 'Investment not found' });
 
-        const [{ data: tier }, { data: transactions }, { data: withdrawals }, { data: profile }] = await Promise.all([
+        const [{ data: tier }, { data: plan }, { data: transactions }, { data: withdrawals }, { data: profile }] = await Promise.all([
           investment.tier_id
             ? supabase.from('investment_tiers').select('*').eq('id', investment.tier_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          investment.plan_id
+            ? supabase.from('plans').select('*').eq('id', investment.plan_id).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase.from('investment_transactions').select('*').eq('investment_id', investment.id).order('created_at', { ascending: true }),
           supabase.from('withdrawals').select('status').eq('investment_id', investment.id).eq('user_id', user.id),
@@ -76,9 +79,9 @@ export default async function handler(req, res) {
         ]);
 
         return res.status(200).json({
-          investment: { ...investment, tier_details: tier },
+          investment: { ...investment, tier_details: tier, plan },
           transactions: transactions || [],
-          userTier: profile?.tier || 'Member',
+          userTier: profile?.tier || tier?.name || plan?.name || investment.plan_name || 'Member',
           lockedBalance: Number(profile?.locked_balance || 0),
           withdrawalPending: (withdrawals || []).some((withdrawal) => withdrawal.status === 'pending'),
         });

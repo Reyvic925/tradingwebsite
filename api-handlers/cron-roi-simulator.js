@@ -73,7 +73,9 @@ export default async function handler(req, res) {
 
   try {
     const secret = process.env.CRON_SECRET;
-    const provided = (req.headers['x-cron-secret'] || req.query?.cron_secret || '').toString();
+    const authorization = String(req.headers.authorization || '');
+    const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    const provided = (req.headers['x-cron-secret'] || bearerToken || req.query?.cron_secret || '').toString();
 
     if (!secret || provided !== secret) {
       return res.status(401).json({ error: 'Invalid or missing cron secret' });
@@ -83,9 +85,15 @@ export default async function handler(req, res) {
     const { data: investments } = await supabase.from('investments').select('*').eq('status', 'active');
     if (!investments) return res.status(200).json({ ok: true, updated: 0 });
 
-    // Get all tiers for ROI calculation
-    const { data: tiers } = await supabase.from('investment_tiers').select('*');
+    // Investments can originate from the current tier flow or the established
+    // plan flow. Normalise both to the same ROI simulation inputs so no active
+    // investment is silently skipped.
+    const [{ data: tiers }, { data: plans }] = await Promise.all([
+      supabase.from('investment_tiers').select('*'),
+      supabase.from('plans').select('*'),
+    ]);
     const tiersById = Object.fromEntries((tiers || []).map((t) => [t.id, t]));
+    const plansById = Object.fromEntries((plans || []).map((plan) => [plan.id, plan]));
 
     // Get config overrides
     const { data: configs } = await supabase.from('config').select('key, value');
@@ -96,9 +104,20 @@ export default async function handler(req, res) {
     for (const investment of investments) {
       try {
         const tier = tiersById[investment.tier_id];
-        if (!tier) continue;
+        const plan = plansById[investment.plan_id];
+        if (tier?.simulation_enabled === false) continue;
+        const simulationPlan = tier || (plan && {
+          name: plan.name,
+          duration_days: plan.duration_days,
+          percent_return: plan.total_return,
+          roi_min: Number(plan.total_return || 0) * 0.9,
+          roi_max: Number(plan.total_return || 0) * 1.1,
+          volatility_min: 2,
+          volatility_max: 6,
+        });
+        if (!simulationPlan) continue;
 
-        const tick = calculateRoiTick(investment, tier, configMap);
+        const tick = calculateRoiTick(investment, simulationPlan, configMap);
 
         // Update investment
         const newValue = Math.max(0.01, tick.newValue);
@@ -121,7 +140,7 @@ export default async function handler(req, res) {
           user_id: investment.user_id,
           type: tick.fluctuation >= 0 ? 'gain' : 'loss',
           amount: Math.abs(tick.fluctuation),
-          description: tick.fluctuation >= 0 ? `Gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `Loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
+          description: tick.fluctuation >= 0 ? `ROI simulation gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI simulation loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
         });
 
         // Log to user gain logs
@@ -130,7 +149,7 @@ export default async function handler(req, res) {
           investment_id: investment.id,
           gain_type: 'ROI',
           value: tick.fluctuation,
-          message: tick.fluctuation >= 0 ? `Gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `Loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
+          message: tick.fluctuation >= 0 ? `ROI simulation gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI simulation loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
           logged_at: new Date().toISOString(),
         });
 
