@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import {
   useTraders,
   useLeaderboard,
   useCopyTrading,
-  usePnlAnimation,
-  useNotifications
+  usePnlAnimation
 } from '../lib/copy-trading-hooks';
 import {
   ChevronUp,
@@ -15,10 +14,14 @@ import {
   AlertCircle,
   Zap,
   Plus,
-  X
+  X,
+  Search,
+  SlidersHorizontal,
+  LayoutDashboard,
+  BarChart3
 } from 'lucide-react';
-import { formatMoney, formatPct } from '../lib/format';
-import type { Trader, UserFollow, LeaderboardEntry } from '../types';
+import { formatMoney } from '../lib/format';
+import type { Trader, UserFollow } from '../types';
 
 // Follow Modal Component
 function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; isOpen: boolean; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
@@ -361,7 +364,7 @@ function TraderCard({ trader, onFollow }: { trader: Trader; onFollow: (id: strin
 
 // My Positions Section
 function MyPositions() {
-  const { follows, summary, stopCopying, loading } = useCopyTrading();
+  const { follows, stopCopying, loading } = useCopyTrading();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (loading) {
@@ -482,7 +485,7 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
         leverage
       });
       onClose();
-    } catch (error) {
+    } catch {
       alert('Failed to update settings');
     } finally {
       setSaving(false);
@@ -539,53 +542,122 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
 export default function Social() {
   const { traders, loading: tradersLoading } = useTraders();
   const { followTrader } = useCopyTrading();
+  const [view, setView] = useState<'discover' | 'leaderboard' | 'dashboard'>('discover');
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'popular' | 'return' | 'winRate'>('popular');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const visibleTraders = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = ((traders as any[]) || []).filter((trader: Trader) => {
+      if (!normalizedQuery) return true;
+      return [trader.name, trader.bio, trader.specialty, ...(trader.asset_focus || [])]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+    });
+
+    return [...filtered].sort((first: Trader, second: Trader) => {
+      if (sortBy === 'return') return Number(second.total_return) - Number(first.total_return);
+      if (sortBy === 'winRate') return Number(second.win_rate_trades) - Number(first.win_rate_trades);
+      return Number(second.followers || 0) - Number(first.followers || 0);
+    });
+  }, [query, sortBy, traders]);
 
   return (
     <AppShell>
-      <div className="mb-8">
-        <div className="text-xs uppercase tracking-widest text-amber-300/70 mb-2">Copy Desk</div>
-        <h1 className="text-3xl font-bold text-white mb-2">Social Trading</h1>
-        <p className="text-sm text-gray-400 max-w-2xl">
-          Copy successful traders automatically. Allocate capital with full control over risk management. Real-time PnL tracking with stop-loss and take-profit automation.
-        </p>
+      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-300/70">Social desk / 01</div>
+          <h1 className="mb-2 text-3xl font-bold text-white sm:text-4xl">Copy Trading</h1>
+          <p className="max-w-2xl text-sm text-gray-400">
+            Discover disciplined lead traders, compare their live track records, and copy a strategy with risk controls that stay in your hands.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-stone-400">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          Live strategies updating
+        </div>
       </div>
 
-      {/* Portfolio Summary */}
-      <PortfolioSummary />
+      <div className="mb-8 flex flex-wrap gap-2 border-b border-white/10 pb-3">
+        {[
+          { id: 'discover', label: 'Discover', icon: Search },
+          { id: 'leaderboard', label: 'Leaderboard', icon: BarChart3 },
+          { id: 'dashboard', label: 'Copier dashboard', icon: LayoutDashboard },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setView(id as typeof view)}
+            className={`flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${view === id ? 'bg-amber-400 text-[#1a1304]' : 'text-stone-400 hover:bg-white/5 hover:text-white'}`}
+          >
+            <Icon size={14} />
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {/* Leaderboard */}
-      <LeaderboardSection />
-
-      {/* Traders Grid */}
-      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-        <Zap size={20} className="text-yellow-500" />
-        Available Traders
-      </h2>
-
-      {tradersLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-64 animate-pulse rounded-lg bg-white/5" />
-          ))}
-        </div>
-      ) : (
-        <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {((traders as any[]) || []).map((trader: Trader) => (
-            <TraderCard
-              key={trader.id}
-              trader={trader}
-              onFollow={followTrader}
-            />
-          ))}
-        </div>
+      {view === 'dashboard' && (
+        <>
+          <PortfolioSummary />
+          <h2 className="mb-4 mt-10 flex items-center gap-2 text-lg font-semibold text-white">
+            <TrendingUp size={20} className="text-emerald-500" />
+            Your active copies
+          </h2>
+          <MyPositions />
+        </>
       )}
 
-      {/* My Positions */}
-      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2 mt-12">
-        <TrendingUp size={20} className="text-emerald-500" />
-        Your Active Copies
-      </h2>
-      <MyPositions />
+      {view === 'leaderboard' && (
+        <>
+          <PortfolioSummary />
+          <LeaderboardSection />
+        </>
+      )}
+
+      {view === 'discover' && (
+        <>
+          <PortfolioSummary />
+          <div className="mb-5 flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-sm">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search traders or assets"
+                className="w-full rounded-sm border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-stone-600 focus:border-amber-400/60"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowFilters((current) => !current)} className="flex items-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-xs text-stone-300 hover:border-amber-400/50">
+                <SlidersHorizontal size={14} /> Filters
+              </button>
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className="rounded-sm border border-white/10 bg-[#0b0f16] px-3 py-2 text-xs text-stone-300 outline-none">
+                <option value="popular">Most followed</option>
+                <option value="return">Highest return</option>
+                <option value="winRate">Highest win rate</option>
+              </select>
+            </div>
+          </div>
+          {showFilters && <div className="mb-5 rounded-md border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-100">Showing active strategies. Use the sort menu to compare popularity, return, or win rate.</div>}
+
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
+            <Zap size={20} className="text-yellow-500" />
+            Available traders <span className="text-xs font-normal text-stone-500">{visibleTraders.length} strategies</span>
+          </h2>
+          {tradersLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-64 animate-pulse rounded-lg bg-white/5" />)}
+            </div>
+          ) : visibleTraders.length > 0 ? (
+            <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {visibleTraders.map((trader: Trader) => <TraderCard key={trader.id} trader={trader} onFollow={followTrader} />)}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-white/15 py-12 text-center text-sm text-stone-500">No strategies match that search.</div>
+          )}
+        </>
+      )}
+
     </AppShell>
   );
 }

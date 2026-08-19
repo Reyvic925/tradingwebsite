@@ -10,6 +10,7 @@ export default function AdminTraders() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [avatarData, setAvatarData] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -52,7 +53,7 @@ export default function AdminTraders() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, avatar_data: avatarData || undefined })
       });
 
       if (!response.ok) {
@@ -71,6 +72,7 @@ export default function AdminTraders() {
         volatility: 0.005,
         risk_score: 5
       });
+      setAvatarData('');
       setShowForm(false);
       setEditingId(null);
       setError('');
@@ -109,8 +111,28 @@ export default function AdminTraders() {
       volatility: trader.volatility,
       risk_score: trader.risk_score
     });
+    setAvatarData('');
     setEditingId(trader.id);
     setShowForm(true);
+  };
+
+  const handleAvatarChange = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Avatar images must be smaller than 2 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarData(typeof reader.result === 'string' ? reader.result : '');
+      setError('');
+    };
+    reader.readAsDataURL(file);
   };
 
   if (loading) {
@@ -141,6 +163,7 @@ export default function AdminTraders() {
               volatility: 0.005,
               risk_score: 5
             });
+            setAvatarData('');
           }}
           className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600 transition"
         >
@@ -183,14 +206,20 @@ export default function AdminTraders() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Avatar URL *</label>
+                <label className="block text-sm text-gray-300 mb-1">Trader image *</label>
                 <input
-                  type="url"
-                  required
-                  value={formData.avatar_url}
-                  onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  required={!editingId && !formData.avatar_url}
+                  onChange={(e) => handleAvatarChange(e.target.files?.[0])}
+                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-500 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
                 />
+                <div className="mt-2 flex items-center gap-3">
+                  {(avatarData || formData.avatar_url) && (
+                    <img src={avatarData || formData.avatar_url} alt="Trader preview" className="h-12 w-12 rounded-full object-cover" />
+                  )}
+                  <span className="text-xs text-gray-500">PNG, JPG, WEBP, or GIF. Max 2 MB.</span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Session Type</label>
