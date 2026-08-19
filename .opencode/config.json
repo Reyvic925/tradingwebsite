@@ -1,0 +1,49 @@
+{
+  "mcp": {
+    "autoclaw-productivity": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:19681/mcp",
+      "enabled": true
+    },
+    "autoclaw-github": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:19681/github/mcp",
+      "enabled": false
+    },
+    "notion": {
+      "type": "streamable-http",
+      "url": "https://mcp.notion.com/mcp",
+      "auth": "oauth",
+      "enabled": false
+    },
+    "connector:lexiang": {
+      "type": "streamable-http",
+      "url": "https://mcp.lexiang-app.com/mcp",
+      "auth": "oauth",
+      "enabled": true
+    },
+    "connector:ima": {
+      "type": "streamable-http",
+      "url": "https://ima.qq.com/mcp",
+      "auth": "oauth",
+      "enabled": true
+    },
+    "connector:tianyancha": {
+      "type": "streamable-http",
+      "url": "https://mcp.tianyancha.com/v1",
+      "auth": "oauth",
+      "enabled": true
+    },
+    "connector:feishu": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:65100",
+      "enabled": true
+    },
+    "connector:vercel": {
+      "type": "streamable-http",
+      "url": "https://mcp.vercel.com",
+      "auth": "oauth",
+      "enabled": true
+    }
+  }
+}

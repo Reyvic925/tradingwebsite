@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "autoclaw-productivity": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "http://127.0.0.1:19681/mcp"
+    },
+    "connector:lexiang": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "https://mcp.lexiang-app.com/mcp",
+      "auth": "oauth"
+    },
+    "connector:ima": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "https://ima.qq.com/mcp",
+      "auth": "oauth"
+    },
+    "connector:tianyancha": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "https://mcp.tianyancha.com/v1",
+      "auth": "oauth"
+    },
+    "connector:feishu": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "http://127.0.0.1:65100"
+    },
+    "connector:vercel": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "https://mcp.vercel.com",
+      "auth": "oauth"
+    }
+  },
+  "imports": []
+}
