@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminShell from '../../components/AdminShell';
-import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Save, X, Eye, EyeOff } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
 import { authHeaders } from '../../lib/api';
 import type { Trader } from '../../types';
@@ -29,7 +29,9 @@ export default function AdminTraders() {
   const fetchTraders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/traders');
+      const response = await fetch('/api/traders?include_inactive=1', {
+        headers: await authHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch traders');
       const data = await response.json();
       setTraders(data);
@@ -89,16 +91,21 @@ export default function AdminTraders() {
     }
   };
 
-  const handleDelete = async (id: string | number) => {
-    if (!confirm('Delete this trader?')) return;
+  const handleVisibility = async (trader: Trader) => {
+    const nextIsActive = !trader.is_active;
+    if (!confirm(nextIsActive ? 'Add this trader to the leaderboard?' : 'Remove this trader from the leaderboard?')) return;
     
     try {
-      const response = await fetch(`/api/traders?id=${id}`, {
-        method: 'DELETE',
-        headers: await authHeaders()
+      const response = await fetch(`/api/traders?id=${trader.id}`, {
+        method: 'PUT',
+        headers: await authHeaders(),
+        body: JSON.stringify({ is_active: nextIsActive })
       });
 
-      if (!response.ok) throw new Error('Failed to delete trader');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update trader visibility');
+      }
       await fetchTraders();
       setError('');
     } catch (err) {
@@ -362,7 +369,7 @@ export default function AdminTraders() {
               <th className="px-4 py-3 text-left text-gray-300">Return</th>
               <th className="px-4 py-3 text-left text-gray-300">Session</th>
               <th className="px-4 py-3 text-left text-gray-300">Risk Score</th>
-              <th className="px-4 py-3 text-left text-gray-300">Followers</th>
+              <th className="px-4 py-3 text-left text-gray-300">Status</th>
               <th className="px-4 py-3 text-right text-gray-300">Actions</th>
             </tr>
           </thead>
@@ -392,7 +399,11 @@ export default function AdminTraders() {
                     {trader.risk_score}/10
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-300">{trader.followers || 0}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-block rounded-full px-2 py-1 text-xs ${trader.is_active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-500/20 text-gray-400'}`}>
+                    {trader.is_active ? 'On leaderboard' : 'Removed'}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
                     <button
@@ -403,11 +414,11 @@ export default function AdminTraders() {
                       <Edit2 size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(trader.id)}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded transition"
-                      title="Delete"
+                      onClick={() => handleVisibility(trader)}
+                      className={`p-2 rounded transition ${trader.is_active ? 'text-red-400 hover:bg-red-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+                      title={trader.is_active ? 'Remove from leaderboard' : 'Add to leaderboard'}
                     >
-                      <Trash2 size={16} />
+                      {trader.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </td>

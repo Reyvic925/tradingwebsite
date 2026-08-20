@@ -54,12 +54,18 @@ export default async function handler(req, res) {
   try {
     // GET: Fetch active traders, sorted by total_return
     if (req.method === 'GET') {
-      const { session, asset } = req.query;
+      const { session, asset, include_inactive } = req.query;
       let query = supabase
         .from('traders')
         .select('*')
-        .eq('is_active', true)
         .order('total_return', { ascending: false });
+
+      if (include_inactive === '1') {
+        const admin = await requireAdmin(req);
+        if (!admin) return res.status(403).json({ error: 'Admin access required' });
+      } else {
+        query = query.eq('is_active', true);
+      }
       
       if (session) {
         query = query.eq('session_type', session);
