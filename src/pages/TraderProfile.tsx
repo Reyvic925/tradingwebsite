@@ -140,9 +140,8 @@ export default function TraderProfile() {
       {/* Key Metrics */}
       <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                  <div className="text-xs text-gray-400 mb-1">Platform Equity</div>
-                  <div className="text-2xl font-bold text-white">{formatMoney(trader.website_equity ?? trader.current_equity ?? 0)}</div>
-                  <div className="mt-1 text-[11px] text-gray-500">All user accounts</div>
+                  <div className="text-xs text-gray-400 mb-1">Trader Equity</div>
+                  <div className="text-2xl font-bold text-white">{formatMoney(trader.current_equity ?? 0)}</div>
           <div className="text-xs text-gray-500 mt-1">Starting: $10,000</div>
         </div>
 

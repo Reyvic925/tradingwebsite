@@ -5,23 +5,6 @@ import { requireAdmin } from './auth-admin.js';
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-async function getWebsiteEquity() {
-  const [{ data: wallets, error: walletError }, { data: positions, error: positionError }] = await Promise.all([
-    supabase.from('wallets').select('available, reserved').eq('currency', 'USD'),
-    supabase.from('positions').select('pnl').eq('status', 'open')
-  ]);
-
-  if (walletError) throw walletError;
-  if (positionError) throw positionError;
-
-  const walletEquity = (wallets || []).reduce(
-    (total, wallet) => total + Number(wallet.available || 0) + Number(wallet.reserved || 0),
-    0
-  );
-  const unrealizedPnl = (positions || []).reduce((total, position) => total + Number(position.pnl || 0), 0);
-  return Number((walletEquity + unrealizedPnl).toFixed(2));
-}
-
 async function resolveAvatarUrl(avatarData, existingUrl = '') {
   if (!avatarData) return existingUrl;
   if (typeof avatarData !== 'string' || !avatarData.startsWith('data:image/')) {
@@ -89,8 +72,7 @@ export default async function handler(req, res) {
       
       const { data, error } = await query;
       if (error) throw error;
-      const websiteEquity = await getWebsiteEquity();
-      return res.status(200).json((data || []).map((trader) => ({ ...trader, website_equity: websiteEquity })));
+      return res.status(200).json(data || []);
     }
 
     // POST: Create new trader (Admin only)

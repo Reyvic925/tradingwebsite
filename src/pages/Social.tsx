@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import {
   useTraders,
@@ -21,17 +21,30 @@ import {
   BarChart3
 } from 'lucide-react';
 import { formatMoney } from '../lib/format';
-import type { Trader, UserFollow } from '../types';
+import { apiGet } from '../lib/api';
+import type { Trader, UserFollow, Wallet } from '../types';
 
 // Follow Modal Component
-function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; isOpen: boolean; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
+function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { trader: Trader; isOpen: boolean; availableBalance: number; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [allocation, setAllocation] = useState(1000);
   const [stopLoss, setStopLoss] = useState(20);
   const [takeProfit, setTakeProfit] = useState(200);
   const [leverage, setLeverage] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) setAllocation(Math.min(1000, Math.max(0, availableBalance)));
+  }, [availableBalance, isOpen]);
+
   const handleFollow = async () => {
+    if (availableBalance < 100) {
+      alert('You need at least $100 available balance to copy a trader.');
+      return;
+    }
+    if (allocation > availableBalance) {
+      alert('Allocation cannot exceed your available balance.');
+      return;
+    }
     try {
       setLoading(true);
       await onFollow(trader.id, allocation, {
@@ -64,11 +77,10 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
         </div>
 
         <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
-          <div className="text-sm text-gray-400 mb-1">Platform equity</div>
+          <div className="text-sm text-gray-400 mb-1">Available balance</div>
           <div className="text-2xl font-bold text-emerald-400">
-            {formatMoney(Number(trader.website_equity ?? trader.current_equity ?? 0))}
+            {formatMoney(availableBalance)}
           </div>
-          <div className="mt-1 text-xs text-gray-500">All user accounts</div>
           <div className="text-sm text-gray-500 mt-1">
             Return: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
               {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
@@ -85,7 +97,7 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
             <input
               type="range"
               min="100"
-              max="10000"
+              max={Math.max(100, availableBalance)}
               step="100"
               value={allocation}
               onChange={(e) => setAllocation(Number(e.target.value))}
@@ -93,7 +105,7 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
             />
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>$100</span>
-              <span>$10,000</span>
+              <span>{formatMoney(availableBalance)}</span>
             </div>
           </div>
 
@@ -146,10 +158,10 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
           </button>
           <button
             onClick={handleFollow}
-            disabled={loading}
+            disabled={loading || availableBalance < 100}
             className="flex-1 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition text-sm font-semibold"
           >
-            {loading ? 'Copying...' : 'Confirm Copy'}
+            {loading ? 'Copying...' : availableBalance < 100 ? 'Insufficient balance' : 'Confirm Copy'}
           </button>
         </div>
       </div>
@@ -268,7 +280,7 @@ function PortfolioSummary() {
 }
 
 // Trader Card Component
-function TraderCard({ trader, onFollow }: { trader: Trader; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
+function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
   const isProfit = trader.total_return >= 0;
 
@@ -355,6 +367,7 @@ function TraderCard({ trader, onFollow }: { trader: Trader; onFollow: (id: strin
 
       <FollowModal
         trader={trader}
+        availableBalance={availableBalance}
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onFollow={onFollow}
@@ -543,10 +556,15 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
 export default function Social() {
   const { traders, loading: tradersLoading } = useTraders();
   const { followTrader } = useCopyTrading();
+  const [wallet, setWallet] = useState<Wallet | null>(null);
   const [view, setView] = useState<'discover' | 'leaderboard' | 'dashboard'>('discover');
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<'popular' | 'return' | 'winRate'>('popular');
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    apiGet<Wallet>('/api/wallet').then(setWallet).catch(() => setWallet(null));
+  }, []);
 
   const visibleTraders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -651,7 +669,7 @@ export default function Social() {
             </div>
           ) : visibleTraders.length > 0 ? (
             <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {visibleTraders.map((trader: Trader) => <TraderCard key={trader.id} trader={trader} onFollow={followTrader} />)}
+              {visibleTraders.map((trader: Trader) => <TraderCard key={trader.id} trader={trader} availableBalance={Number(wallet?.available || 0)} onFollow={followTrader} />)}
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-white/15 py-12 text-center text-sm text-stone-500">No strategies match that search.</div>
