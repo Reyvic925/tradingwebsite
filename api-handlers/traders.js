@@ -1,5 +1,6 @@
 import supabase from './db-client.js';
-import { requireUser as authUser, first } from './helpers.js';
+import { first } from './helpers.js';
+import { requireAdmin } from './auth-admin.js';
 
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -42,26 +43,6 @@ async function resolveAvatarUrl(avatarData, existingUrl = '') {
 
   const { data } = bucket.getPublicUrl(path);
   return data.publicUrl;
-}
-
-async function requireAdmin(req) {
-  // DEVELOPMENT MODE: Allow creation with ?admin_key=dev_test_key for testing
-  // Remove this in production or replace with proper API key validation
-  if (process.env.NODE_ENV !== 'production' && req.query?.admin_key === 'dev_test_key') {
-    return { id: 'dev-user', email: 'dev@test.local' };
-  }
-
-  const user = await authUser(supabase, req);
-  if (!user) return null;
-  
-  // Check if user is admin (implement based on your auth system)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-  
-  return profile?.role === 'admin' ? user : null;
 }
 
 export default async function handler(req, res) {

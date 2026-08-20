@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
+import { authHeaders } from '../../lib/api';
 import type { Trader } from '../../types';
 
 export default function AdminTraders() {
@@ -53,10 +54,7 @@ export default function AdminTraders() {
       
       const response = await fetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
+        headers: await authHeaders(),
         body: JSON.stringify({ ...formData, avatar_data: avatarData || undefined })
       });
 
@@ -91,9 +89,7 @@ export default function AdminTraders() {
     try {
       const response = await fetch(`/api/traders?id=${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: await authHeaders()
       });
 
       if (!response.ok) throw new Error('Failed to delete trader');
