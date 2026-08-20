@@ -46,6 +46,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid trader_id or amount' });
       }
 
+      if (!Number.isInteger(Number(trader_id)) || Number(trader_id) < 1) {
+        return res.status(400).json({ error: 'Trader ID must be an integer' });
+      }
+
       if (allocated_amount < 100) {
         return res.status(400).json({ error: 'Minimum allocation is $100' });
       }

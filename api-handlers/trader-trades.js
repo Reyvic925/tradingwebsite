@@ -11,12 +11,15 @@ export default async function handler(req, res) {
 
     const { traderId } = req.query;
     if (!traderId) return res.status(400).json({ error: 'Trader ID required' });
+    if (!/^\d+$/.test(String(traderId))) {
+      return res.status(400).json({ error: 'Trader ID must be an integer' });
+    }
 
     // Get last 50 trades for this trader
     const { data, error } = await supabase
       .from('trade_logs')
       .select('*')
-      .eq('trader_id', Number(traderId))
+      .eq('trader_id', traderId)
       .order('traded_at', { ascending: false })
       .limit(50);
 
