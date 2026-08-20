@@ -57,6 +57,29 @@ ALTER TABLE IF EXISTS user_follows
   ADD COLUMN IF NOT EXISTS followed_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
+-- Some older deployments created trader_id as UUID. Trader records in this
+-- application use serial/integer IDs, so normalize an empty legacy column.
+DO $$
+DECLARE
+  trader_id_type text;
+  follow_count bigint;
+BEGIN
+  SELECT data_type INTO trader_id_type
+  FROM information_schema.columns
+  WHERE table_schema = current_schema()
+    AND table_name = 'user_follows'
+    AND column_name = 'trader_id';
+
+  IF trader_id_type = 'uuid' THEN
+    SELECT COUNT(*) INTO follow_count FROM user_follows;
+    IF follow_count > 0 THEN
+      RAISE EXCEPTION 'user_follows.trader_id is UUID but contains % existing rows; migrate those trader IDs before rerunning this repair', follow_count;
+    END IF;
+    ALTER TABLE user_follows DROP COLUMN trader_id;
+    ALTER TABLE user_follows ADD COLUMN trader_id INTEGER REFERENCES traders(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
 ALTER TABLE IF EXISTS notifications
   ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'info',
   ADD COLUMN IF NOT EXISTS trader_id INTEGER;

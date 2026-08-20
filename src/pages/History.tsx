@@ -12,7 +12,7 @@ export default function History() {
   const [closed, setClosed] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<number | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<number | string | null>(null);
 
   const reload = () => {
     setLoading(true);

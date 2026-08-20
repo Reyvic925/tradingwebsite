@@ -4,7 +4,7 @@ import { formatMoney, formatPrice, timeAgo } from '../lib/format';
 
 type Order = any;
 
-export default function OrderDetailModal({ orderId, onClose, onUpdated }: { orderId: number | null; onClose: () => void; onUpdated?: () => void }) {
+export default function OrderDetailModal({ orderId, onClose, onUpdated }: { orderId: number | string | null; onClose: () => void; onUpdated?: () => void }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [chart, setChart] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

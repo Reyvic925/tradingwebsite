@@ -36,7 +36,7 @@ export type Profile = {
 };
 
 export type Position = {
-  id: number;
+  id: number | string;
   user_id: string;
   market_id: number;
   symbol: string;
@@ -55,7 +55,7 @@ export type Position = {
 };
 
 export type Order = {
-  id: number;
+  id: number | string;
   user_id: string;
   market_id: number;
   symbol: string;

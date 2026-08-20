@@ -130,7 +130,7 @@ export default async function handler(req, res) {
 
     // GET /api/user/order/:id (details)
     if (req.method === 'GET' && parts[1] === 'order' && parts[2] && !parts[3]) {
-      const id = Number(parts[2]);
+      const id = parts[2];
       if (!id) return res.status(400).json({ error: 'Missing order id' });
       const { data: orders, error: oErr } = await supabase.from('orders').select('*').eq('id', id).eq('user_id', user.id).limit(1);
       if (oErr) throw oErr;
@@ -143,7 +143,7 @@ export default async function handler(req, res) {
 
     // POST /api/user/order/:id/close
     if (req.method === 'POST' && parts[1] === 'order' && parts[2] && parts[3] === 'close') {
-      const id = Number(parts[2]);
+      const id = parts[2];
       if (!id) return res.status(400).json({ error: 'Missing order id' });
       const { data: orders, error: oErr } = await supabase.from('orders').select('*').eq('id', id).eq('user_id', user.id).limit(1);
       if (oErr) throw oErr;
@@ -203,7 +203,7 @@ export default async function handler(req, res) {
 
     // GET /api/user/order/:id/chart
     if (req.method === 'GET' && parts[1] === 'order' && parts[3] === 'chart') {
-      const id = Number(parts[2]);
+      const id = parts[2];
       if (!id) return res.status(400).json({ error: 'Missing order id' });
 
       // try orders

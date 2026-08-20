@@ -58,6 +58,9 @@ export default async function handler(req, res) {
     return res.status(200).json(summary);
   } catch (err) {
     console.error('API error:', err);
+    if (/invalid input syntax for type uuid/i.test(String(err?.message || ''))) {
+      return res.status(500).json({ error: 'Copy-trading database schema mismatch: user_follows.trader_id must be INTEGER. Run 20260820-fix-copy-trading-traders.sql in Supabase.' });
+    }
     res.status(500).json({ error: err.message });
   }
 }

@@ -154,7 +154,7 @@ export default function Trade() {
     }
   };
 
-  const closePos = async (id: number) => {
+  const closePos = async (id: number | string) => {
     setErr('');
     setMsg('');
     try {
@@ -166,12 +166,12 @@ export default function Trade() {
     }
   };
 
-  const updateRisk = async (id: number, stop_loss: string, take_profit: string) => {
+  const updateRisk = async (id: number | string, stop_loss: string, take_profit: string) => {
     await apiSend('/api/positions', 'PUT', { id, stop_loss, take_profit });
     load();
   };
 
-  const cancelOrder = async (id: number) => {
+  const cancelOrder = async (id: number | string) => {
     await apiSend('/api/orders', 'DELETE', { id });
     load();
   };
@@ -403,7 +403,7 @@ export default function Trade() {
   );
 }
 
-function RiskInline({ pos, onSave }: { pos: Position; onSave: (id: number, sl: string, tp: string) => void }) {
+function RiskInline({ pos, onSave }: { pos: Position; onSave: (id: number | string, sl: string, tp: string) => void }) {
   const [sl, setSl] = useState(pos.stop_loss != null ? String(pos.stop_loss) : '');
   const [tp, setTp] = useState(pos.take_profit != null ? String(pos.take_profit) : '');
   return (
