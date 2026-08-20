@@ -23,3 +23,43 @@ ALTER TABLE IF EXISTS traders
 CREATE INDEX IF NOT EXISTS idx_traders_active ON traders(is_active);
 CREATE INDEX IF NOT EXISTS idx_traders_session ON traders(session_type);
 CREATE INDEX IF NOT EXISTS idx_traders_return ON traders(total_return DESC);
+
+-- Copy-trading follows used by /api/copy-trades and /api/copy-summary.
+-- user_id stays text to match the existing application schema and auth IDs.
+CREATE TABLE IF NOT EXISTS user_follows (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  trader_id INTEGER REFERENCES traders(id) ON DELETE CASCADE,
+  allocated_amount NUMERIC DEFAULT 0.00,
+  current_value NUMERIC DEFAULT 0.00,
+  pnl NUMERIC DEFAULT 0.00,
+  pnl_percent NUMERIC DEFAULT 0.00,
+  stop_loss_percent NUMERIC DEFAULT 20.00,
+  take_profit_percent NUMERIC DEFAULT 200.00,
+  leverage_multiplier NUMERIC DEFAULT 1.0,
+  is_copying BOOLEAN DEFAULT true,
+  followed_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, trader_id)
+);
+
+ALTER TABLE IF EXISTS user_follows
+  ADD COLUMN IF NOT EXISTS user_id TEXT,
+  ADD COLUMN IF NOT EXISTS trader_id INTEGER,
+  ADD COLUMN IF NOT EXISTS allocated_amount NUMERIC DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS current_value NUMERIC DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS pnl NUMERIC DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS pnl_percent NUMERIC DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS stop_loss_percent NUMERIC DEFAULT 20.00,
+  ADD COLUMN IF NOT EXISTS take_profit_percent NUMERIC DEFAULT 200.00,
+  ADD COLUMN IF NOT EXISTS leverage_multiplier NUMERIC DEFAULT 1.0,
+  ADD COLUMN IF NOT EXISTS is_copying BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS followed_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE IF EXISTS notifications
+  ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'info',
+  ADD COLUMN IF NOT EXISTS trader_id INTEGER;
+
+CREATE INDEX IF NOT EXISTS idx_follows_user ON user_follows(user_id);
+CREATE INDEX IF NOT EXISTS idx_follows_trader ON user_follows(trader_id);
