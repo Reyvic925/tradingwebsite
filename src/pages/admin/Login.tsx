@@ -67,7 +67,10 @@ export default function AdminLogin() {
 
       navigate('/admin/dashboard', { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Admin login failed');
+      const message = err instanceof Error ? err.message : '';
+      setError(/failed to fetch|network|timed out|timeout/i.test(message)
+        ? 'Unable to reach the authentication service. Check your internet connection, disable any VPN or ad blocker, and try again.'
+        : message || 'Admin login failed');
     } finally {
       setBusy(false);
     }

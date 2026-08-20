@@ -80,7 +80,10 @@ export default function Login() {
         await finishAuthentication();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      const message = err instanceof Error ? err.message : '';
+      setError(/failed to fetch|network|timed out|timeout/i.test(message)
+        ? 'Unable to reach the authentication service. Check your internet connection, disable any VPN or ad blocker, and try again.'
+        : message || 'Authentication failed');
     } finally {
       setBusy(false);
     }
