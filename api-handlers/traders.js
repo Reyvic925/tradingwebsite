@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
       const {
         name, bio, avatar_url, avatar_data, asset_focus, session_type,
-        drift, volatility, risk_score
+        drift, volatility, risk_score, total_return, win_rate_trades, followers
       } = req.body || {};
 
       if (!name || (!avatar_url && !avatar_data)) {
@@ -99,17 +99,17 @@ export default async function handler(req, res) {
           avatar_url: resolvedAvatarUrl,
           asset_focus: asset_focus || ['BTC-USD', 'ETH-USD'],
           current_equity: 10000.00,
-          total_return: 0.00,
+          total_return: Number.isFinite(Number(total_return)) ? Number(total_return) : 0.00,
           daily_return: 0.00,
           total_trades: 0,
-          win_rate_trades: 50.00,
+          win_rate_trades: Number.isFinite(Number(win_rate_trades)) ? Math.min(Math.max(Number(win_rate_trades), 0), 100) : 50.00,
           max_drawdown: 0.00,
           volatility: volatility || 0.005,
           drift: drift || 0.001,
           risk_score: Math.min(Math.max(risk_score || 5, 1), 10),
           session_type: session_type || 'nyc',
           is_active: true,
-          followers: 0
+          followers: Number.isFinite(Number(followers)) ? Math.max(Math.trunc(Number(followers)), 0) : 0
         })
         .select();
       
@@ -135,6 +135,21 @@ export default async function handler(req, res) {
       
       if (updateData.risk_score) {
         updateData.risk_score = Math.min(Math.max(updateData.risk_score, 1), 10);
+      }
+      if (updateData.total_return !== undefined) {
+        const totalReturn = Number(updateData.total_return);
+        if (!Number.isFinite(totalReturn)) return res.status(400).json({ error: 'Total return must be a number' });
+        updateData.total_return = totalReturn;
+      }
+      if (updateData.win_rate_trades !== undefined) {
+        const winRate = Number(updateData.win_rate_trades);
+        if (!Number.isFinite(winRate)) return res.status(400).json({ error: 'Win rate must be a number' });
+        updateData.win_rate_trades = Math.min(Math.max(winRate, 0), 100);
+      }
+      if (updateData.followers !== undefined) {
+        const followers = Number(updateData.followers);
+        if (!Number.isFinite(followers)) return res.status(400).json({ error: 'Followers must be a number' });
+        updateData.followers = Math.max(Math.trunc(followers), 0);
       }
 
       const { data, error } = await supabase

@@ -18,6 +18,9 @@ export default function AdminTraders() {
     avatar_url: '',
     asset_focus: ['BTC-USD', 'ETH-USD'],
     session_type: 'nyc',
+    total_return: 0,
+    win_rate_trades: 50,
+    followers: 0,
     drift: 0.001,
     volatility: 0.005,
     risk_score: 5
@@ -70,6 +73,9 @@ export default function AdminTraders() {
         avatar_url: '',
         asset_focus: ['BTC-USD', 'ETH-USD'],
         session_type: 'nyc',
+        total_return: 0,
+        win_rate_trades: 50,
+        followers: 0,
         drift: 0.001,
         volatility: 0.005,
         risk_score: 5
@@ -107,6 +113,9 @@ export default function AdminTraders() {
       avatar_url: trader.avatar_url,
       asset_focus: trader.asset_focus || ['BTC-USD', 'ETH-USD'],
       session_type: trader.session_type,
+      total_return: trader.total_return,
+      win_rate_trades: trader.win_rate_trades,
+      followers: trader.followers || 0,
       drift: trader.drift,
       volatility: trader.volatility,
       risk_score: trader.risk_score
@@ -159,6 +168,9 @@ export default function AdminTraders() {
               avatar_url: '',
               asset_focus: ['BTC-USD', 'ETH-USD'],
               session_type: 'nyc',
+              total_return: 0,
+              win_rate_trades: 50,
+              followers: 0,
               drift: 0.001,
               volatility: 0.005,
               risk_score: 5
@@ -233,6 +245,39 @@ export default function AdminTraders() {
                   <option value="asia">Asia</option>
                   <option value="crypto">Crypto 24/7</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Total Return (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.total_return}
+                  onChange={(e) => setFormData({ ...formData, total_return: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Win Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formData.win_rate_trades}
+                  onChange={(e) => setFormData({ ...formData, win_rate_trades: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Followers</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.followers}
+                  onChange={(e) => setFormData({ ...formData, followers: parseInt(e.target.value, 10) })}
+                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Volatility (0-1)</label>
