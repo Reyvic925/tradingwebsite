@@ -51,8 +51,8 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-lg bg-gray-900 p-6 border border-white/10">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+      <div className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-white/10 bg-gray-900 p-6">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-xl font-bold text-white">Copy {trader.name}</h2>
           <button
