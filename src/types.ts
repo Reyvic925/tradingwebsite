@@ -140,6 +140,7 @@ export type Trader = {
   specialty?: string;
   // New comprehensive fields
   asset_focus?: string[];
+  website_equity?: number;
   current_equity: number;
   total_return: number;
   daily_return: number;

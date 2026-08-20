@@ -64,9 +64,9 @@ function FollowModal({ trader, isOpen, onClose, onFollow }: { trader: Trader; is
         </div>
 
         <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
-          <div className="text-sm text-gray-400 mb-1">Current Equity</div>
+          <div className="text-sm text-gray-400 mb-1">Website Equity</div>
           <div className="text-2xl font-bold text-emerald-400">
-            {formatMoney(Number(trader.current_equity))}
+            {formatMoney(Number(trader.website_equity ?? trader.current_equity ?? 0))}
           </div>
           <div className="text-sm text-gray-500 mt-1">
             Return: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
