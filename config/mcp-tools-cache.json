@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-19T12:38:42.834Z",
+  "generatedAt": "2026-08-20T10:03:37.897Z",
   "counts": {
     "ok": 0,
     "auth": 0,
@@ -11,7 +11,7 @@
     {
       "name": "autoclaw-productivity",
       "status": "error",
-      "durationMs": 323,
+      "durationMs": 90,
       "transport": "HTTP http://127.0.0.1:19681/mcp",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []
@@ -19,7 +19,7 @@
     {
       "name": "connector:lexiang",
       "status": "error",
-      "durationMs": 366,
+      "durationMs": 64,
       "transport": "HTTP https://mcp.lexiang-app.com/mcp",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []
@@ -27,7 +27,7 @@
     {
       "name": "connector:ima",
       "status": "error",
-      "durationMs": 345,
+      "durationMs": 60,
       "transport": "HTTP https://ima.qq.com/mcp",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []
@@ -35,7 +35,7 @@
     {
       "name": "connector:tianyancha",
       "status": "error",
-      "durationMs": 346,
+      "durationMs": 53,
       "transport": "HTTP https://mcp.tianyancha.com/v1",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []
@@ -43,7 +43,7 @@
     {
       "name": "connector:feishu",
       "status": "error",
-      "durationMs": 279,
+      "durationMs": 48,
       "transport": "HTTP http://127.0.0.1:65100/",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []
@@ -51,7 +51,7 @@
     {
       "name": "connector:vercel",
       "status": "error",
-      "durationMs": 332,
+      "durationMs": 46,
       "transport": "HTTP https://mcp.vercel.com/",
       "error": "SSE error: Unable to connect. Is the computer able to access the url?",
       "tools": []

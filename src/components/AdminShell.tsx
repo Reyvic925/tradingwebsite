@@ -1,11 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2, ArrowDownLeft, ArrowUpRight, Landmark } from 'lucide-react';
+import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2, ArrowDownLeft, ArrowUpRight, Landmark, LineChart } from 'lucide-react';
 import supabase from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const nav = [
   { to: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
   { to: '/admin/health', label: 'Health', icon: Activity },
+  { to: '/app/admin/traders', label: 'Traders', icon: LineChart },
   { to: '/app/admin/users', label: 'All Users', icon: Users },
   { to: '/app/admin/crypto-keys', label: 'Crypto Keys', icon: Wallet },
   { to: '/app/admin/kyc', label: 'KYC', icon: FileCheck2 },

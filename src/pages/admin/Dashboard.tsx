@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet, FileText, Activity, DatabaseZap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet, FileText, Activity, DatabaseZap, LineChart } from 'lucide-react';
 import AdminShell from '../../components/AdminShell';
 import { apiSend } from '../../lib/api';
 
@@ -30,6 +30,7 @@ export default function AdminDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <QuickCard title="All users" to="/app/admin/users" icon={ShieldCheck} desc="Browse every user profile, wallet count, KYC history, and mnemonic presence." />
+        <QuickCard title="Traders" to="/app/admin/traders" icon={LineChart} desc="Create, edit, and remove the lead trader profiles available for copy trading." />
         <QuickCard title="Crypto addresses" to="/app/admin/crypto-keys" icon={Wallet} desc="Review users’ public deposit addresses and admin decrypt history." />
         <QuickCard title="KYC queue" to="/app/admin/kyc" icon={FileText} desc="Approve or reject identity verification submissions." />
         <QuickCard title="Deposits" to="/app/admin/deposits" icon={ArrowUpRight} desc="Approve pending deposit requests only." />

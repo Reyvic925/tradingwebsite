@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import AppShell from '../../components/AppShell';
+import AdminShell from '../../components/AdminShell';
 import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
 import type { Trader } from '../../types';
@@ -38,7 +38,11 @@ export default function AdminTraders() {
   };
 
   useEffect(() => {
-    fetchTraders();
+    const loadTraders = async () => {
+      await fetchTraders();
+    };
+
+    void loadTraders();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,16 +141,16 @@ export default function AdminTraders() {
 
   if (loading) {
     return (
-      <AppShell>
+      <AdminShell title="Traders management">
         <div className="flex h-96 items-center justify-center">
           <div className="text-gray-400">Loading traders...</div>
         </div>
-      </AppShell>
+      </AdminShell>
     );
   }
 
   return (
-    <AppShell>
+    <AdminShell title="Traders management">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white">Traders Management</h1>
         <button
@@ -383,6 +387,6 @@ export default function AdminTraders() {
           </button>
         </div>
       )}
-    </AppShell>
+    </AdminShell>
   );
 }
