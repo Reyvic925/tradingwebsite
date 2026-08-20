@@ -87,7 +87,7 @@ export default function Dashboard() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Equity', value: formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0)) },
+          { label: 'Account equity', value: formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0)) },
           { label: 'Available balance', value: formatMoney(Number(wallet?.available ?? 0)) },
           { label: 'Investment P&L', value: formatMoney(investmentSummary.totalPnl), tone: investmentSummary.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
           { label: 'Trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },

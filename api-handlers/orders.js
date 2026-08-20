@@ -17,7 +17,8 @@ async function applyPnl(userId, pnl, releaseMargin) {
   if (!wallet) throw new Error('Wallet not found');
   const available = Number(wallet.available) + Number(releaseMargin) + Number(pnl);
   const reserved = Math.max(0, Number(wallet.reserved) - Number(releaseMargin));
-  await supabase.from('wallets').update({ available, reserved }).eq('id', wallet.id);
+  const { error } = await supabase.from('wallets').update({ available, reserved }).eq('id', wallet.id);
+  if (error) throw error;
   return { available, reserved };
 }
 
@@ -183,6 +184,23 @@ export default async function handler(req, res) {
             })
             .select();
           newPos = first(created);
+        }
+
+        // The order initially reserves margin for its full quantity. Return the
+        // portion used only to close the existing position; keep only the
+        // margin required by any newly opened remainder.
+        const unusedMargin = margin - (remainder > 0 ? (remainder / qty) * margin : 0);
+        if (unusedMargin > 0) {
+          const settledWallet = await getUsdWallet(supabase, user.id);
+          if (!settledWallet) throw new Error('Wallet not found after position close');
+          const { error: marginError } = await supabase
+            .from('wallets')
+            .update({
+              available: Number(settledWallet.available) + unusedMargin,
+              reserved: Math.max(0, Number(settledWallet.reserved) - unusedMargin),
+            })
+            .eq('id', settledWallet.id);
+          if (marginError) throw marginError;
         }
 
         await createNotification(supabase, {

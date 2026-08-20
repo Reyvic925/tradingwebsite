@@ -155,8 +155,15 @@ export default function Trade() {
   };
 
   const closePos = async (id: number) => {
-    await apiSend('/api/positions', 'DELETE', { id });
-    load();
+    setErr('');
+    setMsg('');
+    try {
+      await apiSend('/api/positions', 'DELETE', { id });
+      setMsg('Position closed successfully.');
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Failed to close position');
+    }
   };
 
   const updateRisk = async (id: number, stop_loss: string, take_profit: string) => {

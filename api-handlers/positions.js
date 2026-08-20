@@ -32,13 +32,14 @@ async function markToMarket(userId) {
     if (hitSL || hitTP) {
       const wallet = await getUsdWallet(supabase, userId);
       if (wallet) {
-        await supabase
+        const { error: walletError } = await supabase
           .from('wallets')
           .update({
             available: Number(wallet.available) + Number(pos.margin) + pnl,
             reserved: Math.max(0, Number(wallet.reserved) - Number(pos.margin)),
           })
           .eq('id', wallet.id);
+        if (walletError) throw walletError;
       }
       const reason = hitSL ? 'stop-loss' : 'take-profit';
       await supabase
@@ -123,13 +124,14 @@ export default async function handler(req, res) {
 
       const wallet = await getUsdWallet(supabase, user.id);
       if (wallet) {
-        await supabase
+        const { error: walletError } = await supabase
           .from('wallets')
           .update({
             available: Number(wallet.available) + Number(pos.margin) + pnl,
             reserved: Math.max(0, Number(wallet.reserved) - Number(pos.margin)),
           })
           .eq('id', wallet.id);
+        if (walletError) throw walletError;
       }
 
       const { data, error } = await supabase
@@ -139,7 +141,7 @@ export default async function handler(req, res) {
         .select();
       if (error) throw error;
 
-      await supabase.from('orders').insert({
+      const { error: closeOrderError } = await supabase.from('orders').insert({
         user_id: user.id,
         market_id: pos.market_id,
         symbol: pos.symbol,
@@ -150,6 +152,9 @@ export default async function handler(req, res) {
         status: 'filled',
         filled_price: price,
       });
+      if (closeOrderError) {
+        console.error('[positions] Closed position but failed to record closing order:', closeOrderError.message || closeOrderError);
+      }
 
       await createNotification(supabase, {
         user_id: user.id,
