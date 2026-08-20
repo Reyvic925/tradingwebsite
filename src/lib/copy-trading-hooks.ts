@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { authHeaders } from './api';
 
 /**
  * Hook to animate PnL numbers smoothly
@@ -66,9 +67,7 @@ export function useCopyTrading() {
     try {
       setLoading(true);
       const response = await fetch('/api/copy-trades', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: await authHeaders()
       });
       if (!response.ok) throw new Error('Failed to fetch follows');
       const data = await response.json();
@@ -84,9 +83,7 @@ export function useCopyTrading() {
   const fetchSummary = async () => {
     try {
       const response = await fetch('/api/copy-summary', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: await authHeaders()
       });
       if (!response.ok) throw new Error('Failed to fetch summary');
       const data = await response.json();
@@ -100,10 +97,7 @@ export function useCopyTrading() {
     try {
       const response = await fetch('/api/copy-trades', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
+        headers: await authHeaders(),
         body: JSON.stringify({
           trader_id: traderId,
           allocated_amount: allocatedAmount,
@@ -126,10 +120,7 @@ export function useCopyTrading() {
     try {
       const response = await fetch(`/api/copy-trades?id=${followId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
+        headers: await authHeaders(),
         body: JSON.stringify({
           stop_loss_percent: (settings as any).stopLoss,
           take_profit_percent: (settings as any).takeProfit,
@@ -149,9 +140,7 @@ export function useCopyTrading() {
     try {
       const response = await fetch(`/api/copy-trades?id=${followId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: await authHeaders()
       });
       if (!response.ok) throw new Error('Failed to stop copying');
       await fetchFollows();
@@ -317,9 +306,7 @@ export function useNotifications() {
     const fetchNotifications = async () => {
       try {
         const response = await fetch('/api/notifications', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
+          headers: await authHeaders()
         });
         if (!response.ok) return;
         const data = await response.json();
@@ -341,9 +328,7 @@ export function useNotifications() {
     try {
       const response = await fetch(`/api/notifications?id=${notificationId}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        headers: await authHeaders()
       });
       if (response.ok) {
         setNotifications((prev: any[]) =>
