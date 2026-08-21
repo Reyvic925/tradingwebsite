@@ -30,6 +30,7 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
   const [stopLoss, setStopLoss] = useState(20);
   const [takeProfit, setTakeProfit] = useState(200);
   const [leverage, setLeverage] = useState(1);
+  const [riskProfile, setRiskProfile] = useState('Balanced');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -61,13 +62,33 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
     }
   };
 
+  const chooseRisk = (profile: 'Conservative' | 'Balanced' | 'Aggressive') => {
+    setRiskProfile(profile);
+    if (profile === 'Conservative') {
+      setStopLoss(10);
+      setTakeProfit(100);
+      setLeverage(0.5);
+    } else if (profile === 'Aggressive') {
+      setStopLoss(30);
+      setTakeProfit(300);
+      setLeverage(2);
+    } else {
+      setStopLoss(20);
+      setTakeProfit(200);
+      setLeverage(1);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
       <div className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-white/10 bg-gray-900 p-6">
         <div className="flex items-start justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Copy {trader.name}</h2>
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/70">Continuous copy</div>
+            <h2 className="mt-1 text-xl font-bold text-white">Copy {trader.name}</h2>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition"
@@ -82,17 +103,20 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
             {formatMoney(availableBalance)}
           </div>
           <div className="text-sm text-gray-500 mt-1">
-            Return: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+            Live ROI: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
               {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
             </span>
           </div>
         </div>
 
         <div className="space-y-4">
-          {/* Allocation */}
+          <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-100">
+            Copying stays active until you stop it or a risk limit closes it. There is no fixed term or maturity date.
+          </div>
+
           <div>
             <label className="text-sm text-gray-300 block mb-2">
-              Allocation: <span className="text-emerald-400">{formatMoney(allocation)}</span>
+              Starting balance: <span className="text-emerald-400">{formatMoney(allocation)}</span>
             </label>
             <input
               type="range"
@@ -109,9 +133,24 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
             </div>
           </div>
 
-          {/* Risk Settings */}
           <div>
-            <label className="text-sm text-gray-300 block mb-2">Stop Loss (%)</label>
+            <div className="mb-2 text-sm text-gray-300">Risk appetite</div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['Conservative', 'Balanced', 'Aggressive'] as const).map((profile) => (
+                <button
+                  key={profile}
+                  type="button"
+                  onClick={() => chooseRisk(profile)}
+                  className={`rounded-md border px-2 py-2 text-xs transition ${riskProfile === profile ? 'border-emerald-400 bg-emerald-400/15 text-emerald-200' : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/25'}`}
+                >
+                  {profile}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300 block mb-2">Maximum drawdown (%)</label>
             <input
               type="number"
               min="5"
@@ -123,7 +162,7 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
           </div>
 
           <div>
-            <label className="text-sm text-gray-300 block mb-2">Take Profit (%)</label>
+            <label className="text-sm text-gray-300 block mb-2">Profit target (%)</label>
             <input
               type="number"
               min="10"
@@ -135,16 +174,15 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
           </div>
 
           <div>
-            <label className="text-sm text-gray-300 block mb-2">Leverage</label>
+            <label className="text-sm text-gray-300 block mb-2">Trade size multiplier</label>
             <select
               value={leverage}
               onChange={(e) => setLeverage(Number(e.target.value))}
               className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
             >
-              <option value={1}>1x (Conservative)</option>
-              <option value={2}>2x (Moderate)</option>
-              <option value={3}>3x (Aggressive)</option>
-              <option value={5}>5x (Expert)</option>
+              <option value={0.5}>0.5x</option>
+              <option value={1}>1x</option>
+              <option value={2}>2x</option>
             </select>
           </div>
         </div>
@@ -161,7 +199,7 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
             disabled={loading || availableBalance < 100}
             className="flex-1 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition text-sm font-semibold"
           >
-            {loading ? 'Copying...' : availableBalance < 100 ? 'Insufficient balance' : 'Confirm Copy'}
+            {loading ? 'Starting copy...' : availableBalance < 100 ? 'Insufficient balance' : 'Start copying'}
           </button>
         </div>
       </div>
@@ -211,9 +249,10 @@ function LeaderboardSection() {
             <div className="text-2xl font-bold text-emerald-400 mb-2">
               {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
             </div>
+            <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">All-time ROI · no fixed term</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="text-gray-400">Win Rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
-              <div className="text-gray-400">Followers: <span className="text-white font-semibold">{trader.followers || 0}</span></div>
+              <div className="text-gray-400">Win rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
+              <div className="text-gray-400">Copiers: <span className="text-white font-semibold">{trader.followers || 0}</span></div>
             </div>
           </div>
         ))}
@@ -344,7 +383,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
               {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(1)}%
             </div>
-            <div className="text-gray-500">Total Return</div>
+            <div className="text-gray-500">All-time ROI</div>
           </div>
           <div>
             <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades || 50).toFixed(0)}%</div>
@@ -352,8 +391,15 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
           </div>
           <div>
             <div className="font-mono font-bold text-white">{trader.followers || 0}</div>
-            <div className="text-gray-500">Followers</div>
+            <div className="text-gray-500">Copiers</div>
           </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-xs">
+          <div><div className="text-gray-500">Daily ROI</div><div className="mt-1 font-mono text-emerald-300">{Number(trader.daily_return || 0) >= 0 ? '+' : ''}{Number(trader.daily_return || 0).toFixed(2)}%</div></div>
+          <div><div className="text-gray-500">Risk score</div><div className="mt-1 font-mono text-white">{Number(trader.risk_score || 5)}/10</div></div>
+          <div><div className="text-gray-500">Drawdown</div><div className="mt-1 font-mono text-amber-200">{Number(trader.max_drawdown || 0).toFixed(2)}%</div></div>
+          <div><div className="text-gray-500">Equity</div><div className="mt-1 font-mono text-white">{formatMoney(Number(trader.current_equity || 0))}</div></div>
         </div>
 
         <button
@@ -395,14 +441,14 @@ function MyPositions() {
   }
 
   return (
-    <div className="divide-y divide-white/5 rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {((follows as any[]) || []).map((follow: UserFollow) => {
         const isProfit = (follow.pnl_percent || 0) >= 0;
         const nearStopLoss =
           (follow.pnl_percent || 0) <= -(follow.stop_loss_percent * 0.8);
 
         return (
-          <div key={follow.id} className="p-4 hover:bg-white/[0.03] transition">
+          <div key={follow.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 transition hover:border-amber-400/30 hover:bg-white/[0.04]">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <img

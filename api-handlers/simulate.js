@@ -27,25 +27,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('[CRON] Starting copy trading simulation...');
+    console.log('[CRON] Starting continuous copy trading tick...');
 
     // Step 1: Fetch all active traders
     const { data: traders, error: traderError } = await supabase
       .from('traders')
       .select('*')
-      .eq('is_active', true)
-      .gt('session_end', new Date().toISOString());
+      .eq('is_active', true);
 
     if (traderError) throw traderError;
 
     let simulatedTraders = 0;
+    let skippedTraders = 0;
     let generatedTrades = 0;
     let updatedFollowers = 0;
+    let closedForRisk = 0;
+    let followerErrors = 0;
 
     // Step 2: Process each trader
     for (const trader of traders || []) {
       // Check if trader is eligible based on session time
       if (!isTraderEligible(trader)) {
+        skippedTraders++;
         console.log(`[CRON] Trader ${trader.id} (${trader.session_type}) not eligible at this time`);
         continue;
       }
@@ -208,6 +211,7 @@ export default async function handler(req, res) {
           // Trigger stop-loss or take-profit
           if (riskCheck.shouldNotify && (riskCheck.reason === 'stop_loss' || riskCheck.reason === 'take_profit')) {
             updateData.is_copying = false;
+            closedForRisk++;
             console.log(`[CRON] ${riskCheck.reason.toUpperCase()} for user follow ${follow.id}: ${followPnLPercent.toFixed(2)}%`);
 
             // Create notification
@@ -227,6 +231,7 @@ export default async function handler(req, res) {
             .eq('id', follow.id);
 
           if (followUpdateError) {
+            followerErrors++;
             console.error(`[CRON] Error updating follower ${follow.id}:`, followUpdateError);
             continue;
           }
@@ -244,6 +249,7 @@ export default async function handler(req, res) {
               reserved: Math.max(0, Number(wallet.reserved || 0) - Number(follow.allocated_amount || 0)),
             }).eq('id', wallet.id);
             if (walletError) {
+              followerErrors++;
               console.error(`[CRON] Error releasing follower ${follow.id} funds:`, walletError);
               continue;
             }
@@ -254,24 +260,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // Step 4: Auto-expire expired sessions
-    const { error: expireError } = await supabase
-      .from('traders')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .lt('session_end', new Date().toISOString())
-      .eq('is_active', true);
-
-    if (expireError) {
-      console.error('[CRON] Error expiring sessions:', expireError);
-    }
-
-    console.log(`[CRON] Simulation complete: ${simulatedTraders} traders, ${generatedTrades} trades, ${updatedFollowers} followers updated`);
+    console.log(`[CRON] Copy tick complete: ${simulatedTraders} traders, ${generatedTrades} trades, ${updatedFollowers} followers updated`);
     
     return res.status(200).json({
       success: true,
+      activeTraders: (traders || []).length,
       simulatedTraders,
+      skippedTraders,
       generatedTrades,
       updatedFollowers,
+      closedForRisk,
+      followerErrors,
+      continuous: true,
       timestamp: new Date().toISOString()
     });
   } catch (err) {

@@ -68,4 +68,6 @@ Create a second cron-job.org job for the social/copy-trading simulator:
 - **Schedule:** every minute (`* * * * *`)
 - **Request body:** empty
 
-This advances active traders, writes trade logs and history, updates active follower PnL, applies stop-loss/take-profit triggers, and expires finished trader sessions. It uses the same `CRON_SECRET` environment variable.
+This advances active traders, writes trade logs and history, updates active follower PnL, and applies stop-loss/take-profit triggers. Copying is continuous: traders remain available until an administrator disables them or a user's risk limit stops that user's copy. It uses the same `CRON_SECRET` environment variable.
+
+A successful response includes counters such as `activeTraders`, `simulatedTraders`, `updatedFollowers`, `closedForRisk`, and `followerErrors` so cron-job.org execution history is useful for monitoring.
