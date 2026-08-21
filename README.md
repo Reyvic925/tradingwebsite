@@ -111,6 +111,8 @@ The server exposes a protected cron tick endpoint at /api/cron/tick that advance
 
 For investment ROI processing, configure cron-job.org to call `POST /api/cron/roi` every five minutes. Setup, security, and verification instructions are in [docs/CRON-JOB-ORG-INVESTMENT.md](docs/CRON-JOB-ORG-INVESTMENT.md).
 
+For copy trading, configure cron-job.org to call `POST /api/cron/copy-trading` every minute. The endpoint advances trader equity, copy-trade PnL, trade logs, risk triggers, and session expiry using the same `CRON_SECRET` protection.
+
 Security
 - The endpoint requires a secret environment variable CRON_SECRET to be set for the server process. Example (Unix):
 

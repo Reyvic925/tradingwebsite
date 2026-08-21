@@ -13,7 +13,7 @@ export function calculateRoiTick(investment, tier, configMap = {}) {
   const minutesLeft = Math.max(0, totalMinutes - elapsedMinutes);
 
   const amount = Number(investment.amount || 0);
-  const currentValue = Number(investment.current_value || amount);
+  const currentValue = amount + Number(investment.earned || 0);
   const roiPercent = Number(tier.percent_return || 100);
   const volatility = (Number(tier.volatility_max || 10) - Number(tier.volatility_min || 5)) / 2;
   const maxVariation = Number(tier.roi_max || roiPercent + 50) - Number(tier.roi_min || roiPercent - 50);
@@ -120,7 +120,6 @@ export default async function handler(req, res) {
         // Update investment
         const newValue = Math.max(0.01, tick.newValue);
         const updateData = {
-          current_value: newValue,
           earned: newValue - Number(investment.amount || 0),
           days_elapsed: tick.daysElapsed,
           updated_at: new Date().toISOString(),

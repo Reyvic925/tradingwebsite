@@ -93,7 +93,6 @@ export default async function handler(req, res) {
           plan_id,
           plan_name: plan.name,
           amount: amt,
-          current_value: amt,
           daily_rate: plan.daily_rate,
           duration_days: plan.duration_days,
           start_date: start.toISOString(),

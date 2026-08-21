@@ -51,9 +51,7 @@ export default function Dashboard() {
   const pnl = positions.reduce((s, p) => s + Number(p.pnl || 0), 0);
   const investmentSummary = investments.reduce((summary, investment) => {
     const principal = Number(investment.amount || 0);
-    const storedValue = Number(investment.current_value);
-    const value = storedValue > 0 ? storedValue : principal;
-    summary.totalPnl += value - principal;
+    summary.totalPnl += Number(investment.earned || 0);
     if (investment.status === 'completed') summary.completed += 1;
     else summary.active += 1;
     return summary;

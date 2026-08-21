@@ -101,7 +101,6 @@ export default async function handler(req, res) {
         tier_id: tier.id,
         plan_name: tier.name,
         amount: amt,
-        current_value: amt,
         duration_days: tier.duration_days,
         start_date: now.toISOString(),
         end_date: endDate.toISOString(),

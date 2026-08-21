@@ -52,3 +52,14 @@ An invalid or missing secret returns HTTP `401`. The endpoint returns HTTP `200`
 ## Important
 
 Schedule `/api/cron/roi` for investments. `/api/cron/tick` is the separate market-price tick endpoint and should not be used as the investment scheduler.
+
+## Copy-trading scheduler
+
+Create a second cron-job.org job for the social/copy-trading simulator:
+
+- **URL:** `https://YOUR_DOMAIN/api/cron/copy-trading?cron_secret=YOUR_CRON_SECRET`
+- **Method:** `POST`
+- **Schedule:** every minute (`* * * * *`)
+- **Request body:** empty
+
+This advances active traders, writes trade logs and history, updates active follower PnL, applies stop-loss/take-profit triggers, and expires finished trader sessions. It uses the same `CRON_SECRET` environment variable.

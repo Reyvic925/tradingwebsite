@@ -8,6 +8,7 @@
 
 import supabase from './db-client.js';
 import { createNotification } from './notification-service.js';
+import { getUsdWallet } from './helpers.js';
 import {
   isTraderEligible,
   calculateMarketChange,
@@ -16,9 +17,14 @@ import {
 } from '../src/lib/session-utils.js';
 
 export default async function handler(req, res) {
-  // Verify cron secret if needed (implement based on your setup)
-  // const secret = req.headers['x-cron-secret'];
-  // if (secret !== process.env.CRON_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const secret = process.env.CRON_SECRET;
+  const provided = (req.headers['x-cron-secret'] || req.query?.cron_secret || '').toString();
+  if (!secret || provided !== secret) {
+    return res.status(401).json({ error: 'Invalid or missing cron secret' });
+  }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
     console.log('[CRON] Starting copy trading simulation...');
@@ -215,10 +221,33 @@ export default async function handler(req, res) {
             });
           }
 
-          await supabase
+          const { error: followUpdateError } = await supabase
             .from('user_follows')
             .update(updateData)
             .eq('id', follow.id);
+
+          if (followUpdateError) {
+            console.error(`[CRON] Error updating follower ${follow.id}:`, followUpdateError);
+            continue;
+          }
+
+          if (!follow.is_copying || updateData.is_copying !== false) {
+            updatedFollowers++;
+            continue;
+          }
+
+          const wallet = await getUsdWallet(supabase, follow.user_id);
+          if (wallet) {
+            const returnAmount = Number(updateData.current_value) || Number(follow.allocated_amount);
+            const { error: walletError } = await supabase.from('wallets').update({
+              available: Number(wallet.available || 0) + returnAmount,
+              reserved: Math.max(0, Number(wallet.reserved || 0) - Number(follow.allocated_amount || 0)),
+            }).eq('id', wallet.id);
+            if (walletError) {
+              console.error(`[CRON] Error releasing follower ${follow.id} funds:`, walletError);
+              continue;
+            }
+          }
 
           updatedFollowers++;
         }
