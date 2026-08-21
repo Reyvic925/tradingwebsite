@@ -397,13 +397,6 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-xs">
-          <div><div className="text-gray-500">Daily ROI</div><div className="mt-1 font-mono text-emerald-300">{Number(trader.daily_return || 0) >= 0 ? '+' : ''}{Number(trader.daily_return || 0).toFixed(2)}%</div></div>
-          <div><div className="text-gray-500">Risk score</div><div className="mt-1 font-mono text-white">{Number(trader.risk_score || 5)}/10</div></div>
-          <div><div className="text-gray-500">Drawdown</div><div className="mt-1 font-mono text-amber-200">{Number(trader.max_drawdown || 0).toFixed(2)}%</div></div>
-          <div><div className="text-gray-500">Equity</div><div className="mt-1 font-mono text-white">{formatMoney(Number(trader.current_equity || 0))}</div></div>
-        </div>
-
         <button
           onClick={() => setShowModal(true)}
           className="w-full py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition text-sm font-semibold flex items-center justify-center gap-2"
