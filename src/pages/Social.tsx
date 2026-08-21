@@ -249,7 +249,7 @@ function LeaderboardSection() {
               </div>
             </div>
             <div className="text-2xl font-bold text-emerald-400 mb-2">
-              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
+              {formatMoney(Number(trader.total_return || 0))}
             </div>
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">All-time ROI · no fixed term</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -383,7 +383,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
         <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
           <div>
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(1)}%
+              {formatMoney(Number(trader.total_return || 0))}
             </div>
             <div className="text-gray-500">All-time ROI</div>
           </div>
