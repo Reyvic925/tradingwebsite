@@ -104,6 +104,7 @@ export default async function handler(req, res) {
     let updated = 0;
     let skipped = 0;
     let errors = 0;
+    const errorMessages = [];
 
     for (const investment of investments) {
       try {
@@ -130,13 +131,11 @@ export default async function handler(req, res) {
         const newValue = Math.max(0.01, tick.newValue);
         const updateData = {
           earned: newValue - Number(investment.amount || 0),
-          days_elapsed: tick.daysElapsed,
-          updated_at: new Date().toISOString(),
+          status: tick.isCompleted ? 'completed' : 'active',
         };
 
         if (tick.isCompleted) {
           updateData.status = 'completed';
-          updateData.mature_at = new Date().toISOString();
         }
 
         const { data: updatedInvestments, error: updateError } = await supabase
@@ -147,6 +146,19 @@ export default async function handler(req, res) {
           .select('id');
         if (updateError) throw updateError;
         if (!updatedInvestments?.length) continue;
+
+        const optionalUpdate = {
+          days_elapsed: tick.daysElapsed,
+          updated_at: new Date().toISOString(),
+          ...(tick.isCompleted ? { mature_at: new Date().toISOString() } : {}),
+        };
+        const { error: optionalUpdateError } = await supabase
+          .from('investments')
+          .update(optionalUpdate)
+          .eq('id', investment.id);
+        if (optionalUpdateError) {
+          console.warn('[cron-roi] Optional investment fields were not updated:', optionalUpdateError.message || optionalUpdateError);
+        }
 
         // Log transaction
         await supabase.from('investment_transactions').insert({
@@ -181,11 +193,12 @@ export default async function handler(req, res) {
         updated++;
       } catch (err) {
         errors++;
+        if (errorMessages.length < 5) errorMessages.push(`investment ${investment.id}: ${String(err?.message || err)}`);
         console.error('[cron-roi] Error processing investment', investment.id, err?.message || err);
       }
     }
 
-    return res.status(200).json({ ok: true, active: investments.length, updated, skipped, errors, timestamp: new Date().toISOString() });
+    return res.status(200).json({ ok: true, active: investments.length, updated, skipped, errors, errorMessages, timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[cron-roi] error', err);
     return res.status(500).json({ error: String(err?.message || err) });
