@@ -166,7 +166,7 @@ export default async function handler(req, res) {
           user_id: investment.user_id,
           type: tick.fluctuation >= 0 ? 'gain' : 'loss',
           amount: Math.abs(tick.fluctuation),
-          description: tick.fluctuation >= 0 ? `ROI simulation gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI simulation loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
+          description: tick.fluctuation >= 0 ? `ROI gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
         });
 
         // Log to user gain logs
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
           investment_id: investment.id,
           gain_type: 'ROI',
           value: tick.fluctuation,
-          message: tick.fluctuation >= 0 ? `ROI simulation gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI simulation loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
+          message: tick.fluctuation >= 0 ? `ROI gain of $${Math.abs(tick.fluctuation).toFixed(2)}` : `ROI loss of $${Math.abs(tick.fluctuation).toFixed(2)}`,
           logged_at: new Date().toISOString(),
         });
 
