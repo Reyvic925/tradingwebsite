@@ -131,7 +131,14 @@ export default async function handler(req, res) {
           updateData.mature_at = new Date().toISOString();
         }
 
-        await supabase.from('investments').update(updateData).eq('id', investment.id);
+        const { data: updatedInvestments, error: updateError } = await supabase
+          .from('investments')
+          .update(updateData)
+          .eq('id', investment.id)
+          .eq('status', 'active')
+          .select('id');
+        if (updateError) throw updateError;
+        if (!updatedInvestments?.length) continue;
 
         // Log transaction
         await supabase.from('investment_transactions').insert({
@@ -154,15 +161,6 @@ export default async function handler(req, res) {
 
         // On completion: move to locked balance
         if (tick.isCompleted) {
-          const { data: wallets } = await supabase.from('wallets').select('*').eq('user_id', investment.user_id).limit(1);
-          const wallet = wallets?.[0];
-          if (wallet) {
-            await supabase.from('wallets').update({
-              locked_balance: Number(wallet.locked_balance || 0) + newValue,
-            }).eq('id', wallet.id);
-          }
-
-          // Also update profile locked balance
           const { data: profiles } = await supabase.from('profiles').select('*').eq('user_id', investment.user_id).limit(1);
           const profile = profiles?.[0];
           if (profile) {

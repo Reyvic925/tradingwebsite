@@ -109,6 +109,8 @@ MIT
 
 The server exposes a protected cron tick endpoint at /api/cron/tick that advances simulated market prices and writes OHLCV rows to the price_history table.
 
+For investment ROI processing, configure cron-job.org to call `POST /api/cron/roi` every five minutes. Setup, security, and verification instructions are in [docs/CRON-JOB-ORG-INVESTMENT.md](docs/CRON-JOB-ORG-INVESTMENT.md).
+
 Security
 - The endpoint requires a secret environment variable CRON_SECRET to be set for the server process. Example (Unix):
 
