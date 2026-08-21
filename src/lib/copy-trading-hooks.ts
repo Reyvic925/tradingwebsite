@@ -106,8 +106,8 @@ export function useCopyTrading() {
           leverage_multiplier: (settings as any).leverage || 1
         })
       });
-      if (!response.ok) throw new Error('Failed to follow trader');
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || `Failed to follow trader (${response.status})`);
       await fetchFollows();
       await fetchSummary();
       return data;

@@ -56,7 +56,7 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
       onClose();
     } catch (error) {
       console.error('Follow error:', error);
-      alert('Failed to follow trader');
+      alert(error instanceof Error ? error.message : 'Failed to follow trader');
     } finally {
       setLoading(false);
     }

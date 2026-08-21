@@ -41,78 +41,86 @@ export default async function handler(req, res) {
         take_profit_percent,
         leverage_multiplier
       } = req.body || {};
+      const traderId = Number(trader_id);
+      const allocatedAmount = Number(allocated_amount);
+      const stopLossPercent = Number(stop_loss_percent ?? 20);
+      const takeProfitPercent = Number(take_profit_percent ?? 200);
+      const leverageMultiplier = Number(leverage_multiplier ?? 1);
 
-      if (!trader_id || !(allocated_amount > 0)) {
+      if (!Number.isInteger(traderId) || traderId < 1 || !Number.isFinite(allocatedAmount) || allocatedAmount <= 0) {
         return res.status(400).json({ error: 'Invalid trader_id or amount' });
       }
 
-      if (!Number.isInteger(Number(trader_id)) || Number(trader_id) < 1) {
-        return res.status(400).json({ error: 'Trader ID must be an integer' });
-      }
-
-      if (allocated_amount < 100) {
+      if (allocatedAmount < 100) {
         return res.status(400).json({ error: 'Minimum allocation is $100' });
+      }
+      if (![stopLossPercent, takeProfitPercent, leverageMultiplier].every(Number.isFinite) || leverageMultiplier <= 0) {
+        return res.status(400).json({ error: 'Invalid copy-trading risk settings' });
       }
 
       // Check if trader exists
-      const trader = await findById(supabase, 'traders', trader_id);
+      const trader = await findById(supabase, 'traders', traderId);
       if (!trader) return res.status(400).json({ error: 'Trader not found' });
 
       // Check wallet balance
       const wallet = await getUsdWallet(supabase, user.id);
-      if (!wallet || Number(wallet.available) < allocated_amount) {
+      if (!wallet || Number(wallet.available) < allocatedAmount) {
         return res.status(400).json({ error: 'Insufficient balance' });
       }
 
       // Check if already following
       const { data: existingFollow } = await supabase
         .from('user_follows')
-        .select('id')
+        .select('*')
         .eq('user_id', user.id)
-        .eq('trader_id', trader_id)
+        .eq('trader_id', traderId)
         .limit(1);
 
       if (existingFollow && existingFollow.length > 0) {
-        return res.status(400).json({ error: 'Already following this trader' });
+        if (existingFollow[0].is_copying) return res.status(400).json({ error: 'Already following this trader' });
       }
 
       // Reserve funds
       await supabase.from('wallets').update({
-        available: Number(wallet.available) - allocated_amount,
-        reserved: Number(wallet.reserved) + allocated_amount,
+        available: Number(wallet.available) - allocatedAmount,
+        reserved: Number(wallet.reserved) + allocatedAmount,
       }).eq('id', wallet.id);
 
-      // Create user_follow entry
-      const { data, error } = await supabase
-        .from('user_follows')
-        .insert({
-          user_id: user.id,
-          trader_id,
-          allocated_amount,
-          current_value: allocated_amount,
-          pnl: 0,
-          pnl_percent: 0,
-          stop_loss_percent: stop_loss_percent || 20,
-          take_profit_percent: take_profit_percent || 200,
-          leverage_multiplier: leverage_multiplier || 1,
-          is_copying: true
-        })
-        .select();
+      const followValues = {
+        user_id: user.id,
+        trader_id: traderId,
+        allocated_amount: allocatedAmount,
+        current_value: allocatedAmount,
+        pnl: 0,
+        pnl_percent: 0,
+        stop_loss_percent: stopLossPercent,
+        take_profit_percent: takeProfitPercent,
+        leverage_multiplier: leverageMultiplier,
+        is_copying: true,
+        updated_at: new Date(),
+      };
+      const followQuery = existingFollow?.[0]
+        ? supabase.from('user_follows').update(followValues).eq('id', existingFollow[0].id).select()
+        : supabase.from('user_follows').insert({
+          ...followValues,
+          followed_at: new Date(),
+        }).select();
+      const { data, error } = await followQuery;
 
       if (error) throw error;
 
       // Update trader followers count
       await supabase
         .from('traders')
-        .update({ followers: Number(trader.followers || 0) + 1 })
-        .eq('id', trader_id);
+        .update({ followers: Number(trader.followers || 0) + (existingFollow?.[0] ? 0 : 1) })
+        .eq('id', traderId);
 
       // Create notification
       await createNotification(supabase, {
         user_id: user.id,
-        trader_id,
+        trader_id: traderId,
         title: `Now copying ${trader.name}`,
-        message: `$${allocated_amount.toFixed(2)} allocated to copy this trader's positions.`,
+        message: `$${allocatedAmount.toFixed(2)} allocated to copy this trader's positions.`,
         type: 'info',
         read: false
       });
