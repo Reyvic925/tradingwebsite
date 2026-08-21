@@ -18,7 +18,9 @@ import {
   Search,
   SlidersHorizontal,
   LayoutDashboard,
-  BarChart3
+  BarChart3,
+  Activity,
+  ShieldCheck
 } from 'lucide-react';
 import { formatMoney } from '../lib/format';
 import { apiGet } from '../lib/api';
@@ -422,10 +424,54 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
   );
 }
 
+function CopyDetailModal({ follow, onClose, onEdit, onStop }: { follow: UserFollow; onClose: () => void; onEdit: () => void; onStop: () => void }) {
+  const isProfit = Number(follow.pnl_percent || 0) >= 0;
+  const nearStopLoss = Number(follow.pnl_percent || 0) <= -(Number(follow.stop_loss_percent || 20) * 0.8);
+  const trader = follow.trader;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+      <div role="dialog" aria-modal="true" aria-label={`${trader?.name || 'Copy position'} details`} className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-xl border border-white/10 bg-[#0b111a] p-5 shadow-2xl sm:p-7">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+          <div className="flex items-center gap-3">
+            <img src={trader?.avatar_url} alt={trader?.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-emerald-400/30" />
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/70">Active copy</div>
+              <h2 className="mt-1 text-2xl font-bold text-white">{trader?.name || 'Copy position'}</h2>
+              <div className="mt-1 text-xs text-gray-500">Running continuously · no fixed term</div>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close copy details" className="text-gray-400 transition hover:text-white"><X size={20} /></button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="text-[10px] uppercase tracking-widest text-gray-500">Current value</div><div className="mt-2 font-mono text-xl text-white">{formatMoney(follow.current_value)}</div></div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="text-[10px] uppercase tracking-widest text-gray-500">Allocated</div><div className="mt-2 font-mono text-xl text-white">{formatMoney(follow.allocated_amount)}</div></div>
+          <div className={`rounded-lg border p-4 ${isProfit ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-[10px] uppercase tracking-widest text-gray-500">P&L</div><div className={`mt-2 font-mono text-xl ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>{isProfit ? '+' : ''}{formatMoney(follow.pnl)}</div></div>
+          <div className={`rounded-lg border p-4 ${isProfit ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-[10px] uppercase tracking-widest text-gray-500">Return</div><div className={`mt-2 font-mono text-xl ${isProfit ? 'text-emerald-300' : 'text-rose-300'}`}>{isProfit ? '+' : ''}{Number(follow.pnl_percent || 0).toFixed(2)}%</div></div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500"><ShieldCheck size={14} /> Risk controls</div><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><div className="text-xs text-gray-500">Max drawdown</div><div className="mt-1 font-mono text-white">-{Number(follow.stop_loss_percent || 20).toFixed(0)}%</div></div><div><div className="text-xs text-gray-500">Profit target</div><div className="mt-1 font-mono text-white">+{Number(follow.take_profit_percent || 200).toFixed(0)}%</div></div></div></div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500"><Activity size={14} /> Copy settings</div><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><div className="text-xs text-gray-500">Trade multiplier</div><div className="mt-1 font-mono text-white">{Number(follow.leverage_multiplier || 1).toFixed(1)}x</div></div><div><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-mono text-emerald-300">Copying</div></div></div></div>
+        </div>
+
+        {nearStopLoss && <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"><AlertCircle size={16} /> This copy is approaching its maximum drawdown.</div>}
+
+        <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-white/10 pt-5">
+          <button type="button" onClick={onEdit} className="rounded-md bg-white/5 px-4 py-2 text-xs font-semibold text-gray-200 transition hover:bg-white/10">Edit risk</button>
+          <button type="button" onClick={onStop} className="rounded-md bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20">Stop copying</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // My Positions Section
 function MyPositions() {
   const { follows, stopCopying, loading } = useCopyTrading();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedFollow, setSelectedFollow] = useState<UserFollow | null>(null);
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
@@ -448,7 +494,19 @@ function MyPositions() {
           (follow.pnl_percent || 0) <= -(follow.stop_loss_percent * 0.8);
 
         return (
-          <div key={follow.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 transition hover:border-amber-400/30 hover:bg-white/[0.04]">
+          <div
+            key={follow.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedFollow(follow)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setSelectedFollow(follow);
+              }
+            }}
+            className="cursor-pointer rounded-lg border border-white/10 bg-white/[0.02] p-4 transition hover:border-amber-400/30 hover:bg-white/[0.04] focus:border-amber-400/50 focus:outline-none"
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <img
@@ -497,13 +555,14 @@ function MyPositions() {
             {/* Actions */}
             <div className="flex gap-2">
               <button
-                onClick={() => setEditingId(editingId === follow.id ? null : follow.id)}
+                onClick={(event) => { event.stopPropagation(); setEditingId(editingId === follow.id ? null : follow.id); }}
                 className="text-xs px-3 py-1 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 transition"
               >
                 {editingId === follow.id ? 'Done' : 'Edit Risk'}
               </button>
               <button
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   if (confirm('Stop copying this trader?')) {
                     stopCopying(follow.id);
                   }
@@ -516,14 +575,24 @@ function MyPositions() {
 
             {/* Edit Form (shown when editing) */}
             {editingId === follow.id && (
-              <EditFollowForm
-                follow={follow}
-                onClose={() => setEditingId(null)}
-              />
+              <div onClick={(event) => event.stopPropagation()}><EditFollowForm follow={follow} onClose={() => setEditingId(null)} /></div>
             )}
           </div>
         );
       })}
+      {selectedFollow && (
+        <CopyDetailModal
+          follow={selectedFollow}
+          onClose={() => setSelectedFollow(null)}
+          onEdit={() => { setSelectedFollow(null); setEditingId(selectedFollow.id); }}
+          onStop={() => {
+            if (confirm('Stop copying this trader?')) {
+              void stopCopying(selectedFollow.id);
+              setSelectedFollow(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
