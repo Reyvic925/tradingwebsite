@@ -6,7 +6,7 @@ The investment ROI processor is exposed at:
 POST https://YOUR_DOMAIN/api/cron/roi
 ```
 
-It is protected by `CRON_SECRET`. The endpoint advances active investments, records gain/loss transactions, marks matured investments as `completed`, and moves their full `current_value` into the user's profile `locked_balance`. ROI is released only through the existing admin approval flow.
+It is protected by `CRON_SECRET`. The endpoint advances active investments, records gain/loss transactions in `investment_transactions`, stores profit/loss in `earned`, marks matured investments as `completed`, and moves their computed value (`amount + earned`) into the user's profile `locked_balance`. ROI is released only through the existing admin approval flow.
 
 ## cron-job.org setup
 
@@ -51,7 +51,13 @@ An invalid or missing secret returns HTTP `401`. The endpoint returns HTTP `200`
 
 ## Important
 
-Schedule `/api/cron/roi` for investments. `/api/cron/tick` is the separate market-price tick endpoint and should not be used as the investment scheduler.
+The existing `/api/cron` route is the market and legacy-plan tick. It is not the current ROI simulator route. Schedule `/api/cron/roi` for investments. `/api/cron/tick` is also a separate market-price tick endpoint and should not be used as the investment scheduler.
+
+If your cron-job.org job currently points to `https://www.theprimemarkets.com/api/cron`, change it to:
+
+```text
+https://www.theprimemarkets.com/api/cron/roi?cron_secret=YOUR_CRON_SECRET
+```
 
 ## Copy-trading scheduler
 

@@ -80,8 +80,12 @@ export default async function handler(req, res) {
     }
 
     // Get all active investments
-    const { data: investments } = await supabase.from('investments').select('*').eq('status', 'active');
-    if (!investments) return res.status(200).json({ ok: true, updated: 0 });
+    const { data: investments, error: investmentsError } = await supabase
+      .from('investments')
+      .select('*')
+      .eq('status', 'active');
+    if (investmentsError) throw investmentsError;
+    if (!investments) return res.status(200).json({ ok: true, active: 0, updated: 0, skipped: 0, errors: 0, timestamp: new Date().toISOString() });
 
     // Investments can originate from the current tier flow or the established
     // plan flow. Normalise both to the same ROI simulation inputs so no active
@@ -98,6 +102,8 @@ export default async function handler(req, res) {
     const configMap = Object.fromEntries((configs || []).map((c) => [c.key, c.value]));
 
     let updated = 0;
+    let skipped = 0;
+    let errors = 0;
 
     for (const investment of investments) {
       try {
@@ -113,7 +119,10 @@ export default async function handler(req, res) {
           volatility_min: 2,
           volatility_max: 6,
         });
-        if (!simulationPlan) continue;
+        if (!simulationPlan) {
+          skipped++;
+          continue;
+        }
 
         const tick = calculateRoiTick(investment, simulationPlan, configMap);
 
@@ -171,11 +180,12 @@ export default async function handler(req, res) {
 
         updated++;
       } catch (err) {
+        errors++;
         console.error('[cron-roi] Error processing investment', investment.id, err?.message || err);
       }
     }
 
-    return res.status(200).json({ ok: true, updated, timestamp: new Date().toISOString() });
+    return res.status(200).json({ ok: true, active: investments.length, updated, skipped, errors, timestamp: new Date().toISOString() });
   } catch (err) {
     console.error('[cron-roi] error', err);
     return res.status(500).json({ error: String(err?.message || err) });
