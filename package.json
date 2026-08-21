@@ -25,7 +25,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
-    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs && node tests/unit/investment-tick.test.mjs && node tests/unit/roi-simulator.test.mjs",
+    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs && node tests/unit/investment-tick.test.mjs && node tests/unit/roi-simulator.test.mjs && node tests/unit/copy-trading-tick.test.mjs",
     "backfill:wallets": "node scripts/backfill-wallets.js",
     "seed:kyc": "node scripts/seed-kyc-table.js"
   },

@@ -9,6 +9,7 @@
 import supabase from './db-client.js';
 import { createNotification } from './notification-service.js';
 import { getUsdWallet } from './helpers.js';
+import { calculateCopyFollowerValue } from './copy-trading-tick.js';
 import {
   isTraderEligible,
   calculateMarketChange,
@@ -187,12 +188,17 @@ export default async function handler(req, res) {
 
       if (!followsError && follows && follows.length > 0) {
         for (const follow of follows) {
-          // Calculate user's PnL based on leverage
-          const baseMultiplier = 1 + changePercent;
-          const userChange = (baseMultiplier - 1) * Number(follow.leverage_multiplier || 1);
-          const newFollowValue = Number(follow.current_value) * (1 + userChange);
-          const followPnL = newFollowValue - Number(follow.allocated_amount);
-          const followPnLPercent = (followPnL / Number(follow.allocated_amount)) * 100;
+          // Risk appetite controls exposure to every trader move. This affects
+          // positive and negative ticks equally before risk limits are checked.
+          const followerTick = calculateCopyFollowerValue({
+            currentValue: follow.current_value,
+            allocatedAmount: follow.allocated_amount,
+            traderChange: changePercent,
+            riskMultiplier: follow.leverage_multiplier,
+          });
+          const newFollowValue = followerTick.currentValue;
+          const followPnL = followerTick.pnl;
+          const followPnLPercent = followerTick.pnlPercent;
 
           // Check risk conditions (Stop-Loss / Take-Profit)
           const riskCheck = checkNotificationTrigger(
