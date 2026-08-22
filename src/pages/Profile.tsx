@@ -44,6 +44,9 @@ export default function Profile() {
     try {
       const updated = await apiSend<ProfileT>('/api/profile', 'PUT', { full_name: fullName, country, phone });
       setProfile(updated);
+      setFullName(updated.full_name || '');
+      setCountry(updated.country || '');
+      setPhone(updated.phone || '');
       setMsg('Profile updated');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Save failed');

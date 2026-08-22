@@ -209,9 +209,20 @@ export default async function handler(req, res) {
       const existing = await getProfileRow(supabase, user.id);
       if (!existing) return res.status(404).json({ error: 'Profile not found' });
 
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'No profile fields to update' });
+      }
+      if (patch.full_name !== undefined && !String(patch.full_name).trim()) {
+        return res.status(400).json({ error: 'Legal name is required' });
+      }
+
+      if (patch.full_name !== undefined) patch.full_name = String(patch.full_name).trim();
+      if (patch.country !== undefined) patch.country = String(patch.country).trim();
+      if (patch.phone !== undefined) patch.phone = String(patch.phone).trim();
+
       const { data, error } = await supabase
         .from('profiles')
-        .update(patch)
+        .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
         .select();
       if (error) throw error;
