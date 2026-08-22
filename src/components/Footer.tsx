@@ -26,6 +26,7 @@ export default function Footer() {
           <div className="mt-4 flex flex-col gap-2 text-sm text-stone-400">
             <a href="#trust">Regulation</a>
             <a href="#proof">Client stories</a>
+            <Link to="/faq">FAQ</Link>
             <span>{BRAND.legal}</span>
             <span>Reg. No. {BRAND.reg}</span>
           </div>
@@ -45,9 +46,9 @@ export default function Footer() {
         </div>
         <div>
           <div className="text-[11px] uppercase tracking-[0.22em] text-amber-300/80">Legal</div>
-          <p className="mt-4 text-xs leading-relaxed text-stone-500">
+          <Link to="/terms" className="mt-4 block text-xs leading-relaxed text-stone-500 hover:text-amber-200">
             Trading leveraged products involves substantial risk of loss. Past performance is not indicative of future results. Capital is at risk.
-          </p>
+          </Link>
         </div>
       </div>
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/5 px-5 pt-6 text-[11px] uppercase tracking-[0.16em] text-stone-600 md:flex-row lg:px-8">

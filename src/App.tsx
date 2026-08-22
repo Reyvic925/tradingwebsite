@@ -17,6 +17,8 @@ import History from './pages/History';
 import Profile from './pages/Profile';
 import KycSubmit from './pages/KycSubmit';
 import Source from './pages/Source';
+import TermsOfService from './pages/TermsOfService';
+import FAQ from './pages/FAQ';
 import AdminRoute from './guards/AdminRoute';
 import AdminLogin from './pages/admin/Login';
 import AdminDashboard from './pages/admin/Dashboard';
@@ -40,6 +42,8 @@ export default function App() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
           <Route path="/source" element={<Source />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/faq" element={<FAQ />} />
           <Route
             path="/admin/dashboard"
             element={
