@@ -347,12 +347,6 @@ export default function TraderProfile() {
         </div>
       )}
 
-      {/* Information Box */}
-      <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-        <div className="text-sm text-blue-100">
-          <strong>Note:</strong> All trader performance metrics are simulated for demonstration purposes. Copy trading involves real financial risk. Always set appropriate stop-loss limits and manage your risk carefully. Past simulated performance does not guarantee future results.
-        </div>
-      </div>
     </AppShell>
   );
 }
