@@ -100,6 +100,16 @@ export default async function handler(req, res) {
           console.error(`[CRON] Error inserting trade for trader ${trader.id}:`, tradeError);
         } else {
           generatedTrades++;
+          const previousTrades = Number(trader.total_trades || 0);
+          const previousWinRate = Number(trader.win_rate_trades || 50);
+          const winningTrades = Math.round((previousTrades * previousWinRate) / 100) + (pnlDelta > 0 ? 1 : 0);
+          await supabase
+            .from('traders')
+            .update({
+              total_trades: previousTrades + 1,
+              win_rate_trades: Number(((winningTrades / (previousTrades + 1)) * 100).toFixed(2))
+            })
+            .eq('id', trader.id);
           console.log(`[CRON] Generated trade: ${quantity.toFixed(2)} ${symbol} at $${entryPrice.toFixed(2)}`);
         }
       }
