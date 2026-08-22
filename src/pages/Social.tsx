@@ -238,13 +238,17 @@ function LeaderboardSection() {
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
-                <img
-                  src={trader.avatar_url}
-                  alt={trader.name}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
+                <Link to={`/app/trader/${trader.id}`} aria-label={`View ${trader.name} profile`} className="shrink-0" onClick={(event) => event.stopPropagation()}>
+                  <img
+                    src={trader.avatar_url}
+                    alt={trader.name}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                </Link>
                 <div>
-                  <div className="text-sm font-semibold text-white">{trader.name}</div>
+                  <Link to={`/app/trader/${trader.id}`} className="text-sm font-semibold text-white hover:text-emerald-300" onClick={(event) => event.stopPropagation()}>
+                    {trader.name}
+                  </Link>
                   <div className="text-xs text-gray-400">{idx + 1}. {trader.medal === 'gold' ? '🥇 Gold' : trader.medal === 'silver' ? '🥈 Silver' : '🥉 Bronze'}</div>
                 </div>
               </div>
@@ -505,15 +509,17 @@ function MyPositions() {
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <img
-                  src={follow.trader?.avatar_url}
-                  alt={follow.trader?.name}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
+                <Link to={`/app/trader/${follow.trader_id}`} aria-label={`View ${follow.trader?.name || 'trader'} profile`} className="shrink-0" onClick={(event) => event.stopPropagation()}>
+                  <img
+                    src={follow.trader?.avatar_url}
+                    alt={follow.trader?.name}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                </Link>
                 <div>
-                  <div className="text-sm font-semibold text-white">
+                  <Link to={`/app/trader/${follow.trader_id}`} className="text-sm font-semibold text-white hover:text-emerald-300" onClick={(event) => event.stopPropagation()}>
                     {follow.trader?.name}
-                  </div>
+                  </Link>
                   <div className="text-xs text-gray-500">
                     {formatMoney(follow.allocated_amount)} allocated
                   </div>

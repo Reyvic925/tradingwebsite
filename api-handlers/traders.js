@@ -92,8 +92,11 @@ export default async function handler(req, res) {
       if (!admin) return res.status(403).json({ error: 'Admin access required' });
 
       const {
-        name, bio, avatar_url, avatar_data, asset_focus, session_type,
-        drift, volatility, risk_score, total_return, win_rate_trades, followers
+        name, bio, country, avatar_url, avatar_data, asset_focus, session_type,
+        specialty, badge, risk_level, current_equity, drift, volatility, risk_score,
+        total_return, daily_return, monthly_return, total_trades, win_rate_trades,
+        max_drawdown, followers, copiers_current, copiers_all_time,
+        profit_for_copiers, profit_sharing_fee, under_management, session_start, session_end
       } = req.body || {};
 
       if (!name || (!avatar_url && !avatar_data)) {
@@ -107,20 +110,32 @@ export default async function handler(req, res) {
         .insert({
           name,
           bio: bio || '',
+          country: country || '',
           avatar_url: resolvedAvatarUrl,
+          specialty: specialty || '',
+          badge: badge || 'Gold',
+          risk_level: risk_level || 'Medium',
           asset_focus: asset_focus || ['BTC-USD', 'ETH-USD'],
-          current_equity: 10000.00,
+          current_equity: Number.isFinite(Number(current_equity)) ? Math.max(Number(current_equity), 0) : 10000.00,
           total_return: Number.isFinite(Number(total_return)) ? Number(total_return) : 0.00,
-          daily_return: 0.00,
-          total_trades: 0,
+          daily_return: Number.isFinite(Number(daily_return)) ? Number(daily_return) : 0.00,
+          monthly_return: Number.isFinite(Number(monthly_return)) ? Number(monthly_return) : 0.00,
+          total_trades: Number.isFinite(Number(total_trades)) ? Math.max(Math.trunc(Number(total_trades)), 0) : 0,
           win_rate_trades: Number.isFinite(Number(win_rate_trades)) ? Math.min(Math.max(Number(win_rate_trades), 0), 100) : 50.00,
-          max_drawdown: 0.00,
+          max_drawdown: Number.isFinite(Number(max_drawdown)) ? Math.max(Number(max_drawdown), 0) : 0.00,
           volatility: volatility || 0.005,
           drift: drift || 0.001,
           risk_score: Math.min(Math.max(risk_score || 5, 1), 10),
           session_type: session_type || 'nyc',
           is_active: true,
-          followers: Number.isFinite(Number(followers)) ? Math.max(Math.trunc(Number(followers)), 0) : 0
+          followers: Number.isFinite(Number(followers)) ? Math.max(Math.trunc(Number(followers)), 0) : 0,
+          copiers_current: Number.isFinite(Number(copiers_current)) ? Math.max(Math.trunc(Number(copiers_current)), 0) : 0,
+          copiers_all_time: Number.isFinite(Number(copiers_all_time)) ? Math.max(Math.trunc(Number(copiers_all_time)), 0) : 0,
+          profit_for_copiers: Number.isFinite(Number(profit_for_copiers)) ? Math.max(Number(profit_for_copiers), 0) : 0,
+          profit_sharing_fee: Number.isFinite(Number(profit_sharing_fee)) ? Math.min(Math.max(Number(profit_sharing_fee), 0), 100) : 20,
+          under_management: Number.isFinite(Number(under_management)) ? Math.max(Number(under_management), 0) : 0,
+          session_start: session_start || new Date().toISOString().slice(0, 10),
+          session_end: session_end || null
         })
         .select();
       
