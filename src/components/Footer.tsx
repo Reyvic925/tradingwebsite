@@ -53,7 +53,7 @@ export default function Footer() {
       </div>
       <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-white/5 px-5 pt-6 text-[11px] uppercase tracking-[0.16em] text-stone-600 md:flex-row lg:px-8">
         <span>© {new Date().getFullYear()} {BRAND.legal}. All rights reserved.</span>
-        <span>SSL · GDPR · PCI-DSS · 30-day guarantee</span>
+        <span>SSL · GDPR · PCI-DSS · Transparent fees</span>
       </div>
     </footer>
   );
