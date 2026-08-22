@@ -7,14 +7,10 @@
  */
 
 import supabase from './db-client.js';
-import { createNotification } from './notification-service.js';
-import { getUsdWallet } from './helpers.js';
 import { calculateCopyFollowerValue } from './copy-trading-tick.js';
 import {
-  isTraderEligible,
   calculateMarketChange,
-  generateRealisticEntryPrice,
-  checkNotificationTrigger
+  generateRealisticEntryPrice
 } from './session-utils.js';
 
 export default async function handler(req, res) {
@@ -39,21 +35,11 @@ export default async function handler(req, res) {
     if (traderError) throw traderError;
 
     let simulatedTraders = 0;
-    let skippedTraders = 0;
     let generatedTrades = 0;
-    let updatedFollowers = 0;
-    let closedForRisk = 0;
-    let followerErrors = 0;
+    let updatedCopies = 0;
 
     // Step 2: Process each trader
     for (const trader of traders || []) {
-      // Check if trader is eligible based on session time
-      if (!isTraderEligible(trader)) {
-        skippedTraders++;
-        console.log(`[CRON] Trader ${trader.id} (${trader.session_type}) not eligible at this time`);
-        continue;
-      }
-
       console.log(`[CRON] Processing trader ${trader.id} (${trader.name})`);
       simulatedTraders++;
 
@@ -65,7 +51,7 @@ export default async function handler(req, res) {
 
       console.log(`[CRON] Trader ${trader.id}: ${(changePercent * 100).toFixed(3)}% change, PnL delta: $${pnlDelta.toFixed(2)}`);
 
-      // Step 2B: Generate realistic "winning" trade that explains the PnL
+      // Step 2B: Record the completed BUY or SELL that produced this P&L tick.
       if (Math.abs(pnlDelta) > 0.01) {
         const isProfit = pnlDelta > 0;
         const assetList = trader.asset_focus || ['BTC-USD', 'ETH-USD', 'AAPL', 'MSFT'];
@@ -93,8 +79,9 @@ export default async function handler(req, res) {
             exit_price: Number(currentPrice.toFixed(4)),
             pnl: Number(pnlDelta.toFixed(2)),
             pnl_percent: ((pnlDelta / oldEquity) * 100).toFixed(2),
-            status: 'OPEN',
-            traded_at: new Date().toISOString()
+            status: 'CLOSED',
+            traded_at: new Date().toISOString(),
+            closed_at: new Date().toISOString()
           });
 
         if (tradeError) {
@@ -105,54 +92,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // Step 2C: Auto-close old OPEN trades (older than 2 minutes)
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-      const { data: oldTrades, error: oldTradesError } = await supabase
-        .from('trade_logs')
-        .select('*')
-        .eq('trader_id', trader.id)
-        .eq('status', 'OPEN')
-        .lt('traded_at', twoMinutesAgo);
-
-      if (!oldTradesError && oldTrades && oldTrades.length > 0) {
-        for (const trade of oldTrades) {
-          const currentPrice = await getAssetPrice(trade.symbol);
-          const exitPnl = trade.side === 'BUY'
-            ? (currentPrice - trade.entry_price) * trade.quantity
-            : (trade.entry_price - currentPrice) * trade.quantity;
-
-          await supabase
-            .from('trade_logs')
-            .update({
-              exit_price: Number(currentPrice.toFixed(4)),
-              pnl: Number(exitPnl.toFixed(2)),
-              pnl_percent: ((exitPnl / (trade.entry_price * trade.quantity)) * 100).toFixed(2),
-              status: 'CLOSED',
-              closed_at: new Date().toISOString()
-            })
-            .eq('id', trade.id);
-        }
-
-        // Update trader stats
-        const { data: allTrades } = await supabase
-          .from('trade_logs')
-          .select('pnl, status')
-          .eq('trader_id', trader.id);
-
-        const closedTrades = (allTrades || []).filter(t => t.status === 'CLOSED');
-        const winningTrades = closedTrades.filter(t => Number(t.pnl) > 0).length;
-        const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 50;
-
-        await supabase
-          .from('traders')
-          .update({
-            total_trades: (allTrades || []).length,
-            win_rate_trades: Number(winRate.toFixed(2))
-          })
-          .eq('id', trader.id);
-      }
-
-      // Step 2D: Update trader equity and daily return
+      // Step 2C: Update trader equity and daily return.
       const { error: updateError } = await supabase
         .from('traders')
         .update({
@@ -168,7 +108,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Step 2E: Save daily equity snapshot
+      // Step 2D: Save the current P&L snapshot.
       const today = new Date().toISOString().split('T')[0];
       await supabase
         .from('trader_history')
@@ -179,7 +119,7 @@ export default async function handler(req, res) {
           daily_return: Number(changePercent * 100).toFixed(2)
         }, { onConflict: 'trader_id,snapshot_date' });
 
-      // Step 3: Update followers' PnL
+      // Step 3: Update active copies' P&L only.
       const { data: follows, error: followsError } = await supabase
         .from('user_follows')
         .select('*')
@@ -188,8 +128,6 @@ export default async function handler(req, res) {
 
       if (!followsError && follows && follows.length > 0) {
         for (const follow of follows) {
-          // Risk appetite controls exposure to every trader move. This affects
-          // positive and negative ticks equally before risk limits are checked.
           const followerTick = calculateCopyFollowerValue({
             currentValue: follow.current_value,
             allocatedAmount: follow.allocated_amount,
@@ -200,36 +138,12 @@ export default async function handler(req, res) {
           const followPnL = followerTick.pnl;
           const followPnLPercent = followerTick.pnlPercent;
 
-          // Check risk conditions (Stop-Loss / Take-Profit)
-          const riskCheck = checkNotificationTrigger(
-            followPnLPercent,
-            Number(follow.stop_loss_percent || 20),
-            Number(follow.take_profit_percent || 200)
-          );
-
-          let updateData = {
+          const updateData = {
             current_value: Number(newFollowValue.toFixed(2)),
             pnl: Number(followPnL.toFixed(2)),
             pnl_percent: Number(followPnLPercent.toFixed(2)),
             updated_at: new Date().toISOString()
           };
-
-          // Trigger stop-loss or take-profit
-          if (riskCheck.shouldNotify && (riskCheck.reason === 'stop_loss' || riskCheck.reason === 'take_profit')) {
-            updateData.is_copying = false;
-            closedForRisk++;
-            console.log(`[CRON] ${riskCheck.reason.toUpperCase()} for user follow ${follow.id}: ${followPnLPercent.toFixed(2)}%`);
-
-            // Create notification
-            await createNotification(supabase, {
-              user_id: follow.user_id,
-              trader_id: follow.trader_id,
-              title: riskCheck.reason === 'stop_loss' ? '⚠️ Stop-Loss Triggered' : '🎉 Take-Profit Reached',
-              message: riskCheck.message,
-              type: riskCheck.reason === 'stop_loss' ? 'alert' : 'profit',
-              read: false
-            });
-          }
 
           const { error: followUpdateError } = await supabase
             .from('user_follows')
@@ -237,46 +151,22 @@ export default async function handler(req, res) {
             .eq('id', follow.id);
 
           if (followUpdateError) {
-            followerErrors++;
             console.error(`[CRON] Error updating follower ${follow.id}:`, followUpdateError);
             continue;
           }
-
-          if (!follow.is_copying || updateData.is_copying !== false) {
-            updatedFollowers++;
-            continue;
-          }
-
-          const wallet = await getUsdWallet(supabase, follow.user_id);
-          if (wallet) {
-            const returnAmount = Number(updateData.current_value) || Number(follow.allocated_amount);
-            const { error: walletError } = await supabase.from('wallets').update({
-              available: Number(wallet.available || 0) + returnAmount,
-              reserved: Math.max(0, Number(wallet.reserved || 0) - Number(follow.allocated_amount || 0)),
-            }).eq('id', wallet.id);
-            if (walletError) {
-              followerErrors++;
-              console.error(`[CRON] Error releasing follower ${follow.id} funds:`, walletError);
-              continue;
-            }
-          }
-
-          updatedFollowers++;
+          updatedCopies++;
         }
       }
     }
 
-    console.log(`[CRON] Copy tick complete: ${simulatedTraders} traders, ${generatedTrades} trades, ${updatedFollowers} followers updated`);
+    console.log(`[CRON] P&L tick complete: ${simulatedTraders} traders, ${generatedTrades} trades, ${updatedCopies} copies updated`);
     
     return res.status(200).json({
       success: true,
       activeTraders: (traders || []).length,
       simulatedTraders,
-      skippedTraders,
       generatedTrades,
-      updatedFollowers,
-      closedForRisk,
-      followerErrors,
+      updatedCopies,
       continuous: true,
       timestamp: new Date().toISOString()
     });
