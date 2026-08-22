@@ -70,7 +70,7 @@ export default function TraderProfile() {
           <div className="text-lg font-semibold text-white mb-2">Trader Not Found</div>
           <p className="text-gray-400 mb-4">{error || 'This trader profile is not available'}</p>
           <button
-            onClick={() => navigate('/social')}
+            onClick={() => navigate('/app/social')}
             className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
           >
             Back to Social Trading
@@ -87,7 +87,7 @@ export default function TraderProfile() {
       {/* Header Section */}
       <div className="mb-8">
         <button
-          onClick={() => navigate('/social')}
+          onClick={() => navigate('/app/social')}
           className="text-blue-400 hover:text-blue-300 text-sm mb-4"
         >
           ← Back to Traders

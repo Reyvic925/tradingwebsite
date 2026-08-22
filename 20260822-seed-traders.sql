@@ -1,0 +1,148 @@
+-- Seed a varied trader roster for the copy-trading platform.
+-- Run this file in the Supabase SQL editor.
+-- Safe to rerun: existing traders are matched by name and are not duplicated.
+
+ALTER TABLE IF EXISTS traders
+  ADD COLUMN IF NOT EXISTS country TEXT,
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+  ADD COLUMN IF NOT EXISTS win_rate NUMERIC DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS followers INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS monthly_return NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'Medium',
+  ADD COLUMN IF NOT EXISTS specialty TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS asset_focus TEXT[] DEFAULT '{"BTC-USD", "ETH-USD"}',
+  ADD COLUMN IF NOT EXISTS current_equity NUMERIC DEFAULT 10000,
+  ADD COLUMN IF NOT EXISTS total_return NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS daily_return NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_trades INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS win_rate_trades NUMERIC DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS max_drawdown NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS volatility NUMERIC DEFAULT 0.005,
+  ADD COLUMN IF NOT EXISTS drift NUMERIC DEFAULT 0.001,
+  ADD COLUMN IF NOT EXISTS risk_score INTEGER DEFAULT 5,
+  ADD COLUMN IF NOT EXISTS session_type VARCHAR DEFAULT 'nyc',
+  ADD COLUMN IF NOT EXISTS session_start DATE DEFAULT CURRENT_DATE,
+  ADD COLUMN IF NOT EXISTS session_end DATE DEFAULT (CURRENT_DATE + INTERVAL '7 days'),
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+WITH seed (
+  name, country, avatar_url, bio, asset_focus, session_type,
+  total_return, daily_return, total_trades, win_rate_trades, max_drawdown,
+  volatility, drift, risk_score, risk_level, specialty, followers, monthly_return
+) AS (
+  VALUES
+    ('Sofia Alvarez', 'Spain', 'https://i.pravatar.cc/300?img=47', 'Systematic FX trader focused on disciplined London-session entries and controlled downside.', ARRAY['EUR-USD', 'GBP-USD', 'XAU-USD'], 'london', 34.80, 0.72, 684, 71.40, 11.20, 0.009, 0.0014, 5, 'Medium', 'FX and gold', 842, 6.90),
+    ('Marcus Reed', 'United States', 'https://i.pravatar.cc/300?img=12', 'US equities specialist using momentum and earnings strength during the New York session.', ARRAY['AAPL', 'NVDA', 'TSLA', 'SPX500'], 'nyc', 48.60, 1.05, 921, 68.90, 15.80, 0.013, 0.0018, 6, 'Medium', 'US equities', 1240, 8.40),
+    ('Kenji Watanabe', 'Japan', 'https://i.pravatar.cc/300?img=11', 'Patient Asia-session trader combining crypto liquidity analysis with major currency pairs.', ARRAY['BTC-USD', 'ETH-USD', 'USD-JPY'], 'asia', 27.35, 0.41, 512, 74.20, 8.60, 0.007, 0.0011, 4, 'Low', 'Crypto and FX', 691, 5.30),
+    ('Amara Okafor', 'Nigeria', 'https://i.pravatar.cc/300?img=32', 'High-conviction macro trader who follows commodities, currencies, and global risk sentiment.', ARRAY['XAU-USD', 'USD-JPY', 'WTI', 'SPX500'], 'london', 41.20, 0.88, 738, 66.80, 17.40, 0.016, 0.0016, 7, 'High', 'Macro trading', 975, 7.60),
+    ('Liam Oconnell', 'Ireland', 'https://i.pravatar.cc/300?img=68', 'Conservative portfolio manager prioritizing steady returns and small position sizes.', ARRAY['EUR-USD', 'GBP-USD', 'DAX40'], 'london', 19.75, 0.29, 403, 79.60, 6.90, 0.005, 0.0008, 3, 'Low', 'Conservative FX', 518, 3.80),
+    ('Priya Nair', 'India', 'https://i.pravatar.cc/300?img=44', 'Quantitative crypto trader using volatility bands and strict exposure limits around the clock.', ARRAY['BTC-USD', 'ETH-USD', 'SOL-USD'], 'crypto', 62.40, 1.32, 1186, 72.50, 19.10, 0.021, 0.0022, 8, 'High', 'Crypto quant', 1830, 10.20),
+    ('Daniel Silva', 'Brazil', 'https://i.pravatar.cc/300?img=52', 'Price-action trader specializing in index breakouts and short intraday opportunities.', ARRAY['NASDAQ', 'SPX500', 'USD-BRL'], 'nyc', 38.90, 0.67, 806, 64.70, 14.60, 0.014, 0.0015, 6, 'Medium', 'Indices', 1104, 7.10),
+    ('Elena Petrova', 'Bulgaria', 'https://i.pravatar.cc/300?img=49', 'Technical FX trader combining trend structure with carefully timed London reversals.', ARRAY['GBP-USD', 'EUR-USD', 'GBP-JPY'], 'london', 29.45, 0.56, 597, 70.30, 10.80, 0.010, 0.0012, 5, 'Medium', 'Technical FX', 733, 5.90),
+    ('Noah Williams', 'Canada', 'https://i.pravatar.cc/300?img=13', 'Balanced multi-asset trader with a preference for liquid US shares and precious metals.', ARRAY['MSFT', 'AMZN', 'XAU-USD'], 'nyc', 24.10, 0.36, 455, 69.80, 9.70, 0.008, 0.0010, 4, 'Low', 'Balanced assets', 604, 4.70),
+    ('Fatima Hassan', 'United Arab Emirates', 'https://i.pravatar.cc/300?img=25', 'Active commodities trader focused on gold and energy momentum across global sessions.', ARRAY['XAU-USD', 'BRENT', 'WTI'], 'asia', 53.70, 1.10, 902, 67.10, 18.30, 0.018, 0.0019, 7, 'High', 'Commodities', 1422, 9.30),
+    ('Ethan Brooks', 'Australia', 'https://i.pravatar.cc/300?img=14', '24/7 digital-asset trader seeking liquid setups while keeping leverage measured.', ARRAY['BTC-USD', 'ETH-USD', 'AVAX-USD'], 'crypto', 45.25, 0.93, 1004, 70.90, 16.40, 0.017, 0.0017, 6, 'Medium', 'Digital assets', 1287, 8.10),
+    ('Maya Thompson', 'United Kingdom', 'https://i.pravatar.cc/300?img=45', 'London-session trader using structured entries across sterling, euro, and European indices.', ARRAY['GBP-USD', 'EUR-USD', 'DAX40'], 'london', 31.60, 0.62, 645, 73.10, 12.50, 0.011, 0.0013, 5, 'Medium', 'European markets', 876, 6.40),
+    ('Victor Mensah', 'Ghana', 'https://i.pravatar.cc/300?img=33', 'Day trader combining New York momentum with clear risk limits and repeatable execution.', ARRAY['BTC-USD', 'ETH-USD', 'XAU-USD'], 'nyc', 46.07, 0.46, 890, 69.60, 13.80, 0.010, 0.0015, 5, 'Medium', 'Day trading', 11626, 8.20),
+    ('Lucas Martin', 'France', 'https://i.pravatar.cc/300?img=59', 'Rule-based European trader focused on major FX pairs and low-frequency setups.', ARRAY['EUR-USD', 'USD-CHF', 'CAC40'], 'london', 22.85, 0.33, 376, 77.20, 7.40, 0.006, 0.0009, 3, 'Low', 'Major FX pairs', 439, 4.10),
+    ('Aisha Williams', 'South Africa', 'https://i.pravatar.cc/300?img=31', 'Momentum trader moving between crypto and global indices when liquidity is strongest.', ARRAY['BTC-USD', 'NASDAQ', 'USD-JPY'], 'crypto', 57.30, 1.18, 1098, 65.90, 20.20, 0.023, 0.0020, 8, 'High', 'Momentum', 1596, 9.80),
+    ('Victor', 'Ghana', 'https://xslfgntbpnzvhaxfegap.supabase.co/storage/v1/object/public/trader-avatars/traders/e428ef7e-fe57-4760-91f7-d20ccd6eaac2.jpeg', 'Professional New York day trader focused on BTC, ETH, and gold.', ARRAY['BTC-USD', 'ETH-USD', 'XAU-USD'], 'nyc', 0.46, 0.46, 1, 100.00, 0.00, 0.005, 0.001, 5, 'Medium', 'Day trading', 0, 0.46),
+    ('James Carter', 'United States', 'https://i.pravatar.cc/300?img=3', 'Trend-following trader focused on liquid technology shares and index momentum.', ARRAY['AAPL', 'MSFT', 'NASDAQ'], 'nyc', 36.40, 0.74, 612, 70.20, 12.80, 0.011, 0.0013, 5, 'Medium', 'Tech momentum', 728, 6.80),
+    ('Isabella Rossi', 'Italy', 'https://i.pravatar.cc/300?img=4', 'European market specialist trading currency reversals around major economic releases.', ARRAY['EUR-USD', 'GBP-USD', 'DAX40'], 'london', 26.70, 0.48, 488, 72.60, 9.30, 0.008, 0.0010, 4, 'Low', 'European FX', 584, 5.10),
+    ('Oliver Schmidt', 'Germany', 'https://i.pravatar.cc/300?img=5', 'Structured index trader using measured breakouts and strict daily loss limits.', ARRAY['DAX40', 'CAC40', 'EUR-USD'], 'london', 33.15, 0.59, 571, 68.40, 13.10, 0.012, 0.0012, 5, 'Medium', 'Index breakouts', 667, 6.00),
+    ('Layla Hassan', 'Egypt', 'https://i.pravatar.cc/300?img=6', 'Asia-session currency trader with a focus on yen crosses and gold.', ARRAY['USD-JPY', 'GBP-JPY', 'XAU-USD'], 'asia', 30.25, 0.53, 526, 73.80, 10.40, 0.009, 0.0011, 4, 'Low', 'Yen crosses', 615, 5.70),
+    ('Mateo Garcia', 'Mexico', 'https://i.pravatar.cc/300?img=7', 'Short-term trader combining US index strength with regional currency flows.', ARRAY['SPX500', 'NASDAQ', 'USD-MXN'], 'nyc', 42.80, 0.91, 784, 66.30, 16.70, 0.015, 0.0017, 6, 'Medium', 'Index scalping', 982, 7.90),
+    ('Chloe Bennett', 'New Zealand', 'https://i.pravatar.cc/300?img=8', 'Balanced digital-asset trader looking for liquid setups and controlled volatility.', ARRAY['BTC-USD', 'ETH-USD', 'SOL-USD'], 'crypto', 39.55, 0.82, 873, 71.60, 14.50, 0.014, 0.0015, 5, 'Medium', 'Crypto swing', 904, 7.20),
+    ('Rafael Costa', 'Portugal', 'https://i.pravatar.cc/300?img=9', 'Macro-focused trader blending euro pairs with gold and energy markets.', ARRAY['EUR-USD', 'XAU-USD', 'BRENT'], 'london', 35.90, 0.68, 603, 69.10, 14.20, 0.013, 0.0014, 6, 'Medium', 'Macro commodities', 745, 6.50),
+    ('Hana Kim', 'South Korea', 'https://i.pravatar.cc/300?img=10', 'Asia-session momentum trader specializing in crypto and semiconductor exposure.', ARRAY['BTC-USD', 'ETH-USD', 'NVDA'], 'asia', 51.35, 1.06, 944, 67.80, 18.70, 0.019, 0.0019, 7, 'High', 'Asian momentum', 1186, 8.90),
+    ('Samuel Brown', 'United Kingdom', 'https://i.pravatar.cc/300?img=15', 'Disciplined London trader using multi-timeframe confirmation on major FX pairs.', ARRAY['GBP-USD', 'EUR-USD', 'USD-CHF'], 'london', 18.90, 0.27, 367, 78.10, 6.20, 0.005, 0.0007, 3, 'Low', 'Major FX', 401, 3.60),
+    ('Nadia Ivanova', 'Romania', 'https://i.pravatar.cc/300?img=16', 'Systematic trader seeking repeatable European index and currency patterns.', ARRAY['EUR-USD', 'DAX40', 'CAC40'], 'london', 28.80, 0.44, 519, 74.50, 8.90, 0.007, 0.0010, 4, 'Low', 'Systematic trading', 552, 5.40),
+    ('Diego Herrera', 'Colombia', 'https://i.pravatar.cc/300?img=17', 'High-energy New York trader focused on commodities and US index momentum.', ARRAY['XAU-USD', 'WTI', 'SPX500'], 'nyc', 47.20, 0.98, 817, 65.70, 17.90, 0.017, 0.0018, 7, 'High', 'Commodity momentum', 1099, 8.70),
+    ('Grace Chen', 'Singapore', 'https://i.pravatar.cc/300?img=18', 'Quantitative Asia-session trader balancing digital assets and currency exposure.', ARRAY['BTC-USD', 'USD-JPY', 'ETH-USD'], 'asia', 44.10, 0.87, 756, 72.00, 15.30, 0.015, 0.0016, 6, 'Medium', 'Quantitative FX', 932, 7.80),
+    ('Arthur Johnson', 'United States', 'https://i.pravatar.cc/300?img=19', 'Long-biased equity trader combining earnings momentum with portfolio hedges.', ARRAY['NVDA', 'AMZN', 'MSFT'], 'nyc', 40.65, 0.79, 692, 69.70, 14.90, 0.012, 0.0015, 6, 'Medium', 'Growth equities', 846, 7.00),
+    ('Mila Novak', 'Croatia', 'https://i.pravatar.cc/300?img=20', 'Patient FX trader specializing in clean price structure and low leverage.', ARRAY['EUR-USD', 'GBP-USD', 'USD-JPY'], 'london', 16.45, 0.22, 298, 81.20, 5.80, 0.004, 0.0006, 2, 'Low', 'Low-risk FX', 318, 3.10),
+    ('Omar Farouk', 'Morocco', 'https://i.pravatar.cc/300?img=21', 'Gold and currency specialist trading London and Asia overlap conditions.', ARRAY['XAU-USD', 'EUR-USD', 'USD-JPY'], 'asia', 37.75, 0.71, 641, 70.60, 13.60, 0.012, 0.0014, 5, 'Medium', 'Gold trading', 774, 6.60),
+    ('Emma Wilson', 'Australia', 'https://i.pravatar.cc/300?img=22', 'Crypto trend trader using predefined exits and measured position sizing.', ARRAY['BTC-USD', 'SOL-USD', 'AVAX-USD'], 'crypto', 55.80, 1.12, 1074, 68.50, 19.60, 0.020, 0.0020, 7, 'High', 'Crypto trends', 1368, 9.40),
+    ('Julian Meyer', 'Austria', 'https://i.pravatar.cc/300?img=23', 'European index trader with a preference for patient continuation setups.', ARRAY['DAX40', 'CAC40', 'EUR-USD'], 'london', 25.30, 0.39, 432, 75.40, 8.10, 0.006, 0.0009, 4, 'Low', 'European indices', 467, 4.80),
+    ('Zara Khan', 'Pakistan', 'https://i.pravatar.cc/300?img=24', 'Round-the-clock digital asset trader focusing on liquidity and market structure.', ARRAY['BTC-USD', 'ETH-USD', 'BNB-USD'], 'crypto', 49.70, 0.96, 986, 66.90, 17.50, 0.018, 0.0018, 7, 'High', 'Liquidity trading', 1217, 8.50),
+    ('Benjamin Lee', 'Malaysia', 'https://i.pravatar.cc/300?img=26', 'Asia-session specialist trading technology exposure and major currency pairs.', ARRAY['USD-JPY', 'NVDA', 'BTC-USD'], 'asia', 32.60, 0.57, 584, 71.30, 11.70, 0.010, 0.0012, 5, 'Medium', 'Asia technology', 702, 6.10),
+    ('Lucia Bianchi', 'Switzerland', 'https://i.pravatar.cc/300?img=27', 'Conservative multi-market trader emphasizing capital preservation and consistency.', ARRAY['USD-CHF', 'EUR-USD', 'XAU-USD'], 'london', 14.90, 0.19, 281, 82.40, 4.70, 0.003, 0.0005, 2, 'Low', 'Capital preservation', 289, 2.80),
+    ('Thomas Anderson', 'United States', 'https://i.pravatar.cc/300?img=28', 'New York session trader focused on liquid large-cap stocks and index futures.', ARRAY['AAPL', 'MSFT', 'SPX500'], 'nyc', 30.85, 0.61, 566, 70.10, 10.90, 0.009, 0.0012, 5, 'Medium', 'Large-cap equities', 638, 5.70),
+    ('Yuki Tanaka', 'Japan', 'https://i.pravatar.cc/300?img=29', 'Technical Asia trader using trend continuation on yen pairs and crypto.', ARRAY['USD-JPY', 'GBP-JPY', 'BTC-USD'], 'asia', 43.60, 0.83, 719, 69.40, 15.80, 0.014, 0.0015, 6, 'Medium', 'Technical momentum', 821, 7.40),
+    ('Santiago Ruiz', 'Argentina', 'https://i.pravatar.cc/300?img=30', 'Fast-moving trader specializing in index volatility and breakout confirmation.', ARRAY['NASDAQ', 'SPX500', 'BTC-USD'], 'nyc', 58.45, 1.27, 1139, 63.80, 21.40, 0.024, 0.0021, 9, 'High', 'Volatility breakouts', 1474, 10.60),
+    ('Nora Adams', 'Norway', 'https://i.pravatar.cc/300?img=34', 'Measured commodities trader combining energy trends with currency hedges.', ARRAY['BRENT', 'WTI', 'EUR-USD'], 'london', 29.70, 0.51, 493, 73.60, 10.20, 0.009, 0.0011, 5, 'Medium', 'Energy markets', 526, 5.80),
+    ('Kofi Mensah', 'Ghana', 'https://i.pravatar.cc/300?img=35', 'Disciplined global trader rotating between gold, crypto, and major FX pairs.', ARRAY['XAU-USD', 'BTC-USD', 'GBP-USD'], 'crypto', 46.85, 0.89, 874, 70.80, 16.10, 0.016, 0.0017, 6, 'Medium', 'Global rotation', 1008, 8.00),
+    ('Camila Torres', 'Chile', 'https://i.pravatar.cc/300?img=36', 'New York momentum trader focused on US technology and index leadership.', ARRAY['TSLA', 'NVDA', 'NASDAQ'], 'nyc', 52.15, 1.03, 938, 67.40, 18.90, 0.019, 0.0019, 7, 'High', 'Technology momentum', 1274, 9.10),
+    ('Alexander Petrov', 'Serbia', 'https://i.pravatar.cc/300?img=37', 'Rule-based FX trader using trend filters and conservative exposure.', ARRAY['EUR-USD', 'USD-CHF', 'GBP-USD'], 'london', 21.40, 0.31, 349, 79.30, 6.60, 0.005, 0.0008, 3, 'Low', 'Rule-based FX', 372, 4.00),
+    ('Mariam Diallo', 'Senegal', 'https://i.pravatar.cc/300?img=38', 'Macro trader combining gold, oil, and dollar strength analysis.', ARRAY['XAU-USD', 'WTI', 'USD-JPY'], 'london', 39.25, 0.76, 678, 68.20, 14.80, 0.013, 0.0015, 6, 'Medium', 'Dollar macro', 809, 7.30),
+    ('Henry Scott', 'Scotland', 'https://i.pravatar.cc/300?img=39', 'Low-frequency trader seeking clear setups in European currencies and indices.', ARRAY['GBP-USD', 'EUR-USD', 'DAX40'], 'london', 17.80, 0.24, 317, 80.10, 5.90, 0.004, 0.0007, 3, 'Low', 'Low-frequency FX', 344, 3.40),
+    ('Amina Yusuf', 'Kenya', 'https://i.pravatar.cc/300?img=40', 'Crypto and commodities trader combining momentum signals with strict stops.', ARRAY['BTC-USD', 'ETH-USD', 'XAU-USD'], 'crypto', 50.90, 1.01, 1027, 67.20, 18.40, 0.020, 0.0019, 7, 'High', 'Crypto commodities', 1175, 8.90),
+    ('Robert King', 'United States', 'https://i.pravatar.cc/300?img=41', 'Steady New York equity trader focused on profitable risk-adjusted returns.', ARRAY['AMZN', 'MSFT', 'SPX500'], 'nyc', 23.65, 0.34, 421, 76.80, 8.40, 0.007, 0.0009, 4, 'Low', 'Risk-adjusted equities', 489, 4.50),
+    ('Sakura Ito', 'Japan', 'https://i.pravatar.cc/300?img=42', 'Asia-session trader specializing in yen volatility and digital-asset momentum.', ARRAY['USD-JPY', 'BTC-USD', 'SOL-USD'], 'asia', 48.35, 0.92, 846, 68.70, 16.90, 0.017, 0.0018, 6, 'Medium', 'Yen volatility', 1056, 8.30),
+    ('Clara Dupont', 'France', 'https://i.pravatar.cc/300?img=43', 'European swing trader using clean support and resistance across liquid markets.', ARRAY['EUR-USD', 'CAC40', 'XAU-USD'], 'london', 27.15, 0.43, 462, 74.10, 9.60, 0.008, 0.0010, 4, 'Low', 'European swing', 533, 5.20),
+    ('Michael Evans', 'Ireland', 'https://i.pravatar.cc/300?img=46', 'New York trader combining US stock momentum with gold as a defensive hedge.', ARRAY['NVDA', 'AAPL', 'XAU-USD'], 'nyc', 37.45, 0.69, 644, 70.50, 12.60, 0.011, 0.0013, 5, 'Medium', 'Hedged momentum', 716, 6.70),
+    ('Rina Das', 'Bangladesh', 'https://i.pravatar.cc/300?img=48', 'Systematic crypto trader with a focus on liquidity, spreads, and controlled exposure.', ARRAY['BTC-USD', 'ETH-USD', 'MATIC-USD'], 'crypto', 42.25, 0.81, 932, 71.90, 14.70, 0.015, 0.0016, 6, 'Medium', 'Crypto systems', 982, 7.60),
+    ('George Miller', 'United States', 'https://i.pravatar.cc/300?img=50', 'Index trader using opening-range setups during the most liquid New York hours.', ARRAY['SPX500', 'NASDAQ', 'TSLA'], 'nyc', 45.70, 0.94, 801, 66.10, 17.20, 0.016, 0.0017, 7, 'High', 'Opening range', 1132, 8.40),
+    ('Ana Silva', 'Portugal', 'https://i.pravatar.cc/300?img=51', 'Careful London-session trader specializing in euro and sterling price action.', ARRAY['EUR-USD', 'GBP-USD', 'GBP-JPY'], 'london', 20.65, 0.30, 388, 78.70, 7.20, 0.005, 0.0008, 3, 'Low', 'Sterling price action', 421, 3.90),
+    ('Musa Kamara', 'Sierra Leone', 'https://i.pravatar.cc/300?img=53', 'Global macro trader using commodities and currencies to follow inflation trends.', ARRAY['XAU-USD', 'BRENT', 'EUR-USD'], 'asia', 34.35, 0.64, 577, 69.90, 12.10, 0.010, 0.0013, 5, 'Medium', 'Inflation themes', 648, 6.20),
+    ('Sophie Laurent', 'Belgium', 'https://i.pravatar.cc/300?img=54', 'European market trader blending index continuation with disciplined FX entries.', ARRAY['DAX40', 'EUR-USD', 'CAC40'], 'london', 24.75, 0.37, 439, 75.80, 8.70, 0.007, 0.0009, 4, 'Low', 'European continuation', 477, 4.60),
+    ('William Taylor', 'United Kingdom', 'https://i.pravatar.cc/300?img=55', 'Experienced FX trader focused on repeatable setups and stable daily performance.', ARRAY['GBP-USD', 'EUR-USD', 'USD-CHF'], 'london', 28.35, 0.46, 508, 73.40, 9.80, 0.008, 0.0010, 4, 'Low', 'Stable FX', 579, 5.20),
+    ('Nia Robinson', 'Jamaica', 'https://i.pravatar.cc/300?img=56', 'New York session trader following US indices and high-volume equity rotations.', ARRAY['NASDAQ', 'SPX500', 'AMZN'], 'nyc', 40.30, 0.77, 717, 67.90, 15.60, 0.014, 0.0015, 6, 'Medium', 'Equity rotation', 874, 7.10),
+    ('Andrei Popescu', 'Romania', 'https://i.pravatar.cc/300?img=57', 'Technical trader focused on European currencies and structured breakout levels.', ARRAY['EUR-USD', 'USD-CHF', 'DAX40'], 'london', 31.05, 0.55, 552, 71.70, 11.30, 0.009, 0.0012, 5, 'Medium', 'Technical breakouts', 619, 5.90),
+    ('Mei Lin', 'Taiwan', 'https://i.pravatar.cc/300?img=58', 'Asia-session trader combining semiconductor equities with crypto trend analysis.', ARRAY['NVDA', 'BTC-USD', 'ETH-USD'], 'asia', 54.25, 1.09, 978, 66.70, 19.80, 0.021, 0.0020, 8, 'High', 'Semiconductor trends', 1339, 9.70),
+    ('Jonas Berg', 'Sweden', 'https://i.pravatar.cc/300?img=60', 'Conservative European trader seeking low-volatility currency opportunities.', ARRAY['EUR-USD', 'USD-CHF', 'GBP-USD'], 'london', 13.85, 0.17, 246, 83.10, 4.30, 0.003, 0.0005, 2, 'Low', 'Low-volatility FX', 264, 2.50),
+    ('Hugo Martinez', 'Spain', 'https://i.pravatar.cc/300?img=61', 'Intraday trader focused on index momentum and fast but controlled execution.', ARRAY['NASDAQ', 'DAX40', 'SPX500'], 'nyc', 46.55, 0.86, 889, 65.40, 18.20, 0.018, 0.0018, 7, 'High', 'Index momentum', 1180, 8.20),
+    ('Fatou Ndiaye', 'Senegal', 'https://i.pravatar.cc/300?img=62', 'Multi-asset trader using gold and currencies to express global macro views.', ARRAY['XAU-USD', 'USD-JPY', 'GBP-USD'], 'asia', 33.90, 0.63, 602, 70.70, 12.90, 0.011, 0.0013, 5, 'Medium', 'Global macro', 693, 6.10),
+    ('Leo Zhang', 'China', 'https://i.pravatar.cc/300?img=63', 'Digital-asset trader focused on liquid markets and systematic trend participation.', ARRAY['BTC-USD', 'ETH-USD', 'SOL-USD'], 'crypto', 60.15, 1.24, 1216, 67.60, 20.80, 0.022, 0.0021, 8, 'High', 'Digital trends', 1704, 10.10),
+    ('Eva Hansen', 'Denmark', 'https://i.pravatar.cc/300?img=64', 'Patient trader specializing in European currencies and measured position sizing.', ARRAY['EUR-USD', 'GBP-USD', 'USD-CHF'], 'london', 18.25, 0.26, 335, 80.40, 5.50, 0.004, 0.0007, 3, 'Low', 'Measured FX', 356, 3.50),
+    ('Daniel Okoro', 'Nigeria', 'https://i.pravatar.cc/300?img=65', 'Commodities trader using energy and gold momentum across global market hours.', ARRAY['WTI', 'BRENT', 'XAU-USD'], 'crypto', 47.95, 0.97, 913, 68.10, 17.60, 0.018, 0.0018, 7, 'High', 'Energy momentum', 1096, 8.60),
+    ('Maria Gonzalez', 'Peru', 'https://i.pravatar.cc/300?img=66', 'US equity trader combining large-cap strength with index confirmation.', ARRAY['AAPL', 'AMZN', 'SPX500'], 'nyc', 35.35, 0.66, 594, 72.20, 11.90, 0.010, 0.0013, 5, 'Medium', 'Large-cap momentum', 687, 6.30),
+    ('Peter Walsh', 'Ireland', 'https://i.pravatar.cc/300?img=67', 'Risk-aware London trader specializing in major FX pairs and clear exits.', ARRAY['EUR-USD', 'GBP-USD', 'DAX40'], 'london', 15.70, 0.20, 273, 82.00, 4.90, 0.003, 0.0006, 2, 'Low', 'Risk-aware FX', 298, 2.90),
+    ('Alina Georgescu', 'Moldova', 'https://i.pravatar.cc/300?img=69', 'Technical European trader combining currency trends with index confirmation.', ARRAY['EUR-USD', 'DAX40', 'USD-CHF'], 'london', 27.90, 0.42, 475, 74.80, 9.10, 0.007, 0.0010, 4, 'Low', 'Currency trends', 513, 5.00),
+    ('Kwame Boateng', 'Ghana', 'https://i.pravatar.cc/300?img=70', 'Global trader balancing crypto momentum with gold and dollar exposure.', ARRAY['BTC-USD', 'XAU-USD', 'USD-JPY'], 'crypto', 52.75, 1.07, 1058, 66.50, 19.30, 0.020, 0.0020, 8, 'High', 'Balanced momentum', 1260, 9.20),
+    ('Rachel Green', 'United States', 'https://i.pravatar.cc/300?img=71', 'New York trader specializing in repeatable equity and index continuation patterns.', ARRAY['MSFT', 'NVDA', 'NASDAQ'], 'nyc', 32.40, 0.58, 621, 71.00, 12.40, 0.010, 0.0012, 5, 'Medium', 'Continuation trading', 731, 6.00),
+    ('Arjun Mehta', 'India', 'https://i.pravatar.cc/300?img=72', '24/7 crypto trader using algorithmic entries and strict position limits.', ARRAY['BTC-USD', 'ETH-USD', 'AVAX-USD'], 'crypto', 56.65, 1.15, 1142, 69.20, 18.80, 0.019, 0.0020, 7, 'High', 'Algorithmic crypto', 1492, 9.80),
+    ('Laura Costa', 'Brazil', 'https://i.pravatar.cc/300?img=73', 'New York trader focused on indices, energy, and short-term market catalysts.', ARRAY['SPX500', 'NASDAQ', 'WTI'], 'nyc', 43.85, 0.84, 752, 67.50, 15.10, 0.015, 0.0016, 6, 'Medium', 'Market catalysts', 886, 7.50),
+    ('Nikolai Volkov', 'Kazakhstan', 'https://i.pravatar.cc/300?img=74', 'Asia-session trader combining commodities with major currency trend signals.', ARRAY['XAU-USD', 'USD-JPY', 'BRENT'], 'asia', 38.40, 0.73, 638, 70.00, 14.00, 0.013, 0.0014, 6, 'Medium', 'Commodity trends', 742, 6.90),
+    ('Sienna Moore', 'United Kingdom', 'https://i.pravatar.cc/300?img=75', 'London trader focused on sterling volatility and clean technical structures.', ARRAY['GBP-USD', 'GBP-JPY', 'EUR-GBP'], 'london', 30.10, 0.50, 544, 72.80, 10.70, 0.009, 0.0011, 5, 'Medium', 'Sterling volatility', 601, 5.60),
+    ('Diego Fernandez', 'Uruguay', 'https://i.pravatar.cc/300?img=76', 'Disciplined index trader who favors selective high-probability New York setups.', ARRAY['NASDAQ', 'SPX500', 'AAPL'], 'nyc', 26.25, 0.40, 463, 76.10, 8.80, 0.007, 0.0009, 4, 'Low', 'Selective indices', 489, 4.90),
+    ('Mina Park', 'South Korea', 'https://i.pravatar.cc/300?img=77', 'Asia-session crypto trader focused on liquid pairs and controlled risk exposure.', ARRAY['BTC-USD', 'ETH-USD', 'SOL-USD'], 'crypto', 41.75, 0.80, 816, 71.80, 13.70, 0.014, 0.0015, 6, 'Medium', 'Liquid crypto', 944, 7.00),
+    ('Adrian King', 'Canada', 'https://i.pravatar.cc/300?img=78', 'Balanced trader using gold and US equities to manage changing market regimes.', ARRAY['XAU-USD', 'MSFT', 'SPX500'], 'nyc', 22.60, 0.35, 397, 77.50, 7.90, 0.006, 0.0008, 4, 'Low', 'Regime rotation', 418, 4.30),
+    ('Selam Tesfaye', 'Ethiopia', 'https://i.pravatar.cc/300?img=79', 'Global macro trader focused on currencies, gold, and disciplined capital allocation.', ARRAY['EUR-USD', 'XAU-USD', 'USD-JPY'], 'asia', 36.75, 0.70, 687, 69.50, 13.40, 0.012, 0.0014, 5, 'Medium', 'Capital allocation', 763, 6.70),
+    ('Maximilian Bauer', 'Germany', 'https://i.pravatar.cc/300?img=80', 'European index specialist using volatility compression and breakout confirmation.', ARRAY['DAX40', 'CAC40', 'EUR-USD'], 'london', 45.15, 0.90, 731, 66.80, 16.50, 0.016, 0.0017, 7, 'High', 'Volatility compression', 915, 8.00),
+    ('Irene Garcia', 'Spain', 'https://i.pravatar.cc/300?img=81', 'Steady London-session FX trader with a strong focus on risk consistency.', ARRAY['EUR-USD', 'GBP-USD', 'USD-CHF'], 'london', 12.95, 0.16, 224, 84.20, 3.90, 0.002, 0.0004, 2, 'Low', 'Consistent FX', 241, 2.30),
+    ('Jamal Williams', 'United States', 'https://i.pravatar.cc/300?img=82', 'Fast New York trader specializing in technology stocks and index momentum.', ARRAY['TSLA', 'NVDA', 'NASDAQ'], 'nyc', 50.35, 1.08, 967, 64.90, 20.10, 0.022, 0.0020, 8, 'High', 'High-growth stocks', 1317, 9.50),
+    ('Lena Fischer', 'Germany', 'https://i.pravatar.cc/300?img=83', 'Methodical European trader combining currency structure with index confirmation.', ARRAY['EUR-USD', 'DAX40', 'USD-CHF'], 'london', 23.20, 0.32, 406, 78.00, 7.00, 0.005, 0.0008, 3, 'Low', 'Methodical trading', 434, 4.20),
+    ('Tariq Rahman', 'Bangladesh', 'https://i.pravatar.cc/300?img=84', 'Round-the-clock trader combining crypto momentum with major market trends.', ARRAY['BTC-USD', 'ETH-USD', 'NASDAQ'], 'crypto', 59.30, 1.20, 1198, 67.30, 21.00, 0.023, 0.0021, 8, 'High', 'Cross-market momentum', 1625, 10.30),
+    ('Helena Costa', 'Brazil', 'https://i.pravatar.cc/300?img=85', 'New York commodities trader focused on gold, oil, and dollar direction.', ARRAY['XAU-USD', 'WTI', 'USD-BRL'], 'nyc', 33.55, 0.60, 582, 71.60, 12.00, 0.010, 0.0012, 5, 'Medium', 'Dollar commodities', 649, 6.00),
+    ('Marek Kowalski', 'Poland', 'https://i.pravatar.cc/300?img=86', 'European trader focused on measured index trades and major currency pairs.', ARRAY['DAX40', 'EUR-USD', 'GBP-USD'], 'london', 19.35, 0.28, 354, 79.00, 6.40, 0.005, 0.0007, 3, 'Low', 'Measured indices', 382, 3.70),
+    ('Aya Nakamura', 'Japan', 'https://i.pravatar.cc/300?img=87', 'Asia-session trader using currency momentum and highly liquid crypto markets.', ARRAY['USD-JPY', 'BTC-USD', 'ETH-USD'], 'asia', 47.65, 0.95, 905, 68.90, 17.00, 0.017, 0.0018, 6, 'Medium', 'Liquid momentum', 1094, 8.50),
+    ('Ruben Morales', 'Venezuela', 'https://i.pravatar.cc/300?img=88', 'Tactical trader focused on short-term US index opportunities and gold.', ARRAY['SPX500', 'NASDAQ', 'XAU-USD'], 'nyc', 39.80, 0.78, 703, 66.40, 15.40, 0.014, 0.0015, 6, 'Medium', 'Tactical markets', 811, 7.00),
+    ('Mariam El-Sayed', 'Egypt', 'https://i.pravatar.cc/300?img=89', 'Asia-session macro trader following gold, yen, and global risk sentiment.', ARRAY['XAU-USD', 'USD-JPY', 'BTC-USD'], 'asia', 31.85, 0.52, 548, 72.10, 11.60, 0.010, 0.0012, 5, 'Medium', 'Risk sentiment', 627, 5.90),
+    ('Theo Martin', 'France', 'https://i.pravatar.cc/300?img=90', 'Low-frequency European trader seeking stable outcomes from clean market structure.', ARRAY['EUR-USD', 'CAC40', 'DAX40'], 'london', 11.80, 0.14, 198, 85.10, 3.50, 0.002, 0.0004, 2, 'Low', 'Stable structure', 208, 2.10)
+)
+INSERT INTO traders (
+  name, country, avatar_url, bio, asset_focus, session_type,
+  current_equity, total_return, daily_return, total_trades, win_rate_trades,
+  max_drawdown, volatility, drift, risk_score, risk_level, specialty,
+  followers, monthly_return, is_active, session_start, session_end
+)
+SELECT
+  seed.name, seed.country, seed.avatar_url, seed.bio, seed.asset_focus, seed.session_type,
+  ROUND((10000 * (1 + seed.total_return / 100))::numeric, 2), seed.total_return, seed.daily_return,
+  seed.total_trades, seed.win_rate_trades, seed.max_drawdown, seed.volatility, seed.drift,
+  seed.risk_score, seed.risk_level, seed.specialty, seed.followers, seed.monthly_return,
+  true, CURRENT_DATE, CURRENT_DATE + INTERVAL '365 days'
+FROM seed
+WHERE NOT EXISTS (
+  SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(seed.name)
+)
+ORDER BY seed.name
+LIMIT GREATEST(0, 70 - (SELECT COUNT(*) FROM traders));
+
+SELECT id, name, session_type, asset_focus, total_return, risk_score
+FROM traders
+ORDER BY total_return DESC, name ASC;

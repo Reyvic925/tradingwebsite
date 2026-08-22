@@ -13,7 +13,12 @@ const missingMsg = 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_S
 let supabase: any;
 
 if (url && anon) {
-  supabase = createClient(url, anon);
+  supabase = createClient(url, anon, {
+    auth: {
+      persistSession: true,
+      storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    },
+  });
 } else {
   console.warn('[apex-prime] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — running in local demo mode with an in-memory backend.');
 
@@ -46,7 +51,7 @@ if (url && anon) {
 
   const readDemoSession = () => {
     try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DEMO_KEY) : null;
+      const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(DEMO_KEY) : null;
       const parsed = raw ? JSON.parse(raw) : null;
       return parsed && parsed.access_token ? parsed : null;
     } catch {
@@ -56,8 +61,8 @@ if (url && anon) {
 
   const writeDemoSession = (session: unknown | null) => {
     try {
-      if (session) localStorage.setItem(DEMO_KEY, JSON.stringify(session));
-      else localStorage.removeItem(DEMO_KEY);
+      if (session) sessionStorage.setItem(DEMO_KEY, JSON.stringify(session));
+      else sessionStorage.removeItem(DEMO_KEY);
     } catch { /* storage unavailable — session stays in-memory */ }
   };
 
