@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminShell from '../../components/AdminShell';
-import { Plus, Edit2, Save, X, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit2, Save, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
 import { authHeaders } from '../../lib/api';
 import type { Trader } from '../../types';
@@ -93,6 +93,26 @@ export default function AdminTraders() {
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to update trader visibility');
+      }
+      await fetchTraders();
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  };
+
+  const handleDelete = async (trader: Trader) => {
+    if (!confirm(`Remove ${trader.name} from the trader roster? This keeps its history but hides it from users.`)) return;
+
+    try {
+      const response = await fetch(`/api/traders?id=${trader.id}`, {
+        method: 'DELETE',
+        headers: await authHeaders()
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete trader');
       }
       await fetchTraders();
       setError('');
@@ -455,6 +475,13 @@ export default function AdminTraders() {
                       title={trader.is_active ? 'Remove from leaderboard' : 'Add to leaderboard'}
                     >
                       {trader.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(trader)}
+                      className="p-2 text-red-400 hover:bg-red-500/10 rounded transition"
+                      title="Delete trader"
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </td>
