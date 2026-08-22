@@ -54,11 +54,16 @@ export default async function handler(req, res) {
   try {
     // GET: Fetch active traders, sorted by total_return
     if (req.method === 'GET') {
-      const { session, asset, include_inactive } = req.query;
+      const { id, session, asset, include_inactive } = req.query;
       let query = supabase
         .from('traders')
         .select('*')
         .order('total_return', { ascending: false });
+
+      if (id) {
+        if (!/^\d+$/.test(String(id))) return res.status(400).json({ error: 'Trader ID must be an integer' });
+        query = query.eq('id', id);
+      }
 
       if (include_inactive === '1') {
         const admin = await requireAdmin(req);

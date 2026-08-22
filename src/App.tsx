@@ -11,6 +11,7 @@ import Invest from './pages/Invest';
 import InvestmentDetail from './pages/InvestmentDetail';
 import Wallet from './pages/Wallet';
 import Social from './pages/Social';
+import TraderProfile from './pages/TraderProfile';
 import Referrals from './pages/Referrals';
 import History from './pages/History';
 import Profile from './pages/Profile';
@@ -116,6 +117,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Social />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/trader/:traderId"
+            element={
+              <ProtectedRoute>
+                <TraderProfile />
               </ProtectedRoute>
             }
           />

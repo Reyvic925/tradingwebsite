@@ -28,6 +28,7 @@ export default function TraderProfile() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
   const { trades } = useTraderTrades(traderId as string);
   const { followTrader } = useCopyTrading();
   const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
@@ -37,14 +38,12 @@ export default function TraderProfile() {
     const fetchTrader = async () => {
       try {
         setLoading(true);
-        // You'd implement this endpoint
-        // const response = await fetch(`/api/traders/${traderId}`);
-        // if (!response.ok) throw new Error('Trader not found');
-        // const data = await response.json();
-        // setTrader(data);
-        
-        // For now, placeholder
-        console.log('Fetch trader:', traderId);
+        const response = await fetch(`/api/traders?id=${traderId}`);
+        if (!response.ok) throw new Error('Trader not found');
+        const data = await response.json();
+        const traderData = Array.isArray(data) ? data[0] : data;
+        if (!traderData) throw new Error('Trader not found');
+        setTrader(traderData);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -222,21 +221,30 @@ export default function TraderProfile() {
         </div>
       )}
 
-      {/* Live Trade Feed */}
+      {/* Trading activity */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold text-white mb-4">Live Trade Feed</h2>
+        <div className="mb-4 flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Trading activity</h2>
+            <p className="mt-1 text-xs text-gray-500">BUY and SELL activity for {trader.name}'s configured assets</p>
+          </div>
+          <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
+        </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {trades && trades.length > 0 ? (
             trades.map((trade: TradeLog) => {
               const isProfitable = (trade.pnl || 0) > 0;
               return (
-                <div
+                <button
+                  type="button"
                   key={trade.id}
+                  onClick={() => setSelectedTrade(trade)}
+                  aria-label={`View ${trade.side} ${trade.symbol} trade details`}
                   className={`p-3 rounded-lg border flex items-center justify-between transition ${
                     isProfitable
                       ? 'bg-emerald-500/10 border-emerald-500/30'
                       : 'bg-red-500/10 border-red-500/30'
-                  }`}
+                  } w-full text-left hover:border-white/30`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`px-3 py-1 rounded text-xs font-bold ${
@@ -268,7 +276,7 @@ export default function TraderProfile() {
                       {trade.status === 'CLOSED' ? 'Closed' : 'Open'}
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })
           ) : (
@@ -279,6 +287,34 @@ export default function TraderProfile() {
           )}
         </div>
       </div>
+
+      {selectedTrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setSelectedTrade(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedTrade.side} ${selectedTrade.symbol} trade details`}
+            className="w-full max-w-lg rounded-xl border border-white/10 bg-[#0b111a] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Trade details</div>
+                <h2 className="mt-1 text-xl font-bold text-white">{selectedTrade.symbol}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedTrade(null)} className="text-sm text-gray-400 hover:text-white">Close</button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Side</div><div className="mt-1 font-semibold text-white">{selectedTrade.side}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-semibold text-white">{selectedTrade.status}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{formatMoney(selectedTrade.entry_price)}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit price</div><div className="mt-1 font-mono text-white">{selectedTrade.exit_price ? formatMoney(selectedTrade.exit_price) : 'Open'}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Quantity</div><div className="mt-1 font-mono text-white">{Number(selectedTrade.quantity).toFixed(4)}</div></div>
+              <div className={`rounded-lg border p-3 ${(selectedTrade.pnl || 0) >= 0 ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-xs text-gray-500">Profit / loss</div><div className="mt-1 font-mono text-white">{(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{formatMoney(selectedTrade.pnl || 0)} ({(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{Number(selectedTrade.pnl_percent || 0).toFixed(2)}%)</div></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Information Box */}
       <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">

@@ -9,6 +9,7 @@
 import supabase from './db-client.js';
 import { calculateCopyFollowerValue } from './copy-trading-tick.js';
 import {
+  isTraderEligible,
   calculateMarketChange,
   generateRealisticEntryPrice
 } from './session-utils.js';
@@ -35,11 +36,18 @@ export default async function handler(req, res) {
     if (traderError) throw traderError;
 
     let simulatedTraders = 0;
+    let skippedTraders = 0;
     let generatedTrades = 0;
     let updatedCopies = 0;
 
     // Step 2: Process each trader
     for (const trader of traders || []) {
+      if (!isTraderEligible(trader)) {
+        skippedTraders++;
+        console.log(`[CRON] Skipping ${trader.id} (${trader.name}): ${trader.session_type} session is closed`);
+        continue;
+      }
+
       console.log(`[CRON] Processing trader ${trader.id} (${trader.name})`);
       simulatedTraders++;
 
@@ -54,7 +62,9 @@ export default async function handler(req, res) {
       // Step 2B: Record the completed BUY or SELL that produced this P&L tick.
       if (Math.abs(pnlDelta) > 0.01) {
         const isProfit = pnlDelta > 0;
-        const assetList = trader.asset_focus || ['BTC-USD', 'ETH-USD', 'AAPL', 'MSFT'];
+        const assetList = Array.isArray(trader.asset_focus) && trader.asset_focus.length > 0
+          ? trader.asset_focus
+          : ['BTC-USD', 'ETH-USD', 'AAPL', 'MSFT'];
         const symbol = assetList[Math.floor(Math.random() * assetList.length)];
 
         // Get or simulate current price
@@ -165,6 +175,7 @@ export default async function handler(req, res) {
       success: true,
       activeTraders: (traders || []).length,
       simulatedTraders,
+      skippedTraders,
       generatedTrades,
       updatedCopies,
       continuous: true,

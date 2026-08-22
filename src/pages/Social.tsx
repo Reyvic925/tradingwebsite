@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import {
   useTraders,
@@ -354,7 +355,9 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
               className="h-12 w-12 rounded-full object-cover"
             />
             <div>
-              <div className="text-sm font-semibold text-white">{trader.name}</div>
+              <Link to={`/app/trader/${trader.id}`} className="text-sm font-semibold text-white hover:text-emerald-300">
+                {trader.name}
+              </Link>
               <div className="text-xs text-gray-500">{badge.emoji} {badge.label}</div>
             </div>
           </div>
