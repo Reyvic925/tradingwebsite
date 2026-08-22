@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMoney } from '../lib/format';
+import { getMarketStatus, getSessionLabel } from '../lib/session-utils';
 import type { Trader, TradeLog } from '../types';
 
 /**
@@ -26,6 +27,7 @@ export default function TraderProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
+  const [, refreshStatus] = useState(Date.now());
   const { trades, error: tradesError } = useTraderTrades(traderId as string);
   const { followTrader } = useCopyTrading();
   const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
@@ -52,6 +54,11 @@ export default function TraderProfile() {
       fetchTrader();
     }
   }, [traderId]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => refreshStatus(Date.now()), 60000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   if (loading) {
     return (
@@ -82,6 +89,8 @@ export default function TraderProfile() {
   }
 
   const isProfit = trader.total_return >= 0;
+  const marketStatus = getMarketStatus(trader.session_type);
+  const sessionOpen = marketStatus.status === 'Live';
   const startingEquity = 10000;
   const currentEquity = Number(trader.current_equity || startingEquity);
   const equityCurve = Array.from({ length: 7 }, (_, index) => ({
@@ -115,7 +124,10 @@ export default function TraderProfile() {
                   Badge: <span className="text-amber-300">{trader.badge || 'Gold'}</span>
                 </span>
                 <span className="text-gray-500">
-                  Session: <span className="text-white capitalize">{trader.session_type}</span>
+                  Session: <span className="text-white">{getSessionLabel(trader.session_type)}</span>
+                  <span className={sessionOpen ? 'ml-2 text-emerald-400' : 'ml-2 text-gray-500'}>
+                    {sessionOpen ? 'Open' : 'Closed'}
+                  </span>
                 </span>
                 <span className="text-gray-500">
                   Risk: <span className="text-white">{trader.risk_score}/10</span>

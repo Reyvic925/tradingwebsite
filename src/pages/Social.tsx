@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
 import { apiGet } from '../lib/api';
+import { getMarketStatus } from '../lib/session-utils';
 import type { Trader, UserFollow, Wallet } from '../types';
 
 // Follow Modal Component
@@ -328,7 +329,13 @@ function PortfolioSummary() {
 // Trader Card Component
 function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [, refreshStatus] = useState(Date.now());
   const isProfit = trader.total_return >= 0;
+
+  useEffect(() => {
+    const interval = window.setInterval(() => refreshStatus(Date.now()), 60000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const getSessionBadge = (sessionType: string) => {
     const badges: Record<string, any> = {
@@ -343,6 +350,8 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
   };
 
   const badge = getSessionBadge(trader.session_type);
+  const marketStatus = getMarketStatus(trader.session_type);
+  const sessionOpen = marketStatus.status === 'Live';
 
   return (
     <>
@@ -365,6 +374,10 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
                 {trader.name}
               </Link>
               <div className="text-xs text-gray-500">{badge.emoji} {badge.label}</div>
+              <div className={`mt-1 text-[10px] uppercase tracking-wider ${sessionOpen ? 'text-emerald-400' : 'text-gray-500'}`}>
+                <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${sessionOpen ? 'bg-emerald-400' : 'bg-gray-600'}`} />
+                {sessionOpen ? 'Open' : 'Closed'}
+              </div>
             </div>
           </div>
         </div>
