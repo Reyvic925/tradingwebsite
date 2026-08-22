@@ -27,6 +27,7 @@ import type { Feature, Market, Partner, Plan, Stat, Testimonial } from '../types
 import { formatPct, formatPrice } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { isSignupConfirmationCallback } from '../lib/supabase';
+import { isTraderEligible } from '../lib/session-utils';
 
 const PARTNER_LOGOS: Record<string, string> = {
   JPMorgan: '/logos/jpmorgan.svg',
@@ -140,6 +141,7 @@ const fallbackFeatures: Feature[] = [
 
 export default function Landing() {
   const { user, loading: authLoading } = useAuth();
+  const [openSessions, setOpenSessions] = useState<string[]>([]);
   const [features, setFeatures] = useState<Feature[]>(fallbackFeatures);
   const [partners, setPartners] = useState<Partner[]>(fallbackPartners);
   const [stats, setStats] = useState<Stat[]>([]);
@@ -149,6 +151,21 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeVid, setActiveVid] = useState<Testimonial | null>(null);
+
+  useEffect(() => {
+    const updateOpenSessions = () => {
+      const sessions = [
+        { type: 'nyc', label: 'NY' },
+        { type: 'london', label: 'LDN' },
+        { type: 'asia', label: 'SG' },
+      ];
+      setOpenSessions(sessions.filter((session) => isTraderEligible({ session_type: session.type })).map((session) => session.label));
+    };
+
+    updateOpenSessions();
+    const interval = window.setInterval(updateOpenSessions, 60000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -240,7 +257,7 @@ export default function Landing() {
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-black/30 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-amber-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Markets open · NY · LDN · SG
+              {openSessions.length > 0 ? `Markets open · ${openSessions.join(' · ')}` : 'Markets closed · NY · LDN · SG'}
             </div>
             <h1 className="mt-6 max-w-5xl font-display text-5xl leading-[0.95] sm:text-7xl lg:text-8xl">
               Trade Like a Pro,{' '}
