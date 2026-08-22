@@ -355,21 +355,23 @@ async function fetchLiveYahooPrices(symbols) {
       if (result.status !== 'fulfilled' || !result.value) return;
       const quote = result.value;
       if (!quote?.symbol || quote.regularMarketPrice === undefined) return;
-      const lookup = Object.entries(YAHOO_SYMBOL_MAP).find(([ourSymbol, yahooSym]) => {
-        if (yahooSym === quote.symbol) return true;
-        if (typeof yahooSym === 'string' && yahooSym.endsWith('=X') && quote.symbol.startsWith(yahooSym.slice(0, -2))) return true;
-        return false;
-      });
-
-      const targetSymbol = lookup ? lookup[0] : null;
-      if (targetSymbol) {
-        priceMap[targetSymbol] = {
+      const quoteData = {
           price: quote.regularMarketPrice,
           change_24h: quote.regularMarketChangePercent || 0,
           high_24h: quote.fiftyTwoWeekHigh || quote.regularMarketPrice,
           low_24h: quote.fiftyTwoWeekLow || quote.regularMarketPrice,
           volume: quote.regularMarketVolume || 0,
-        };
+      };
+      const targetSymbols = symbols.filter((ourSymbol) => {
+        const yahooSymbol = YAHOO_SYMBOL_MAP[ourSymbol] || ourSymbol;
+        if (yahooSymbol === quote.symbol) return true;
+        return typeof yahooSymbol === 'string' && yahooSymbol.endsWith('=X') && quote.symbol.startsWith(yahooSymbol.slice(0, -2));
+      });
+
+      if (targetSymbols.length) {
+        targetSymbols.forEach((targetSymbol) => {
+          priceMap[targetSymbol] = quoteData;
+        });
         return;
       }
 
@@ -629,8 +631,11 @@ export default async function handler(req, res) {
       if (countErr && !isMissingSchemaError(countErr)) {
         throw countErr;
       }
-      if (!count || count < 1000) {
-        console.log(`Markets table count ${count || 0} below threshold, calling ensureUniverse()...`);
+      const requiredSymbols = ['USOIL', 'XAUUSD', 'GER40', 'UK100', 'JPN225', 'US500', 'NAS100', 'TRUMPUSD', 'JTOUSD', 'RAYUSD', 'EURCAD'];
+      const { data: requiredRows } = await supabase.from('markets').select('symbol').in('symbol', requiredSymbols);
+      const missingRequiredSymbols = requiredSymbols.some((required) => !(requiredRows || []).some((row) => row.symbol === required));
+      if (!count || count < 1000 || missingRequiredSymbols) {
+        console.log(`Markets universe incomplete (count=${count || 0}, missing required=${missingRequiredSymbols}), calling ensureUniverse()...`);
         await ensureUniverse();
         console.log('ensureUniverse() completed');
       }
