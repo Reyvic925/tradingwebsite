@@ -15,7 +15,7 @@ import {
   calculateMarketChange,
   generateRealisticEntryPrice,
   checkNotificationTrigger
-} from '../src/lib/session-utils.js';
+} from './session-utils.js';
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
