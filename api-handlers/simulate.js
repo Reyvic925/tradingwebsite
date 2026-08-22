@@ -122,11 +122,12 @@ export default async function handler(req, res) {
       }
 
       // Step 2C: Update trader equity and daily return.
+      const allTimeReturn = Number(trader.total_return || 0) + ((newEquity - oldEquity) / 10000) * 100;
       const { error: updateError } = await supabase
         .from('traders')
         .update({
           current_equity: Number(newEquity.toFixed(2)),
-          total_return: (((newEquity - 10000) / 10000) * 100).toFixed(2),
+          total_return: Number(allTimeReturn.toFixed(2)),
           daily_return: Number(changePercent * 100).toFixed(2),
           updated_at: new Date().toISOString()
         })

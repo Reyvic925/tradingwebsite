@@ -23,7 +23,7 @@ import {
   Activity,
   ShieldCheck
 } from 'lucide-react';
-import { formatMoney } from '../lib/format';
+import { formatMoney, formatPct } from '../lib/format';
 import { apiGet } from '../lib/api';
 import type { Trader, UserFollow, Wallet } from '../types';
 
@@ -250,7 +250,7 @@ function LeaderboardSection() {
               </div>
             </div>
             <div className="text-2xl font-bold text-emerald-400 mb-2">
-              {formatMoney(Number(trader.total_return || 0))}
+              {formatPct(Number(trader.total_return || 0))}
             </div>
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">All-time ROI · no fixed term</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
