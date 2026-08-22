@@ -232,7 +232,10 @@ export function useTraderTrades(traderId: string | null) {
       try {
         setLoading(true);
         const response = await fetch(`/api/trader-trades?traderId=${traderId}`);
-        if (!response.ok) throw new Error('Failed to fetch trades');
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data?.error || `Failed to fetch trades (${response.status})`);
+        }
         const data = await response.json();
         setTrades(data);
       } catch (err: unknown) {

@@ -38,6 +38,7 @@ export default async function handler(req, res) {
     let simulatedTraders = 0;
     let skippedTraders = 0;
     let generatedTrades = 0;
+    let tradeErrors = 0;
     let updatedCopies = 0;
 
     // Step 2: Process each trader
@@ -95,6 +96,7 @@ export default async function handler(req, res) {
           });
 
         if (tradeError) {
+          tradeErrors++;
           console.error(`[CRON] Error inserting trade for trader ${trader.id}:`, tradeError);
         } else {
           generatedTrades++;
@@ -177,6 +179,7 @@ export default async function handler(req, res) {
       simulatedTraders,
       skippedTraders,
       generatedTrades,
+      tradeErrors,
       updatedCopies,
       continuous: true,
       timestamp: new Date().toISOString()

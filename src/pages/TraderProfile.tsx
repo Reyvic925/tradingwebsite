@@ -29,7 +29,7 @@ export default function TraderProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
-  const { trades } = useTraderTrades(traderId as string);
+  const { trades, error: tradesError } = useTraderTrades(traderId as string);
   const { followTrader } = useCopyTrading();
   const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
 
@@ -231,7 +231,11 @@ export default function TraderProfile() {
           <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
         </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {trades && trades.length > 0 ? (
+          {tradesError ? (
+            <div className="rounded-lg border border-red-400/20 bg-red-400/5 px-4 py-6 text-center text-red-300">
+              Unable to load trading activity: {tradesError}
+            </div>
+          ) : trades && trades.length > 0 ? (
             trades.map((trade: TradeLog) => {
               const isProfitable = (trade.pnl || 0) > 0;
               return (
