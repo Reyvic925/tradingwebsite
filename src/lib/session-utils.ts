@@ -20,9 +20,14 @@ export function isTraderEligible(trader: Record<string, any>): boolean {
 
   // Weekdays: Check session hours
   switch (trader.session_type) {
+    case 'sydney':
     case 'asia':
-      // Asia session: 22:00 - 07:00 UTC (Hong Kong, Tokyo, Singapore)
+      // Sydney session; asia is retained as a legacy alias.
       return utcHours >= 22 || utcHours <= 7;
+
+    case 'tokyo':
+      // Tokyo session: 00:00 - 09:00 UTC
+      return utcHours < 9;
     
     case 'london':
       // London session: 08:00 - 17:00 UTC
@@ -78,8 +83,12 @@ export function getMarketStatus(sessionType: string): Record<string, any> {
  */
 export function getSessionLabel(sessionType: string): string {
   switch (sessionType) {
+    case 'sydney':
+      return 'Sydney Session';
     case 'asia':
       return 'Asia Session';
+    case 'tokyo':
+      return 'Tokyo Session';
     case 'london':
       return 'London Session';
     case 'nyc':

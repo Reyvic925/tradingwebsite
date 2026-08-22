@@ -84,6 +84,12 @@ WHERE NOT EXISTS (
   SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(requested.name)
 );
 
+-- Split legacy Asia assignments across the two named Forex sessions.
+UPDATE traders
+SET session_type = CASE WHEN id % 2 = 0 THEN 'tokyo' ELSE 'sydney' END,
+    updated_at = NOW()
+WHERE session_type = 'asia';
+
 -- Keep displayed demo performance plausible for established traders and consistent with the $10,000 starting balance.
 UPDATE traders
 SET total_return = ROUND(GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35))::numeric, 2),

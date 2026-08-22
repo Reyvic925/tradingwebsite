@@ -155,9 +155,10 @@ export default function Landing() {
   useEffect(() => {
     const updateOpenSessions = () => {
       const sessions = [
+        { type: 'sydney', label: 'SYD' },
+        { type: 'tokyo', label: 'TYO' },
         { type: 'nyc', label: 'NY' },
         { type: 'london', label: 'LDN' },
-        { type: 'asia', label: 'SG' },
       ];
       setOpenSessions(sessions.filter((session) => isTraderEligible({ session_type: session.type })).map((session) => session.label));
     };
@@ -257,7 +258,7 @@ export default function Landing() {
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-black/30 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-amber-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              {openSessions.length > 0 ? `Markets open · ${openSessions.join(' · ')}` : 'Markets closed · NY · LDN · SG'}
+              {openSessions.length > 0 ? `Markets open · ${openSessions.join(' · ')}` : 'Markets closed · SYD · TYO · LDN · NY'}
             </div>
             <h1 className="mt-6 max-w-5xl font-display text-5xl leading-[0.95] sm:text-7xl lg:text-8xl">
               Trade Like a Pro,{' '}

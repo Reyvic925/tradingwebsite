@@ -155,7 +155,7 @@ export type Trader = {
   volatility: number;
   drift: number;
   risk_score: number;
-  session_type: 'asia' | 'london' | 'nyc' | 'crypto';
+  session_type: 'sydney' | 'tokyo' | 'asia' | 'london' | 'nyc' | 'crypto';
   session_start?: string;
   session_end?: string;
   is_active: boolean;

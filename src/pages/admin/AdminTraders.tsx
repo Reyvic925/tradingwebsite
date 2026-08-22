@@ -253,7 +253,9 @@ export default function AdminTraders() {
                 >
                   <option value="nyc">NYC</option>
                   <option value="london">London</option>
-                  <option value="asia">Asia</option>
+                  <option value="sydney">Sydney</option>
+                  <option value="tokyo">Tokyo</option>
+                  <option value="asia">Asia (legacy)</option>
                   <option value="crypto">Crypto 24/7</option>
                 </select>
               </div>

@@ -332,7 +332,9 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
 
   const getSessionBadge = (sessionType: string) => {
     const badges: Record<string, any> = {
+      sydney: { emoji: '🌅', label: 'Sydney' },
       asia: { emoji: '🌙', label: 'Asia' },
+      tokyo: { emoji: '🗾', label: 'Tokyo' },
       london: { emoji: '🇬🇧', label: 'London' },
       nyc: { emoji: '🗽', label: 'NYC' },
       crypto: { emoji: '🔗', label: '24/7 Crypto' }
