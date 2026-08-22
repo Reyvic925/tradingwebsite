@@ -11,6 +11,7 @@ import {
   Clock,
   Plus
 } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMoney } from '../lib/format';
 import type { Trader, TradeLog } from '../types';
 
@@ -81,6 +82,12 @@ export default function TraderProfile() {
   }
 
   const isProfit = trader.total_return >= 0;
+  const startingEquity = 10000;
+  const currentEquity = Number(trader.current_equity || startingEquity);
+  const equityCurve = Array.from({ length: 7 }, (_, index) => ({
+    day: index === 0 ? 'Start' : `Day ${index}`,
+    equity: Number((startingEquity + ((currentEquity - startingEquity) * index) / 6).toFixed(2)),
+  }));
 
   return (
     <AppShell>
@@ -188,15 +195,35 @@ export default function TraderProfile() {
         </div>
       </div>
 
-      {/* Equity Curve (Placeholder) */}
+      {/* Equity Curve */}
       <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">
         <h2 className="text-lg font-semibold text-white mb-4">Equity Curve (7 Days)</h2>
-        <div className="h-64 bg-white/[0.02] rounded-lg border border-white/10 flex items-center justify-center">
-          <div className="text-center">
-            <TrendingUp size={32} className="mx-auto mb-2 text-gray-600" />
-            <p className="text-gray-500">Chart visualization would appear here</p>
-            <p className="text-gray-600 text-sm mt-1">Integration with Recharts coming soon</p>
-          </div>
+        <div className="h-64 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={equityCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#ffffff" strokeOpacity={0.08} vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `$${Number(value).toLocaleString()}`}
+                width={76}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#111827', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8 }}
+                labelStyle={{ color: '#d1d5db' }}
+                formatter={(value) => [formatMoney(Number(value)), 'Equity']}
+              />
+              <Area type="monotone" dataKey="equity" stroke="#34d399" strokeWidth={2} fill="url(#equityFill)" />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

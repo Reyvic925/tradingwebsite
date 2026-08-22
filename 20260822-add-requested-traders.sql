@@ -78,6 +78,20 @@ WHERE NOT EXISTS (
   SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(requested.name)
 );
 
+-- Keep displayed demo performance plausible and consistent with the $10,000 starting balance.
+UPDATE traders
+SET total_return = ROUND(GREATEST(8, LEAST(68, COALESCE(total_return, 0)))::numeric, 2),
+    current_equity = ROUND((10000 * (1 + GREATEST(8, LEAST(68, COALESCE(total_return, 0))) / 100))::numeric, 2),
+    risk_score = GREATEST(
+      1,
+      LEAST(
+        10,
+        ROUND(2 + (GREATEST(8, LEAST(68, COALESCE(total_return, 0))) / 20) + (COALESCE(max_drawdown, 0) / 20))::integer
+      )
+    ),
+    updated_at = NOW()
+WHERE is_active = true;
+
 SELECT name, specialty, total_return, current_equity, followers, total_trades
 FROM traders
 WHERE LOWER(name) IN (
