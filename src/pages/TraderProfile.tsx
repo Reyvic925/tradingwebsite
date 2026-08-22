@@ -112,6 +112,9 @@ export default function TraderProfile() {
               <p className="text-gray-400 text-sm">{trader.bio}</p>
               <div className="flex gap-4 mt-2 text-xs">
                 <span className="text-gray-500">
+                  Badge: <span className="text-amber-300">{trader.badge || 'Gold'}</span>
+                </span>
+                <span className="text-gray-500">
                   Session: <span className="text-white capitalize">{trader.session_type}</span>
                 </span>
                 <span className="text-gray-500">
@@ -192,6 +195,32 @@ export default function TraderProfile() {
             <div className="text-sm text-gray-300">Risk Score</div>
           </div>
           <div className="text-2xl font-bold text-white">{trader.risk_score}/10</div>
+        </div>
+      </div>
+
+      {/* Copier performance */}
+      <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+          <div className="text-sm text-gray-300">Profit for copiers</div>
+          <div className="mt-2 text-xl font-bold text-emerald-300">{formatMoney(trader.profit_for_copiers || 0)}</div>
+        </div>
+        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="text-sm text-gray-300">Profit sharing fee</div>
+          <div className="mt-2 text-xl font-bold text-amber-300">{Number(trader.profit_sharing_fee ?? 20).toFixed(0)}%</div>
+        </div>
+        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+          <div className="text-sm text-gray-300">Copiers</div>
+          <div className="mt-2 text-xl font-bold text-blue-300">{trader.copiers_current ?? trader.followers ?? 0}</div>
+          <div className="mt-1 text-xs text-gray-500">Current</div>
+        </div>
+        <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+          <div className="text-sm text-gray-300">Copiers</div>
+          <div className="mt-2 text-xl font-bold text-cyan-300">{trader.copiers_all_time ?? trader.followers ?? 0}</div>
+          <div className="mt-1 text-xs text-gray-500">All-time</div>
+        </div>
+        <div className="p-4 rounded-lg bg-violet-500/10 border border-violet-500/30">
+          <div className="text-sm text-gray-300">Under management</div>
+          <div className="mt-2 text-xl font-bold text-violet-300">{formatMoney(trader.under_management || 0)}</div>
         </div>
       </div>
 

@@ -134,6 +134,12 @@ export type Trader = {
   avatar_url: string;
   win_rate?: number;
   followers: number;
+  badge?: string;
+  profit_for_copiers?: number;
+  profit_sharing_fee?: number;
+  copiers_current?: number;
+  copiers_all_time?: number;
+  under_management?: number;
   monthly_return?: number;
   bio: string;
   risk_level?: string;

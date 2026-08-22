@@ -94,6 +94,12 @@ create table if not exists profiles (
   created_at timestamptz default now()
 );
 
+-- Keep the newest profile for each user before enforcing one profile per user.
+delete from profiles duplicate_profile
+using profiles retained_profile
+where duplicate_profile.user_id = retained_profile.user_id
+  and duplicate_profile.id < retained_profile.id;
+
 create unique index if not exists idx_profiles_user_id_unique on profiles (user_id);
 
 create table if not exists crypto_addresses (
@@ -305,7 +311,29 @@ create table if not exists traders (
   monthly_return numeric,
   bio text,
   risk_level text,
-  specialty text
+  specialty text,
+  asset_focus text[] default '{"BTC-USD", "ETH-USD"}',
+  current_equity numeric default 10000,
+  total_return numeric default 0,
+  daily_return numeric default 0,
+  total_trades integer default 0,
+  win_rate_trades numeric default 50,
+  max_drawdown numeric default 0,
+  volatility numeric default 0.005,
+  drift numeric default 0.001,
+  risk_score integer default 5,
+  session_type varchar default 'nyc',
+  badge text default 'Gold',
+  profit_for_copiers numeric default 0,
+  profit_sharing_fee numeric default 20,
+  copiers_current integer default 0,
+  copiers_all_time integer default 0,
+  under_management numeric default 0,
+  is_active boolean default true,
+  session_start date default current_date,
+  session_end date default (current_date + interval '365 days'),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 create table if not exists copy_trades (

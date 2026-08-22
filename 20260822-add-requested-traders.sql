@@ -19,6 +19,12 @@ ALTER TABLE IF EXISTS traders
   ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'Medium',
   ADD COLUMN IF NOT EXISTS specialty TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS followers INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'Gold',
+  ADD COLUMN IF NOT EXISTS profit_for_copiers NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS profit_sharing_fee NUMERIC DEFAULT 20,
+  ADD COLUMN IF NOT EXISTS copiers_current INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS copiers_all_time INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS under_management NUMERIC DEFAULT 0,
   ADD COLUMN IF NOT EXISTS monthly_return NUMERIC DEFAULT 0,
   ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
   ADD COLUMN IF NOT EXISTS session_start DATE DEFAULT CURRENT_DATE,
@@ -78,21 +84,55 @@ WHERE NOT EXISTS (
   SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(requested.name)
 );
 
--- Keep displayed demo performance plausible and consistent with the $10,000 starting balance.
+-- Keep displayed demo performance plausible for established traders and consistent with the $10,000 starting balance.
 UPDATE traders
-SET total_return = ROUND(GREATEST(8, LEAST(68, COALESCE(total_return, 0)))::numeric, 2),
-    current_equity = ROUND((10000 * (1 + GREATEST(8, LEAST(68, COALESCE(total_return, 0))) / 100))::numeric, 2),
+SET total_return = ROUND(GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35))::numeric, 2),
+    monthly_return = ROUND((GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35)) / 6)::numeric, 2),
+    current_equity = ROUND((10000 * (1 + GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35)) / 100))::numeric, 2),
     risk_score = GREATEST(
       1,
       LEAST(
         10,
-        ROUND(2 + (GREATEST(8, LEAST(68, COALESCE(total_return, 0))) / 20) + (COALESCE(max_drawdown, 0) / 20))::integer
+        ROUND(2 + (GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35)) / 20) + (COALESCE(max_drawdown, 0) / 20))::integer
       )
     ),
     updated_at = NOW()
 WHERE is_active = true;
 
-SELECT name, specialty, total_return, current_equity, followers, total_trades
+-- Add varied copier and fee metrics for every active trader.
+UPDATE traders
+SET badge = CASE
+      WHEN total_return >= 78 THEN 'Diamond'
+      WHEN total_return >= 65 THEN 'Platinum'
+      WHEN total_return >= 50 THEN 'Gold'
+      ELSE 'Silver'
+    END,
+    profit_for_copiers = ROUND((GREATEST(current_equity - 10000, 0) * (0.35 + ((id % 7) * 0.04)))::numeric, 2),
+    profit_sharing_fee = 15 + (id % 4) * 5,
+    copiers_current = GREATEST(COALESCE(followers, 0), 250 + ((id * 137) % 2400)),
+    copiers_all_time = GREATEST(COALESCE(followers, 0), 250 + ((id * 137) % 2400)) + 300 + ((id * 83) % 1800),
+    under_management = ROUND((GREATEST(COALESCE(followers, 0), 250 + ((id * 137) % 2400)) * (42.5 + ((id % 9) * 17.5)))::numeric, 2)
+WHERE is_active = true;
+
+-- Preserve the supplied reference metrics for Ingrid's profile.
+UPDATE traders
+SET badge = 'Diamond',
+    current_equity = 32198.00,
+    total_return = 67.98,
+    win_rate_trades = 90.36,
+    followers = 842,
+    copiers_current = 842,
+    copiers_all_time = 4123,
+    profit_for_copiers = 882651.54,
+    profit_sharing_fee = 25,
+    under_management = 66739.90,
+    total_trades = 2127,
+    updated_at = NOW()
+WHERE LOWER(name) = 'ingrid martingale';
+
+SELECT name, badge, total_return, current_equity, win_rate_trades,
+       profit_for_copiers, profit_sharing_fee, copiers_current,
+       copiers_all_time, under_management, total_trades, risk_score
 FROM traders
 WHERE LOWER(name) IN (
   'ingrid martingale', 'emagamtrad', 'pip-rainha', 'bajoriesgomx', 'condormx'
