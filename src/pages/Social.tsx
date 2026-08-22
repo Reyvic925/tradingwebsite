@@ -386,7 +386,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
         <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
           <div>
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-              {formatMoney(Number(trader.total_return || 0))}
+              {formatPct(Number(trader.total_return || 0))}
             </div>
             <div className="text-gray-500">All-time ROI</div>
           </div>
