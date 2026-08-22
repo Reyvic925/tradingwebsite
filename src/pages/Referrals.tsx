@@ -45,7 +45,7 @@ export default function Referrals() {
     <AppShell>
       <div className="text-[11px] uppercase tracking-[0.24em] text-amber-300/70">Network</div>
       <h1 className="font-display text-4xl">Referral program</h1>
-      <p className="mt-2 max-w-xl text-sm text-stone-400">Invite a client. When they open an account, you receive a $25 credit. They start with a $1,000 welcome balance.</p>
+      <p className="mt-2 max-w-xl text-sm text-stone-400">Earn 10% of each confirmed deposit made by a client you refer. Rewards are credited after their deposit is approved.</p>
       {loading && <div className="mt-8 h-28 animate-pulse rounded-md bg-white/5" />}
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
 

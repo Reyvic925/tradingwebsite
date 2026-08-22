@@ -1,7 +1,7 @@
 import supabase from './db-client.js';
 import { createNotification } from './notification-service.js';
 import cryptoKeys from './crypto-keys.js';
-import { getOrCreateWallet, getProfileRow, getUsdWallet } from './helpers.js';
+import { getOrCreateWallet, getProfileRow } from './helpers.js';
 import registrationWallet from './registration-wallet.js';
 
 const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'MATIC', 'AVAX', 'ARB', 'OP', 'BASE'];
@@ -169,18 +169,8 @@ export default async function handler(req, res) {
                 referrer_id: referrer.user_id,
                 referred_id: user.id,
                 referred_email: user.email,
-                bonus: 25,
-                status: 'credited',
-              });
-              const rw = await getUsdWallet(supabase, referrer.user_id);
-              if (rw) {
-                await supabase.from('wallets').update({ available: Number(rw.available) + 25 }).eq('id', rw.id);
-              }
-              await createNotification(supabase, {
-                user_id: referrer.user_id,
-                title: 'Referral bonus credited',
-                body: `${fullName} joined with your code. $25 has been added to your wallet.`,
-                read: false,
+                bonus: 0,
+                status: 'pending',
               });
             }
           }

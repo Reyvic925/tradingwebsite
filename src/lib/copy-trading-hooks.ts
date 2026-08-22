@@ -238,6 +238,7 @@ export function useTraderTrades(traderId: string | null) {
         }
         const data = await response.json();
         setTrades(data);
+        setError(null);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -249,7 +250,12 @@ export function useTraderTrades(traderId: string | null) {
 
     // Refresh every 10 seconds
     const interval = setInterval(fetchTrades, 10000);
-    return () => clearInterval(interval);
+    const handleOnline = () => fetchTrades();
+    window.addEventListener('online', handleOnline);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+    };
   }, [traderId]);
 
   return { trades, loading, error };

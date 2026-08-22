@@ -1,6 +1,7 @@
 import supabase from './db-client.js';
 import { requireAdmin } from './auth-admin.js';
 import { logAdminAction } from './admin-helpers.js';
+import { creditReferralDeposit } from './referral-rewards.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -99,6 +100,8 @@ export default async function handler(req, res) {
             reserved: 0,
           });
       }
+
+      await creditReferralDeposit(supabase, { ...existing, amount: amountToCredit });
 
       await supabase.from('transactions').insert({
         user_id: existing.user_id,

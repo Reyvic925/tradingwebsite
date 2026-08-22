@@ -10,6 +10,7 @@
 import supabase from './db-client.js';
 import { first, requireUser } from './helpers.js';
 import { requireAdmin } from './auth-admin.js';
+import { creditReferralDeposit } from './referral-rewards.js';
 
 async function getUserDeposits(userId) {
   const { data, error } = await supabase
@@ -140,6 +141,8 @@ export default async function handler(req, res) {
             reserved: 0,
           });
       }
+
+      await creditReferralDeposit(supabase, { ...deposit, amount: Number(deposit.amount) });
 
       return res.status(200).json({ deposit: first(updated) });
     }

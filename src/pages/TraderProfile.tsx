@@ -6,15 +6,12 @@ import {
   ChevronUp,
   ChevronDown,
   TrendingUp,
-  TrendingDown,
   Shield,
   Users,
-  Award,
   Clock,
-  ArrowRight,
   Plus
 } from 'lucide-react';
-import { formatMoney, formatPct } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import type { Trader, TradeLog } from '../types';
 
 /**
@@ -25,7 +22,6 @@ export default function TraderProfile() {
   const { traderId } = useParams();
   const navigate = useNavigate();
   const [trader, setTrader] = useState<Trader | null>(null);
-  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
@@ -231,7 +227,11 @@ export default function TraderProfile() {
           <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
         </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {tradesError ? (
+          {typeof navigator !== 'undefined' && !navigator.onLine ? (
+            <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-6 text-center text-amber-200">
+              You are offline. Trading activity will refresh when the connection returns.
+            </div>
+          ) : tradesError ? (
             <div className="rounded-lg border border-red-400/20 bg-red-400/5 px-4 py-6 text-center text-red-300">
               Unable to load trading activity: {tradesError}
             </div>
