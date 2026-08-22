@@ -37,6 +37,7 @@ export default async function handler(req, res) {
 
     let simulatedTraders = 0;
     let skippedTraders = 0;
+    const skippedSessions = [];
     let generatedTrades = 0;
     let tradeErrors = 0;
     let updatedCopies = 0;
@@ -45,6 +46,12 @@ export default async function handler(req, res) {
     for (const trader of traders || []) {
       if (!isTraderEligible(trader)) {
         skippedTraders++;
+        skippedSessions.push({
+          traderId: trader.id,
+          trader: trader.name,
+          session: trader.session_type,
+          reason: 'session_closed'
+        });
         console.log(`[CRON] Skipping ${trader.id} (${trader.name}): ${trader.session_type} session is closed`);
         continue;
       }
@@ -188,6 +195,7 @@ export default async function handler(req, res) {
       activeTraders: (traders || []).length,
       simulatedTraders,
       skippedTraders,
+      skippedSessions,
       generatedTrades,
       tradeErrors,
       updatedCopies,
