@@ -700,6 +700,9 @@ export const CRYPTO_PAIRS = [
   row('LDOUSD', 'Lido DAO / USD', 'crypto', 1.76, 8500000),
   row('GNOUSD', 'Gnosis / USD', 'crypto', 244.2, 8200000),
   row('IMXUSD', 'Immutable / USD', 'crypto', 1.42, 8000000),
+  row('TRUMPUSD', 'Official Trump / USD', 'crypto', 12.4, 180000000),
+  row('JTOUSD', 'Jito / USD', 'crypto', 2.8, 32000000),
+  row('RAYUSD', 'Raydium / USD', 'crypto', 4.2, 26000000),
 ];
 
 export const FX_PAIRS = [
@@ -766,9 +769,17 @@ export const FX_PAIRS = [
   row('GBPUSD2', 'Pound / Dollar 2', 'fx', 1.275, 47000000),
   row('USDNGN', 'US Dollar / Nigerian Naira', 'fx', 1490, 45000000),
   row('USDKES', 'US Dollar / Kenyan Shilling', 'fx', 129.4, 42000000),
+  row('EURCAD', 'Euro / Canadian Dollar', 'fx', 1.48, 200000000),
 ];
 
 export const FUTURE_PAIRS = [
+  row('USOIL', 'WTI Crude Oil', 'futures', 75.6, 52000000),
+  row('XAUUSD', 'Gold / USD', 'futures', 2368.2, 36000000),
+  row('GER40', 'DAX 40 Index', 'futures', 18336, 10000000),
+  row('UK100', 'FTSE 100 Index', 'futures', 8284, 9800000),
+  row('JPN225', 'Nikkei 225 Index', 'futures', 38780, 9400000),
+  row('US500', 'S&P 500 Index', 'futures', 5487.25, 64000000),
+  row('NAS100', 'Nasdaq 100 Index', 'futures', 19365.4, 54000000),
   row('ES=F', 'E-mini S&P 500', 'futures', 5487.25, 64000000),
   row('NQ=F', 'E-mini Nasdaq 100', 'futures', 19365.4, 54000000),
   row('YM=F', 'Dow Jones Mini', 'futures', 39580, 43000000),

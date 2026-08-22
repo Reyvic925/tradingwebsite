@@ -21,6 +21,16 @@ const YAHOO_SYMBOL_MAP = {
   'USDCAD': 'USDCAD=X',
   'USDCHF': 'USDCHF=X',
   'NZDUSD': 'NZDUSD=X',
+  'EURGBP': 'EURGBP=X',
+  'USDMXN': 'USDMXN=X',
+  'USDNOK': 'USDNOK=X',
+  'USDSEK': 'USDSEK=X',
+  'USDSGD': 'USDSGD=X',
+  'USOIL': 'CL=F',
+  'XAUUSD': 'GC=F',
+  'GER40': '^GDAXI',
+  'UK100': '^FTSE',
+  'JPN225': '^N225',
   // Futures
   'GC=F': 'GC=F', // Gold
   'CL=F': 'CL=F', // Oil (Crude)

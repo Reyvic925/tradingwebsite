@@ -41,6 +41,9 @@ const COIN_GECKO_IDS = {
   CRVUSD: 'curve-dao-token',
   PEPEUSD: 'pepe',
   SHIBUSD: 'shiba-inu',
+  TRUMPUSD: 'official-trump',
+  JTOUSD: 'jito-staked-sol',
+  RAYUSD: 'raydium',
 };
 
 const FX_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'USDCNH', 'USDMXN', 'USDZAR', 'USDSEK', 'USDNOK', 'USDPLN', 'USDSGD', 'USDHKD', 'USDTRY', 'EURCHF', 'EURAUD', 'EURCAD', 'EURNZD', 'EURSEK', 'EURNOK', 'EURPLN', 'GBPCHF', 'GBPAUD', 'GBPCAD', 'GBPNZD', 'CHFJPY', 'CADJPY', 'NZDJPY'];
