@@ -114,6 +114,16 @@ SET badge = CASE
     under_management = ROUND((GREATEST(COALESCE(followers, 0), 250 + ((id * 137) % 2400)) * (42.5 + ((id % 9) * 17.5)))::numeric, 2)
 WHERE is_active = true;
 
+  -- Make copier figures internally consistent: profit is earned on managed copier capital.
+  -- Every active trader receives a positive, varied copier return for the demo roster.
+  UPDATE traders
+  SET copiers_current = GREATEST(COALESCE(copiers_current, followers, 0), 250),
+    copiers_all_time = GREATEST(COALESCE(copiers_all_time, 0), COALESCE(copiers_current, followers, 0) + 300),
+    under_management = ROUND((GREATEST(COALESCE(copiers_current, followers, 0), 250) * (75 + ((id % 12) * 25)))::numeric, 2),
+    profit_for_copiers = ROUND((GREATEST(COALESCE(copiers_current, followers, 0), 250) * (75 + ((id % 12) * 25)) * (GREATEST(total_return, 35) / 100) * (0.45 + ((id % 5) * 0.05)))::numeric, 2),
+    updated_at = NOW()
+  WHERE is_active = true;
+
 -- Preserve the supplied reference metrics for Ingrid's profile.
 UPDATE traders
 SET badge = 'Diamond',
@@ -138,3 +148,12 @@ WHERE LOWER(name) IN (
   'ingrid martingale', 'emagamtrad', 'pip-rainha', 'bajoriesgomx', 'condormx'
 )
 ORDER BY total_return DESC, name ASC;
+
+SELECT
+  COUNT(*) AS active_traders,
+  COUNT(*) FILTER (WHERE profit_for_copiers > 0) AS profitable_traders,
+  COUNT(*) FILTER (WHERE profit_for_copiers > 0) > 50 AS more_than_50_profitable,
+  ROUND(AVG(profit_for_copiers)::numeric, 2) AS average_copier_profit,
+  ROUND(SUM(under_management)::numeric, 2) AS total_assets_under_management
+FROM traders
+WHERE is_active = true;
