@@ -152,7 +152,7 @@ export default async function handler(req, res) {
 
           await createNotification(supabase, {
             user_id: user.id,
-            title: 'Welcome to Apex Prime Broker',
+            title: 'Welcome to The Prime Markets',
             body: 'Your account is ready. Complete KYC and deposit to start trading.',
             read: false,
           });

@@ -13,7 +13,7 @@ function buildGoogleUrl(appName: string) {
   return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(state)}`;
 }
 
-export function signInWithGoogle(appName = 'Apex Prime') {
+export function signInWithGoogle(appName = 'The Prime Markets') {
   const url = buildGoogleUrl(appName);
   if (!url) {
     console.warn('[google-auth] Missing VITE_GOOGLE_CLIENT_ID or VITE_GOOGLE_AUTH_PROXY');

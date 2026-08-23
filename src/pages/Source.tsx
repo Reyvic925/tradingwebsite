@@ -23,14 +23,14 @@ export default function Source() {
         <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Archive</div>
         <h1 className="mt-3 font-display text-5xl">Full website source</h1>
         <p className="mt-4 text-stone-400">
-          One zip of the complete Apex Prime Broker app: landing page, authenticated terminal, API routes, videos, logos, and database schema. No <code className="text-stone-200">node_modules</code>, no <code className="text-stone-200">.env</code>.
+          One zip of the complete The Prime Markets app: landing page, authenticated terminal, API routes, videos, logos, and database schema. No <code className="text-stone-200">node_modules</code>, no <code className="text-stone-200">.env</code>.
         </p>
         <a
-          href="/downloads/apex-prime-broker.zip"
+          href="/downloads/the-prime-markets.zip"
           download
           className="mt-8 inline-flex rounded-sm bg-amber-400 px-6 py-3 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304]"
         >
-          Download apex-prime-broker.zip
+          Download the-prime-markets.zip
         </a>
         <ul className="mt-10 divide-y divide-white/5 rounded-md border border-white/8">
           {CONTENTS.map((c) => (

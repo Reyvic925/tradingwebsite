@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process';
 const root = process.cwd();
 const staging = join(root, '.pack-staging');
 const outDir = join(root, 'public', 'downloads');
-const zipPath = join(outDir, 'apex-prime-broker.zip');
+const zipPath = join(outDir, 'the-prime-markets.zip');
 
 const files = [
   'api',
@@ -73,7 +73,7 @@ writeFileSync(
 
 writeFileSync(
   join(staging, 'README.FIRST.txt'),
-  `Apex Prime Broker — FULL WEBSITE source
+  `The Prime Markets — FULL WEBSITE source
 
 This archive is the complete product:
 - Cinematic landing (video hero, ticker, partners, plans, testimonials)
@@ -81,7 +81,7 @@ This archive is the complete product:
 - Global markets: USA, Japan, Canada, UK, Europe, Germany, France, India
 - API routes, schema.sql, logos, videos
 
-1. unzip apex-prime-broker.zip
+1. unzip the-prime-markets.zip
 2. npm install
 3. cp .env.example .env
 4. Run schema.sql in the Supabase SQL editor
