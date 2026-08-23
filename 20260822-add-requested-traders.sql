@@ -146,6 +146,40 @@ SET badge = 'Diamond',
     updated_at = NOW()
 WHERE LOWER(name) = 'ingrid martingale';
 
+-- Replace fragile remote avatars with bundled images for the requested traders.
+UPDATE traders
+SET avatar_url = CASE LOWER(name)
+      WHEN 'helena costa' THEN '/images/avatar-1.jpg'
+      WHEN 'irene garcia' THEN '/images/avatar-2.jpg'
+      WHEN 'arjun mehta' THEN '/images/avatar-3.jpg'
+      WHEN 'mina park' THEN '/images/avatar-4.jpg'
+      WHEN 'emagamtrad' THEN '/images/avatar-5.jpg'
+      WHEN 'pip-rainha' THEN '/images/avatar-6.jpg'
+      WHEN 'laura costa' THEN '/images/avatar-7.jpg'
+      WHEN 'jamal williams' THEN '/images/avatar-8.jpg'
+      WHEN 'lena fischer' THEN '/images/avatar-1.jpg'
+      WHEN 'diego fernandez' THEN '/images/avatar-2.jpg'
+      WHEN 'maximilian bauer' THEN '/images/avatar-3.jpg'
+      WHEN 'adrian king' THEN '/images/avatar-4.jpg'
+      WHEN 'marek kowalski' THEN '/images/avatar-5.jpg'
+      WHEN 'aya nakamura' THEN '/images/avatar-6.jpg'
+      WHEN 'mariam el-sayed' THEN '/images/avatar-7.jpg'
+      WHEN 'bajor iesgomx' THEN '/images/avatar-8.jpg'
+      WHEN 'bajoriesgomx' THEN '/images/avatar-8.jpg'
+      WHEN 'nikolai volkov' THEN '/images/avatar-1.jpg'
+      WHEN 'ingrid martingale' THEN '/images/avatar-2.jpg'
+      WHEN 'condormx' THEN '/images/avatar-3.jpg'
+      ELSE avatar_url
+    END,
+    updated_at = NOW()
+WHERE LOWER(name) IN (
+  'helena costa', 'irene garcia', 'arjun mehta', 'mina park', 'emagamtrad',
+  'pip-rainha', 'laura costa', 'jamal williams', 'lena fischer', 'diego fernandez',
+  'maximilian bauer', 'adrian king', 'marek kowalski', 'aya nakamura',
+  'mariam el-sayed', 'bajoriesgomx', 'nikolai volkov', 'ingrid martingale', 'condormx'
+)
+OR LOWER(name) LIKE '%condor%';
+
 SELECT name, badge, total_return, current_equity, win_rate_trades,
        profit_for_copiers, profit_sharing_fee, copiers_current,
        copiers_all_time, under_management, total_trades, risk_score
