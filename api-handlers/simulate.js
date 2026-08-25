@@ -13,6 +13,34 @@ import {
   calculateMarketChange,
   generateRealisticEntryPrice
 } from './session-utils.js';
+import { fetchCoinGeckoQuotes } from './live-market-data.js';
+
+function normalizeTradingSymbol(symbol) {
+  return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
+}
+
+let cryptoQuotesPromise;
+
+async function getAssetPrice(symbol) {
+  const normalizedSymbol = normalizeTradingSymbol(symbol);
+  cryptoQuotesPromise ||= fetchCoinGeckoQuotes().catch((error) => {
+    console.error('Error fetching crypto prices:', error);
+    return {};
+  });
+  const quotes = await cryptoQuotesPromise;
+  const livePrice = Number(quotes[normalizedSymbol]?.price);
+  if (Number.isFinite(livePrice) && livePrice > 0) return livePrice;
+
+  const { data: market } = await supabase
+    .from('markets')
+    .select('price')
+    .eq('symbol', normalizedSymbol)
+    .maybeSingle();
+  const marketPrice = Number(market?.price);
+  if (Number.isFinite(marketPrice) && marketPrice > 0) return marketPrice;
+
+  throw new Error(`No market price available for ${normalizedSymbol}`);
+}
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
@@ -73,10 +101,9 @@ export default async function handler(req, res) {
         const assetList = Array.isArray(trader.asset_focus) && trader.asset_focus.length > 0
           ? trader.asset_focus
           : ['BTC-USD', 'ETH-USD', 'AAPL', 'MSFT'];
-        const symbol = assetList[Math.floor(Math.random() * assetList.length)];
+        const symbol = normalizeTradingSymbol(assetList[Math.floor(Math.random() * assetList.length)]);
 
-        // Get or simulate current price
-        let currentPrice = await getAssetPrice(symbol);
+        const currentPrice = await getAssetPrice(symbol);
 
         // Generate realistic entry price
         const entryPrice = generateRealisticEntryPrice(currentPrice, Math.abs(changePercent), isProfit);
@@ -209,20 +236,3 @@ export default async function handler(req, res) {
   }
 }
 
-/**
- * Get asset price (real or simulated)
- * TODO: Integrate with real price APIs (yahoo-finance2, CoinGecko, etc.)
- */
-async function getAssetPrice(symbol) {
-  try {
-    // For now, return simulated price
-    // In production, fetch real prices from API
-    const basePrice = Math.random() * 1000 + 100;
-    const variation = (Math.random() - 0.5) * 0.1;
-    return basePrice * (1 + variation);
-  } catch (error) {
-    console.error(`Error fetching price for ${symbol}:`, error);
-    // Fallback to simulated price
-    return 100 + Math.random() * 50;
-  }
-}
