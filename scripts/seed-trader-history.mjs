@@ -118,7 +118,7 @@ function generateTrades(trader, daysBack = 90) {
   return trades.slice(0, baseTradeCount);
 }
 
-function generateHistorySnapshots(trader, daysBack = 7) {
+function generateHistorySnapshots(trader, daysBack = 90) {
   const snapshots = [];
   const startEquity = 10000;
   let currentEquity = startEquity;
@@ -176,8 +176,8 @@ async function seedTraders() {
       const allBatchSnapshots = [];
 
       for (const trader of batch) {
-        const trades = generateTrades(trader, 7);
-        const snapshots = generateHistorySnapshots(trader, 7);
+        const trades = generateTrades(trader, 90);
+        const snapshots = generateHistorySnapshots(trader, 90);
         allBatchTrades.push(...trades);
         allBatchSnapshots.push(...snapshots);
       }
@@ -212,6 +212,78 @@ async function seedTraders() {
     }
 
     console.log(`\n✨ Seeding complete!`);
+
+        // Now calculate and update trader stats based on seeded data
+        console.log(`\n📊 Calculating trader performance metrics...`);
+        for (const trader of traders) {
+          try {
+            // Fetch all trades for this trader
+            const { data: traderTrades, error: tradesError } = await supabase
+              .from('trade_logs')
+              .select('*')
+              .eq('trader_id', trader.id);
+
+            if (tradesError) throw tradesError;
+
+            // Calculate metrics from actual trades
+            const totalTrades = traderTrades.length;
+            const winTrades = traderTrades.filter(t => t.pnl > 0).length;
+            const totalPnL = traderTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+            const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 50;
+
+            // Calculate max drawdown from history
+            const { data: history, error: historyError } = await supabase
+              .from('trader_history')
+              .select('equity')
+              .eq('trader_id', trader.id)
+              .order('snapshot_date', { ascending: true });
+
+            let maxDrawdown = 0;
+            if (!historyError && history && history.length > 0) {
+              let peak = history[0].equity;
+              for (const snapshot of history) {
+                if (snapshot.equity > peak) peak = snapshot.equity;
+                const drawdown = ((peak - snapshot.equity) / peak) * 100;
+                if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+              }
+            }
+
+            // Get final equity for total return
+            const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
+            const totalReturn = ((finalEquity - 10000) / 10000) * 100;
+
+            // Calculate daily volatility
+            if (history && history.length > 1) {
+              const returns = [];
+              for (let i = 1; i < history.length; i++) {
+                const dailyReturn = ((history[i].equity - history[i - 1].equity) / history[i - 1].equity) * 100;
+                returns.push(dailyReturn);
+              }
+              const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+              const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
+              const dailyVolatility = Math.sqrt(variance);
+
+              // Update trader record with all calculated metrics
+              const { error: updateError } = await supabase
+                .from('traders')
+                .update({
+                  total_trades: totalTrades,
+                  win_rate_trades: winRate,
+                  total_return: Number(totalReturn.toFixed(2)),
+                  current_equity: Number(finalEquity.toFixed(2)),
+                })
+                .eq('id', trader.id);
+
+              if (updateError) {
+                console.error(`⚠️  Failed to update ${trader.name}:`, updateError.message);
+              } else {
+                console.log(`✅ ${trader.name}: ${totalTrades} trades, ${winRate}% win, ${totalReturn.toFixed(2)}% return`);
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error processing ${trader.name}:`, error.message);
+          }
+        }
     console.log(`   📈 Total trades created: ${totalTrades}`);
     console.log(`   📊 Total history snapshots: ${totalSnapshots}`);
     console.log(`   👥 Traders updated: ${traders.length}`);
