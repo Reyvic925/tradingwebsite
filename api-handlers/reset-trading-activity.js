@@ -30,32 +30,46 @@ export default async function handler(req, res) {
     const today = now.slice(0, 10);
     const baselineTrades = [];
     const baselineCounts = new Map();
+    const traderAssets = new Map();
+    const symbols = new Set();
 
     for (const trader of traders || []) {
       const assets = Array.isArray(trader.asset_focus) && trader.asset_focus.length > 0
         ? trader.asset_focus
         : ['BTC-USD', 'ETH-USD'];
+      const normalizedAssets = [...new Set(assets.map(normalizeTradingSymbol))];
+      traderAssets.set(trader.id, normalizedAssets);
+      normalizedAssets.forEach((asset) => symbols.add(asset));
+    }
 
-      for (const asset of [...new Set(assets.map(normalizeTradingSymbol))]) {
-        try {
-          const price = await getAssetPrice(asset);
-          baselineTrades.push({
-            trader_id: trader.id,
-            symbol: asset,
-            side: 'BUY',
-            quantity: 1,
-            entry_price: Number(price.toFixed(4)),
-            exit_price: Number(price.toFixed(4)),
-            pnl: 0,
-            pnl_percent: 0,
-            status: 'CLOSED',
-            traded_at: now,
-            closed_at: now,
-          });
-          baselineCounts.set(trader.id, (baselineCounts.get(trader.id) || 0) + 1);
-        } catch (error) {
-          console.error(`[RESET] Could not price ${asset} for trader ${trader.id}:`, error.message);
-        }
+    const priceResults = await Promise.all([...symbols].map(async (symbol) => {
+      try {
+        return [symbol, await getAssetPrice(symbol)];
+      } catch (error) {
+        console.error(`[RESET] Could not price ${symbol}:`, error.message);
+        return [symbol, null];
+      }
+    }));
+    const prices = new Map(priceResults);
+
+    for (const trader of traders || []) {
+      for (const asset of traderAssets.get(trader.id) || []) {
+        const price = prices.get(asset);
+        if (!Number.isFinite(price) || price <= 0) continue;
+        baselineTrades.push({
+          trader_id: trader.id,
+          symbol: asset,
+          side: 'BUY',
+          quantity: 1,
+          entry_price: Number(price.toFixed(4)),
+          exit_price: Number(price.toFixed(4)),
+          pnl: 0,
+          pnl_percent: 0,
+          status: 'CLOSED',
+          traded_at: now,
+          closed_at: now,
+        });
+        baselineCounts.set(trader.id, (baselineCounts.get(trader.id) || 0) + 1);
       }
     }
 
@@ -64,7 +78,7 @@ export default async function handler(req, res) {
       if (insertError) throw insertError;
     }
 
-    for (const trader of traders || []) {
+    await Promise.all((traders || []).map(async (trader) => {
       const totalTrades = baselineCounts.get(trader.id) || 0;
       const { error: traderError } = await supabase.from('traders').update({
         current_equity: 10000,
@@ -84,7 +98,7 @@ export default async function handler(req, res) {
         daily_return: 0,
       });
       if (historyError) throw historyError;
-    }
+    }));
 
     return res.status(200).json({
       success: true,
