@@ -13,7 +13,7 @@ import {
   calculateMarketChange,
   generateRealisticEntryPrice
 } from './session-utils.js';
-import { fetchCoinGeckoQuotes } from './live-market-data.js';
+import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-data.js';
 
 function normalizeTradingSymbol(symbol) {
   return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
@@ -21,14 +21,18 @@ function normalizeTradingSymbol(symbol) {
 
 let cryptoQuotesPromise;
 
-async function getAssetPrice(symbol) {
+export async function getAssetPrice(symbol) {
   const normalizedSymbol = normalizeTradingSymbol(symbol);
-  cryptoQuotesPromise ||= fetchCoinGeckoQuotes().catch((error) => {
-    console.error('Error fetching crypto prices:', error);
+  cryptoQuotesPromise ||= fetchLiveMarketSnapshot().catch((error) => {
+    console.error('Error fetching live market prices:', error);
     return {};
   });
   const quotes = await cryptoQuotesPromise;
-  const livePrice = Number(quotes[normalizedSymbol]?.price);
+  let livePrice = Number(quotes[normalizedSymbol]?.price);
+  if (!Number.isFinite(livePrice) || livePrice <= 0) {
+    const yahooQuotes = await fetchYahooMarketQuotes([normalizedSymbol]).catch(() => ({}));
+    livePrice = Number(yahooQuotes[normalizedSymbol]?.price);
+  }
   if (Number.isFinite(livePrice) && livePrice > 0) return livePrice;
 
   const { data: market } = await supabase

@@ -1,3 +1,7 @@
+import YahooFinance from 'yahoo-finance2';
+
+const yahooFinance = new YahooFinance();
+
 const COIN_GECKO_IDS = {
   BTCUSD: 'bitcoin',
   ETHUSD: 'ethereum',
@@ -45,6 +49,42 @@ const COIN_GECKO_IDS = {
   JTOUSD: 'jito-staked-sol',
   RAYUSD: 'raydium',
 };
+
+const YAHOO_SYMBOLS = {
+  EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', USDJPY: 'USDJPY=X', AUDUSD: 'AUDUSD=X',
+  USDCAD: 'USDCAD=X', USDCHF: 'USDCHF=X', NZDUSD: 'NZDUSD=X', USOIL: 'CL=F',
+  XAUUSD: 'GC=F', XAGUSD: 'SI=F', GER40: '^GDAXI', UK100: '^FTSE', JPN225: '^N225',
+  NASDAQ: '^IXIC', SPX500: '^GSPC', US500: '^GSPC', DOW: '^DJI',
+};
+
+export async function fetchYahooMarketQuotes(symbols = []) {
+  const requested = [...new Set(symbols.map((symbol) => String(symbol || '').toUpperCase()).filter(Boolean))];
+  if (!requested.length) return {};
+
+  const yahooSymbols = requested.map((symbol) => YAHOO_SYMBOLS[symbol] || (symbol.includes('=') ? symbol : symbol));
+  const quotes = await yahooFinance.quote(yahooSymbols, {
+    fields: ['regularMarketPrice', 'regularMarketChangePercent', 'regularMarketDayHigh', 'regularMarketDayLow', 'regularMarketVolume', 'symbol'],
+  });
+  const quoteList = Array.isArray(quotes) ? quotes : [quotes];
+  const result = {};
+
+  for (const quote of quoteList) {
+    const price = Number(quote?.regularMarketPrice);
+    if (!quote?.symbol || !Number.isFinite(price) || price <= 0) continue;
+    const index = yahooSymbols.indexOf(quote.symbol);
+    const symbol = index >= 0 ? requested[index] : quote.symbol;
+    result[symbol] = {
+      symbol,
+      price,
+      change_24h: Number(quote.regularMarketChangePercent || 0),
+      high_24h: Number(quote.regularMarketDayHigh || price),
+      low_24h: Number(quote.regularMarketDayLow || price),
+      volume: Number(quote.regularMarketVolume || 0),
+      source: 'live',
+    };
+  }
+  return result;
+}
 
 const FX_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'USDCNH', 'USDMXN', 'USDZAR', 'USDSEK', 'USDNOK', 'USDPLN', 'USDSGD', 'USDHKD', 'USDTRY', 'EURCHF', 'EURAUD', 'EURCAD', 'EURNZD', 'EURSEK', 'EURNOK', 'EURPLN', 'GBPCHF', 'GBPAUD', 'GBPCAD', 'GBPNZD', 'CHFJPY', 'CADJPY', 'NZDJPY'];
 const FUTURE_SYMBOLS = new Set(['ES', 'NQ', 'YM', 'RTY', 'GC', 'SI', 'CL', 'NG', 'HG', 'HO', 'BZ', 'BRN', 'ZS', 'ZW', 'KC', 'SB', 'CT', 'DX', '6E', '6J', '6B', '6A', '6C', '6S', 'US500', 'NAS100', 'GER40', 'FRA40', 'UK100', 'JPN225', 'HK50', 'XAUUSD', 'XAGUSD', 'USOIL', 'UKOIL', 'WTI', 'BRENT', 'GOLD', 'SILVER', 'XAU', 'XAG']);
