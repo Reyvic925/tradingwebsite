@@ -15,7 +15,7 @@ import {
 } from './session-utils.js';
 import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-data.js';
 
-function normalizeTradingSymbol(symbol) {
+export function normalizeTradingSymbol(symbol) {
   return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
 }
 
