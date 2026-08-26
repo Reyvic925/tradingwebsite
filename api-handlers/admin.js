@@ -12,6 +12,7 @@ import adminPlansHandler from './admin-plans.js';
 import adminTiersHandler from './admin-investment-tiers.js';
 import adminRoiApprovalsHandler from './admin-roi-approvals.js';
 import healthHandler from './health.js';
+import adminSeedHistoryHandler from './admin-seed-history.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,6 +47,10 @@ export default async function handler(req, res) {
       const { count } = await supabase.from('markets').select('*', { count: 'exact', head: true });
       await logAdminAction(adminAuth.admin?.id || null, 'seed-markets', 'markets', null, { count: count || 0 });
       return res.status(200).json({ ok: true, count: count || 0 });
+    }
+
+    if (sub === 'seed-history' && req.method === 'POST') {
+      return adminSeedHistoryHandler(req, res);
     }
 
     if (!sub) {

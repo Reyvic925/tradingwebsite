@@ -44,7 +44,12 @@ export default async function handler(req, res) {
 
     const priceResults = await Promise.all([...symbols].map(async (symbol) => {
       try {
-        return [symbol, await getAssetPrice(symbol)];
+        const price = await getAssetPrice(symbol);
+        if (!Number.isFinite(price) || price <= 0) {
+          console.warn(`[RESET] Invalid price for ${symbol}: ${price}`);
+          return [symbol, null];
+        }
+        return [symbol, price];
       } catch (error) {
         console.error(`[RESET] Could not price ${symbol}:`, error.message);
         return [symbol, null];
@@ -52,10 +57,14 @@ export default async function handler(req, res) {
     }));
     const prices = new Map(priceResults);
 
+    // Only create baseline trades for symbols with valid prices
     for (const trader of traders || []) {
       for (const asset of traderAssets.get(trader.id) || []) {
         const price = prices.get(asset);
-        if (!Number.isFinite(price) || price <= 0) continue;
+        if (!price || !Number.isFinite(price) || price <= 0) {
+          console.warn(`[RESET] Skipping baseline trade for ${trader.id}/${asset}: no valid price`);
+          continue;
+        }
         baselineTrades.push({
           trader_id: trader.id,
           symbol: asset,
