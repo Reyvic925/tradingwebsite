@@ -61,13 +61,14 @@ function getAssetPrice(symbol) {
   return ASSET_PRICES[normalized] || null;
 }
 
-function generateTrades(trader, daysBack = 7) {
+function generateTrades(trader, daysBack = 90) {
   const trades = [];
   const assetsToTrade = Array.isArray(trader.asset_focus) && trader.asset_focus.length > 0
     ? trader.asset_focus
     : ['BTC-USD', 'ETH-USD'];
 
-  const baseTradeCount = trader.total_trades || 0;
+  // Generate 200-600 trades per trader for established look
+  const baseTradeCount = Math.floor(200 + (trader.total_trades || 500) * 1.2);
   const winRate = (trader.win_rate_trades || 50) / 100;
   const tradesPerDay = Math.ceil(baseTradeCount / Math.max(daysBack, 1));
 
@@ -76,7 +77,7 @@ function generateTrades(trader, daysBack = 7) {
     const tradeDate = new Date();
     tradeDate.setDate(tradeDate.getDate() - day);
 
-    const numTrades = Math.max(1, Math.floor(tradesPerDay + (Math.random() - 0.5) * 2));
+    const numTrades = Math.max(4, Math.floor(tradesPerDay + (Math.random() - 0.5) * 6));  // 4-8 trades per day
     for (let t = 0; t < numTrades && tradeId < baseTradeCount; t++, tradeId++) {
       const asset = assetsToTrade[tradeId % assetsToTrade.length];
       const basePrice = getAssetPrice(asset);
@@ -85,12 +86,12 @@ function generateTrades(trader, daysBack = 7) {
       // Generate realistic trade with win/loss based on win rate
       const isWin = Math.random() < winRate;
       const priceMove = isWin 
-        ? Math.random() * 0.03 + 0.001  // +0.1% to +3.1% win
-        : -(Math.random() * 0.04 + 0.001);  // -0.1% to -4.1% loss
+        ? Math.random() * 0.05 + 0.002  // +0.2% to +5.2% win
+        : -(Math.random() * 0.06 + 0.002);  // -0.2% to -6.2% loss
 
-      const entryPrice = basePrice * (1 + (Math.random() - 0.5) * 0.001);
+      const entryPrice = basePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
-      const quantity = Math.random() < 0.5 ? 1 : Math.ceil(Math.random() * 5);
+      const quantity = Math.random() < 0.4 ? 1 : (Math.random() < 0.7 ? Math.ceil(Math.random() * 5) : Math.ceil(Math.random() * 15));
       const pnl = (exitPrice - entryPrice) * quantity;
       const pnlPercent = (priceMove * 100);
 
@@ -169,8 +170,8 @@ async function seedTraders() {
     const batchSize = 500;
 
     // Process traders in batches
-    for (let i = 0; i < traders.length; i += 10) {
-      const batch = traders.slice(i, Math.min(i + 10, traders.length));
+    for (let i = 0; i < traders.length; i += 3) {
+      const batch = traders.slice(i, Math.min(i + 3, traders.length));
       const allBatchTrades = [];
       const allBatchSnapshots = [];
 
