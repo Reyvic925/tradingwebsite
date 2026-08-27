@@ -23,6 +23,7 @@ export function normalizeTradingSymbol(symbol) {
     BTC: 'BTCUSD', ETH: 'ETHUSD', SOL: 'SOLUSD', AVAX: 'AVAXUSD', BNB: 'BNBUSD',
     EUR: 'EURUSD', GBP: 'GBPUSD', XAU: 'XAUUSD', XAG: 'XAGUSD',
     WTI: 'USOIL', BRENT: 'USOIL', GOLD: 'XAUUSD', SILVER: 'XAGUSD',
+    DAX40: 'GER40', CAC40: 'FRA40', SPX: 'SPX500', NAS100: 'NASDAQ',
   };
   return aliases[normalized] || normalized;
 }
@@ -170,20 +171,24 @@ export default async function handler(req, res) {
           currentPrice = await getAssetPrice(symbol, invocationQuotes, false);
         } catch (priceError) {
           console.error(`[CRON] Skipping trade for trader ${trader.id}:`, priceError.message);
-          return;
+          currentPrice = null;
         }
 
-        // Generate realistic entry price
-        const entryPrice = generateRealisticEntryPrice(currentPrice, Math.abs(changePercent), isProfit);
+        if (Number.isFinite(currentPrice) && currentPrice > 0) {
+          // Generate realistic entry price
+          const entryPrice = generateRealisticEntryPrice(currentPrice, Math.abs(changePercent), isProfit);
 
-        // Calculate quantity
-        const priceDiff = Math.abs(currentPrice - entryPrice);
-        const quantity = priceDiff > 0 ? Math.abs(pnlDelta) / priceDiff : 1;
+          // Reject invalid prices before calculating quantity or inserting a row.
+          const priceDiff = Math.abs(currentPrice - entryPrice);
+          const quantity = priceDiff > 0 ? Math.abs(pnlDelta) / priceDiff : 0;
+          if (!Number.isFinite(entryPrice) || entryPrice <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+            console.error(`[CRON] Skipping invalid trade for trader ${trader.id}`);
+          } else {
 
-        // Insert trade log
-        const { error: tradeError } = await supabase
-          .from('trade_logs')
-          .insert({
+            // Insert trade log
+            const { error: tradeError } = await supabase
+              .from('trade_logs')
+              .insert({
             trader_id: trader.id,
             symbol,
             side: isProfit ? 'BUY' : 'SELL',
@@ -195,24 +200,28 @@ export default async function handler(req, res) {
             status: 'CLOSED',
             traded_at: new Date().toISOString(),
             closed_at: new Date().toISOString()
-          });
+              });
 
-        if (tradeError) {
-          tradeErrors++;
-          console.error(`[CRON] Error inserting trade for trader ${trader.id}:`, tradeError);
+            if (tradeError) {
+              tradeErrors++;
+              console.error(`[CRON] Error inserting trade for trader ${trader.id}:`, tradeError);
+            } else {
+              generatedTrades++;
+              const previousTrades = Number(trader.total_trades || 0);
+              const previousWinRate = Number(trader.win_rate_trades || 50);
+              const winningTrades = Math.round((previousTrades * previousWinRate) / 100) + (pnlDelta > 0 ? 1 : 0);
+              await supabase
+                .from('traders')
+                .update({
+                  total_trades: previousTrades + 1,
+                  win_rate_trades: Number(((winningTrades / (previousTrades + 1)) * 100).toFixed(2))
+                })
+                .eq('id', trader.id);
+              console.log(`[CRON] Generated trade: ${quantity.toFixed(2)} ${symbol} at $${entryPrice.toFixed(2)}`);
+            }
+          }
         } else {
-          generatedTrades++;
-          const previousTrades = Number(trader.total_trades || 0);
-          const previousWinRate = Number(trader.win_rate_trades || 50);
-          const winningTrades = Math.round((previousTrades * previousWinRate) / 100) + (pnlDelta > 0 ? 1 : 0);
-          await supabase
-            .from('traders')
-            .update({
-              total_trades: previousTrades + 1,
-              win_rate_trades: Number(((winningTrades / (previousTrades + 1)) * 100).toFixed(2))
-            })
-            .eq('id', trader.id);
-          console.log(`[CRON] Generated trade: ${quantity.toFixed(2)} ${symbol} at $${entryPrice.toFixed(2)}`);
+          console.error(`[CRON] Skipping trade for trader ${trader.id}: invalid current price`);
         }
       }
 
