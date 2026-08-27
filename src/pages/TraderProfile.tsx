@@ -93,9 +93,9 @@ export default function TraderProfile() {
   const sessionOpen = marketStatus.status === 'Live';
   const startingEquity = 10000;
   const currentEquity = Number(trader.current_equity || startingEquity);
-  const equityCurve = Array.from({ length: 7 }, (_, index) => ({
-    day: index === 0 ? 'Start' : `Day ${index}`,
-    equity: Number((startingEquity + ((currentEquity - startingEquity) * index) / 6).toFixed(2)),
+  const equityCurve = Array.from({ length: 13 }, (_, index) => ({
+    day: index === 0 ? 'Start' : `Week ${index}`,
+    equity: Number((startingEquity + ((currentEquity - startingEquity) * index) / 12).toFixed(2)),
   }));
 
   return (
@@ -238,7 +238,7 @@ export default function TraderProfile() {
 
       {/* Equity Curve */}
       <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">
-        <h2 className="text-lg font-semibold text-white mb-4">Equity Curve (7 Days)</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Equity Curve (90 Days)</h2>
         <div className="h-64 rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={equityCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>

@@ -85,13 +85,14 @@ function generateTrades(trader, daysBack = 90) {
 
       // Generate realistic trade with win/loss based on win rate
       const isWin = Math.random() < winRate;
-      const priceMove = isWin 
-        ? Math.random() * 0.05 + 0.002  // +0.2% to +5.2% win
-        : -(Math.random() * 0.06 + 0.002);  // -0.2% to -6.2% loss
+      const priceMove = isWin
+        ? Math.random() * 0.012 + 0.002
+        : -(Math.random() * 0.015 + 0.002);
 
       const entryPrice = basePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
-      const quantity = Math.random() < 0.4 ? 1 : (Math.random() < 0.7 ? Math.ceil(Math.random() * 5) : Math.ceil(Math.random() * 15));
+      const targetExposure = 500 + Math.random() * 2500;
+      const quantity = Math.max(0.0001, targetExposure / entryPrice);
       const pnl = (exitPrice - entryPrice) * quantity;
       const pnlPercent = (priceMove * 100);
 
@@ -118,23 +119,22 @@ function generateTrades(trader, daysBack = 90) {
   return trades.slice(0, baseTradeCount);
 }
 
-function generateHistorySnapshots(trader, daysBack = 90) {
+function generateHistorySnapshots(trader, daysBack = 90, trades = []) {
   const snapshots = [];
   const startEquity = 10000;
   let currentEquity = startEquity;
+  let previousEquity = startEquity;
 
   for (let day = daysBack; day >= 0; day--) {
     const snapshotDate = new Date();
     snapshotDate.setDate(snapshotDate.getDate() - day);
     const dateStr = snapshotDate.toISOString().slice(0, 10);
 
-    // Simulate equity curve using trader's total_return
-    const totalReturnPercent = trader.total_return || 0;
-    const dailyDriftPercent = (totalReturnPercent / Math.max(daysBack, 1)) / 100;
-    const dayVolatility = (Math.random() - 0.5) * 0.02;
-    
-    currentEquity = currentEquity * (1 + dailyDriftPercent + dayVolatility);
-    const dailyReturn = (currentEquity - startEquity) / startEquity * 100;
+    const dayTrades = trades.filter((trade) => trade.traded_at.slice(0, 10) === dateStr);
+    const dayPnl = dayTrades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+    currentEquity = Math.max(100, currentEquity + dayPnl);
+    const dailyReturn = previousEquity > 0 ? ((currentEquity - previousEquity) / previousEquity) * 100 : 0;
+    previousEquity = currentEquity;
 
     snapshots.push({
       trader_id: trader.id,
@@ -154,7 +154,7 @@ async function seedTraders() {
     // Fetch all active traders
     const { data: traders, error: traderError } = await supabase
       .from('traders')
-      .select('id, name, total_trades, win_rate_trades, total_return, asset_focus')
+      .select('id, name, total_trades, win_rate_trades, total_return, asset_focus, followers, copiers_all_time')
       .eq('is_active', true);
 
     if (traderError) throw traderError;
@@ -177,7 +177,7 @@ async function seedTraders() {
 
       for (const trader of batch) {
         const trades = generateTrades(trader, 90);
-        const snapshots = generateHistorySnapshots(trader, 90);
+        const snapshots = generateHistorySnapshots(trader, 90, trades);
         allBatchTrades.push(...trades);
         allBatchSnapshots.push(...snapshots);
       }
@@ -228,8 +228,8 @@ async function seedTraders() {
             // Calculate metrics from actual trades
             const totalTrades = traderTrades.length;
             const winTrades = traderTrades.filter(t => t.pnl > 0).length;
-            const totalPnL = traderTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-            const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 50;
+            const totalPnL = traderTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+            const winRate = totalTrades > 0 ? Number(((winTrades / totalTrades) * 100).toFixed(2)) : 0;
 
             // Calculate max drawdown from history
             const { data: history, error: historyError } = await supabase
@@ -250,7 +250,7 @@ async function seedTraders() {
 
             // Get final equity for total return
             const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
-            const totalReturn = ((finalEquity - 10000) / 10000) * 100;
+            const totalReturn = (totalPnL / 10000) * 100;
 
             // Calculate daily volatility
             if (history && history.length > 1) {
@@ -262,15 +262,25 @@ async function seedTraders() {
               const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
               const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
               const dailyVolatility = Math.sqrt(variance);
+              const currentCopiers = Math.max(Number(trader.followers || 0), 1);
+              const copierProfit = Math.max(totalReturn, 0) / 100 * 1000 * currentCopiers;
 
-              // Update trader record with all calculated metrics
+              // Update every profile metric from this trader's generated history.
               const { error: updateError } = await supabase
                 .from('traders')
                 .update({
                   total_trades: totalTrades,
                   win_rate_trades: winRate,
                   total_return: Number(totalReturn.toFixed(2)),
-                  current_equity: Number(finalEquity.toFixed(2)),
+                  current_equity: Number((10000 + totalPnL).toFixed(2)),
+                  daily_return: Number(returns[returns.length - 1].toFixed(2)),
+                  max_drawdown: Number(maxDrawdown.toFixed(2)),
+                  volatility: Number((dailyVolatility / 100).toFixed(6)),
+                  copiers_current: currentCopiers,
+                  copiers_all_time: Math.max(Number(trader.copiers_all_time || 0), currentCopiers),
+                  under_management: Number((currentCopiers * 1000).toFixed(2)),
+                  profit_for_copiers: Number(copierProfit.toFixed(2)),
+                  updated_at: new Date().toISOString(),
                 })
                 .eq('id', trader.id);
 
