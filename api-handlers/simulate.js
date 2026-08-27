@@ -28,9 +28,23 @@ export function normalizeTradingSymbol(symbol) {
 }
 
 let cryptoQuotesPromise;
+let assetPricePromises = new Map();
 
 export async function getAssetPrice(symbol) {
   const normalizedSymbol = normalizeTradingSymbol(symbol);
+  if (assetPricePromises.has(normalizedSymbol)) {
+    return assetPricePromises.get(normalizedSymbol);
+  }
+
+  const pricePromise = resolveAssetPrice(normalizedSymbol).catch((error) => {
+    assetPricePromises.delete(normalizedSymbol);
+    throw error;
+  });
+  assetPricePromises.set(normalizedSymbol, pricePromise);
+  return pricePromise;
+}
+
+async function resolveAssetPrice(normalizedSymbol) {
   cryptoQuotesPromise ||= fetchLiveMarketSnapshot().catch((error) => {
     console.error('Error fetching live market prices:', error);
     return {};
@@ -73,6 +87,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Refresh quote caches for every cron invocation, including warm Vercel instances.
+    cryptoQuotesPromise = undefined;
+    assetPricePromises = new Map();
     console.log('[CRON] Starting continuous copy trading tick...');
 
     // Step 1: Fetch all active traders
@@ -90,8 +107,9 @@ export default async function handler(req, res) {
     let tradeErrors = 0;
     let updatedCopies = 0;
 
-    // Step 2: Process each trader
-    for (const trader of traders || []) {
+    // Step 2: Process traders with bounded concurrency so external cron callers
+    // do not time out while every trader is updated serially.
+    const processTrader = async (trader) => {
       if (!isTraderEligible(trader)) {
         skippedTraders++;
         skippedSessions.push({
@@ -101,7 +119,7 @@ export default async function handler(req, res) {
           reason: 'session_closed'
         });
         console.log(`[CRON] Skipping ${trader.id} (${trader.name}): ${trader.session_type} session is closed`);
-        continue;
+        return;
       }
 
       console.log(`[CRON] Processing trader ${trader.id} (${trader.name})`);
@@ -130,7 +148,7 @@ export default async function handler(req, res) {
           currentPrice = await getAssetPrice(symbol);
         } catch (priceError) {
           console.error(`[CRON] Skipping trade for trader ${trader.id}:`, priceError.message);
-          continue;
+          return;
         }
 
         // Generate realistic entry price
@@ -193,7 +211,7 @@ export default async function handler(req, res) {
 
       if (updateError) {
         console.error(`[CRON] Error updating trader ${trader.id}:`, updateError);
-        continue;
+        return;
       }
 
       // Step 2D: Save the current P&L snapshot.
@@ -241,11 +259,16 @@ export default async function handler(req, res) {
 
           if (followUpdateError) {
             console.error(`[CRON] Error updating follower ${follow.id}:`, followUpdateError);
-            continue;
+            return;
           }
           updatedCopies++;
         }
       }
+    };
+
+    const concurrency = 8;
+    for (let index = 0; index < (traders || []).length; index += concurrency) {
+      await Promise.all((traders || []).slice(index, index + concurrency).map(processTrader));
     }
 
     console.log(`[CRON] P&L tick complete: ${simulatedTraders} traders, ${generatedTrades} trades, ${updatedCopies} copies updated`);
