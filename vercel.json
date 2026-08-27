@@ -1,7 +1,4 @@
 {
-  "crons": [
-    { "path": "/api/cron/copy-trading", "schedule": "* * * * *" }
-  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     {
