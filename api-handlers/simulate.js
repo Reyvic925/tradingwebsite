@@ -15,6 +15,8 @@ import {
 } from './session-utils.js';
 import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-data.js';
 
+const STARTING_EQUITY = 50000;
+
 export function normalizeTradingSymbol(symbol) {
   return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
 }
@@ -154,7 +156,7 @@ export default async function handler(req, res) {
 
       // Step 2C: Update trader equity and daily return.
       const allTimeReturn = Math.max(
-        Number(trader.total_return || 0) + ((newEquity - oldEquity) / 10000) * 100,
+        Number(trader.total_return || 0) + ((newEquity - oldEquity) / STARTING_EQUITY) * 100,
         0
       );
       const { error: updateError } = await supabase

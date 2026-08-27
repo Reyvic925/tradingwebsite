@@ -6,6 +6,7 @@
 
 import 'dotenv/config.js';
 import { createClient } from '@supabase/supabase-js';
+import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from '../api-handlers/live-market-data.js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,6 +17,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const STARTING_EQUITY = 50000;
 
 // Realistic asset prices for seeding trades
 const ASSET_PRICES = {
@@ -56,7 +58,7 @@ function normalizeSymbol(symbol) {
   return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
 }
 
-function getAssetPrice(symbol) {
+function getAssetPrice(symbol, livePrices = {}) {
   const normalized = normalizeSymbol(symbol);
   const aliases = {
     BTC: 'BTCUSD',
@@ -70,10 +72,12 @@ function getAssetPrice(symbol) {
     BRENT: 'BRENTUSD',
     WTI: 'USDWTI',
   };
-  return ASSET_PRICES[aliases[normalized] || normalized] || null;
+  const liveSymbol = aliases[normalized] || normalized;
+  const livePrice = Number(livePrices[liveSymbol]?.price);
+  return Number.isFinite(livePrice) && livePrice > 0 ? livePrice : ASSET_PRICES[liveSymbol] || null;
 }
 
-function generateTrades(trader, daysBack = 90) {
+function generateTrades(trader, daysBack = 90, livePrices = {}) {
   const trades = [];
   const assetsToTrade = Array.isArray(trader.asset_focus) && trader.asset_focus.length > 0
     ? trader.asset_focus
@@ -92,9 +96,9 @@ function generateTrades(trader, daysBack = 90) {
     const numTrades = Math.max(4, Math.floor(tradesPerDay + (Math.random() - 0.5) * 6));  // 4-8 trades per day
     for (let t = 0; t < numTrades && tradeId < baseTradeCount; t++, tradeId++) {
       const requestedAsset = assetsToTrade[tradeId % assetsToTrade.length];
-      const basePrice = getAssetPrice(requestedAsset);
+      const basePrice = getAssetPrice(requestedAsset, livePrices);
       const asset = basePrice ? requestedAsset : 'BTC-USD';
-      const tradePrice = basePrice || getAssetPrice(asset);
+      const tradePrice = basePrice || getAssetPrice(asset, livePrices);
 
       // Generate realistic trade with win/loss based on win rate
       const isWin = Math.random() < winRate;
@@ -104,7 +108,7 @@ function generateTrades(trader, daysBack = 90) {
 
       const entryPrice = tradePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
-      const targetExposure = 250 + Math.random() * 950;
+      const targetExposure = 1500 + Math.random() * 6500;
       const quantity = Math.max(0.0001, targetExposure / entryPrice);
       const pnl = (exitPrice - entryPrice) * quantity;
       const pnlPercent = (priceMove * 100);
@@ -144,7 +148,7 @@ function generateTrades(trader, daysBack = 90) {
 
 function generateHistorySnapshots(trader, daysBack = 90, trades = []) {
   const snapshots = [];
-  const startEquity = 10000;
+  const startEquity = STARTING_EQUITY;
   let currentEquity = startEquity;
   let previousEquity = startEquity;
 
@@ -155,7 +159,7 @@ function generateHistorySnapshots(trader, daysBack = 90, trades = []) {
 
     const dayTrades = trades.filter((trade) => trade.traded_at.slice(0, 10) === dateStr);
     const dayPnl = dayTrades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
-    currentEquity = Math.max(100, currentEquity + dayPnl);
+    currentEquity = Math.max(startEquity * 0.5, currentEquity + dayPnl);
     const dailyReturn = previousEquity > 0 ? ((currentEquity - previousEquity) / previousEquity) * 100 : 0;
     previousEquity = currentEquity;
 
@@ -183,6 +187,16 @@ async function seedTraders() {
     if (traderError) throw traderError;
     console.log(`📊 Found ${traders.length} active traders`);
 
+    const requestedSymbols = [...new Set(traders.flatMap((trader) => trader.asset_focus || []))]
+      .map(normalizeSymbol)
+      .filter(Boolean);
+    const [liveSnapshot, yahooQuotes] = await Promise.all([
+      fetchLiveMarketSnapshot().catch(() => ({})),
+      fetchYahooMarketQuotes(requestedSymbols).catch(() => ({})),
+    ]);
+    const livePrices = { ...liveSnapshot, ...yahooQuotes };
+    console.log(`💹 Loaded ${Object.keys(livePrices).length} current market quotes`);
+
     // Clear existing trade_logs and trader_history
     console.log('🧹 Clearing existing trade history...');
     const { error: tradeDeleteError } = await supabase
@@ -208,7 +222,7 @@ async function seedTraders() {
       const allBatchSnapshots = [];
 
       for (const trader of batch) {
-        const trades = generateTrades(trader, 90);
+        const trades = generateTrades(trader, 90, livePrices);
         const snapshots = generateHistorySnapshots(trader, 90, trades);
         allBatchTrades.push(...trades);
         allBatchSnapshots.push(...snapshots);
@@ -282,7 +296,7 @@ async function seedTraders() {
 
             // Get final equity for total return
             const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
-            const totalReturn = Math.max((totalPnL / 10000) * 100, 0.25);
+            const totalReturn = Math.max((totalPnL / STARTING_EQUITY) * 100, 0.25);
 
             // Calculate daily volatility
             if (history && history.length > 1) {
@@ -304,7 +318,7 @@ async function seedTraders() {
                   total_trades: totalTrades,
                   win_rate_trades: winRate,
                   total_return: Number(totalReturn.toFixed(2)),
-                  current_equity: Number((10000 * (1 + totalReturn / 100)).toFixed(2)),
+                  current_equity: Number((STARTING_EQUITY * (1 + totalReturn / 100)).toFixed(2)),
                   daily_return: Number(returns[returns.length - 1].toFixed(2)),
                   max_drawdown: Number(maxDrawdown.toFixed(2)),
                   volatility: Number((dailyVolatility / 100).toFixed(6)),

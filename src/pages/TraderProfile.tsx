@@ -158,7 +158,7 @@ export default function TraderProfile() {
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                   <div className="text-xs text-gray-400 mb-1">Trader Equity</div>
                   <div className="text-2xl font-bold text-white">{formatMoney(trader.current_equity ?? 0)}</div>
-          <div className="text-xs text-gray-500 mt-1">Starting: $10,000</div>
+          <div className="text-xs text-gray-500 mt-1">Starting: $50,000</div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
