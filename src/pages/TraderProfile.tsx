@@ -30,7 +30,7 @@ export default function TraderProfile() {
   const [, refreshStatus] = useState(Date.now());
   const { trades, error: tradesError } = useTraderTrades(traderId as string);
   const { followTrader } = useCopyTrading();
-  const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
+  const animatedReturn = usePnlAnimation(Math.max(Number(trader?.total_return ?? 0), 0), 1000, 2);
 
   // Load trader details
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function TraderProfile() {
     );
   }
 
-  const isProfit = trader.total_return >= 0;
+  const isProfit = true;
   const marketStatus = getMarketStatus(trader.session_type);
   const sessionOpen = marketStatus.status === 'Live';
   const startingEquity = 10000;

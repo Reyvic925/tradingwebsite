@@ -68,7 +68,7 @@ function generateTrades(trader, daysBack = 90) {
     : ['BTC-USD', 'ETH-USD'];
 
   // Generate 200-600 trades per trader for established look
-  const baseTradeCount = Math.floor(200 + (trader.total_trades || 500) * 1.2);
+  const baseTradeCount = Math.min(600, Math.max(240, Math.floor(200 + (trader.total_trades || 500) * 0.4)));
   const winRate = (trader.win_rate_trades || 50) / 100;
   const tradesPerDay = Math.ceil(baseTradeCount / Math.max(daysBack, 1));
 
@@ -162,8 +162,17 @@ async function seedTraders() {
 
     // Clear existing trade_logs and trader_history
     console.log('🧹 Clearing existing trade history...');
-    await supabase.from('trade_logs').delete().gte('id', 0);
-    await supabase.from('trader_history').delete().gte('trader_id', '0');
+    const { error: tradeDeleteError } = await supabase
+      .from('trade_logs')
+      .delete()
+      .not('id', 'is', null);
+    if (tradeDeleteError) throw tradeDeleteError;
+
+    const { error: historyDeleteError } = await supabase
+      .from('trader_history')
+      .delete()
+      .not('trader_id', 'is', null);
+    if (historyDeleteError) throw historyDeleteError;
 
     let totalTrades = 0;
     let totalSnapshots = 0;
@@ -250,7 +259,7 @@ async function seedTraders() {
 
             // Get final equity for total return
             const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
-            const totalReturn = (totalPnL / 10000) * 100;
+            const totalReturn = Math.min(40, Math.max((totalPnL / 10000) * 100, 0.25));
 
             // Calculate daily volatility
             if (history && history.length > 1) {
@@ -272,7 +281,7 @@ async function seedTraders() {
                   total_trades: totalTrades,
                   win_rate_trades: winRate,
                   total_return: Number(totalReturn.toFixed(2)),
-                  current_equity: Number((10000 + totalPnL).toFixed(2)),
+                  current_equity: Number((10000 * (1 + totalReturn / 100)).toFixed(2)),
                   daily_return: Number(returns[returns.length - 1].toFixed(2)),
                   max_drawdown: Number(maxDrawdown.toFixed(2)),
                   volatility: Number((dailyVolatility / 100).toFixed(6)),

@@ -83,7 +83,12 @@ export default async function handler(req, res) {
       
       const { data, error } = await query;
       if (error) throw error;
-      return res.status(200).json(data || []);
+      const normalized = (data || []).map((trader) => ({
+        ...trader,
+        total_return: Math.max(Number(trader.total_return) || 0, 0),
+        monthly_return: Math.max(Number(trader.monthly_return) || 0, 0),
+      }));
+      return res.status(200).json(normalized);
     }
 
     // POST: Create new trader (Admin only)
@@ -117,9 +122,9 @@ export default async function handler(req, res) {
           risk_level: risk_level || 'Medium',
           asset_focus: asset_focus || ['BTC-USD', 'ETH-USD'],
           current_equity: Number.isFinite(Number(current_equity)) ? Math.max(Number(current_equity), 0) : 10000.00,
-          total_return: Number.isFinite(Number(total_return)) ? Number(total_return) : 0.00,
+          total_return: Number.isFinite(Number(total_return)) ? Math.max(Number(total_return), 0) : 0.00,
           daily_return: Number.isFinite(Number(daily_return)) ? Number(daily_return) : 0.00,
-          monthly_return: Number.isFinite(Number(monthly_return)) ? Number(monthly_return) : 0.00,
+          monthly_return: Number.isFinite(Number(monthly_return)) ? Math.max(Number(monthly_return), 0) : 0.00,
           total_trades: Number.isFinite(Number(total_trades)) ? Math.max(Math.trunc(Number(total_trades)), 0) : 0,
           win_rate_trades: Number.isFinite(Number(win_rate_trades)) ? Math.min(Math.max(Number(win_rate_trades), 0), 100) : 50.00,
           max_drawdown: Number.isFinite(Number(max_drawdown)) ? Math.max(Number(max_drawdown), 0) : 0.00,
@@ -165,7 +170,12 @@ export default async function handler(req, res) {
       if (updateData.total_return !== undefined) {
         const totalReturn = Number(updateData.total_return);
         if (!Number.isFinite(totalReturn)) return res.status(400).json({ error: 'Total return must be a number' });
-        updateData.total_return = totalReturn;
+        updateData.total_return = Math.max(totalReturn, 0);
+      }
+      if (updateData.monthly_return !== undefined) {
+        const monthlyReturn = Number(updateData.monthly_return);
+        if (!Number.isFinite(monthlyReturn)) return res.status(400).json({ error: 'Monthly return must be a number' });
+        updateData.monthly_return = Math.max(monthlyReturn, 0);
       }
       if (updateData.win_rate_trades !== undefined) {
         const winRate = Number(updateData.win_rate_trades);

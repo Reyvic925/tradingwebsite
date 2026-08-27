@@ -107,8 +107,8 @@ function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { 
             {formatMoney(availableBalance)}
           </div>
           <div className="text-sm text-gray-500 mt-1">
-            Live ROI: <span className={trader.total_return >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-              {trader.total_return >= 0 ? '+' : ''}{Number(trader.total_return).toFixed(2)}%
+            Live ROI: <span className="text-emerald-400">
+              +{Math.max(Number(trader.total_return) || 0, 0).toFixed(2)}%
             </span>
           </div>
         </div>
@@ -255,7 +255,7 @@ function LeaderboardSection() {
               </div>
             </div>
             <div className="text-2xl font-bold text-emerald-400 mb-2">
-              {formatPct(Number(trader.total_return || 0))}
+              {formatPct(Math.max(Number(trader.total_return || 0), 0))}
             </div>
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">30-day ROI</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -330,7 +330,8 @@ function PortfolioSummary() {
 function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [, refreshStatus] = useState(Date.now());
-  const isProfit = trader.total_return >= 0;
+  const isProfit = true;
+  const traderRoi = Math.max(Number(trader.total_return || 0), 0);
 
   useEffect(() => {
     const interval = window.setInterval(() => refreshStatus(Date.now()), 60000);
@@ -405,7 +406,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
         <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
           <div>
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-              {formatPct(Number(trader.total_return || 0))}
+              {formatPct(traderRoi)}
             </div>
             <div className="text-gray-500">30-day ROI</div>
           </div>
