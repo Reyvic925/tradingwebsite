@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import { useTraderTrades, usePnlAnimation, useCopyTrading } from '../lib/copy-trading-hooks';
+import { useTraderTrades, useTraderHistory, usePnlAnimation, useCopyTrading } from '../lib/copy-trading-hooks';
 import {
   ChevronUp,
   ChevronDown,
@@ -29,6 +29,7 @@ export default function TraderProfile() {
   const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
   const [, refreshStatus] = useState(Date.now());
   const { trades, error: tradesError } = useTraderTrades(traderId as string);
+  const history = useTraderHistory(traderId as string);
   const { followTrader } = useCopyTrading();
   const animatedReturn = usePnlAnimation(Math.max(Number(trader?.total_return ?? 0), 0), 1000, 2);
 
@@ -91,11 +92,9 @@ export default function TraderProfile() {
   const isProfit = true;
   const marketStatus = getMarketStatus(trader.session_type);
   const sessionOpen = marketStatus.status === 'Live';
-  const startingEquity = 10000;
-  const currentEquity = Number(trader.current_equity || startingEquity);
-  const equityCurve = Array.from({ length: 13 }, (_, index) => ({
-    day: index === 0 ? 'Start' : `Week ${index}`,
-    equity: Number((startingEquity + ((currentEquity - startingEquity) * index) / 12).toFixed(2)),
+  const equityCurve = history.map((snapshot, index) => ({
+    day: index === 0 ? 'Start' : snapshot.snapshot_date,
+    equity: Number(snapshot.equity || 0),
   }));
 
   return (

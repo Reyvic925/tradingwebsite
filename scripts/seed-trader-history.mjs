@@ -58,7 +58,19 @@ function normalizeSymbol(symbol) {
 
 function getAssetPrice(symbol) {
   const normalized = normalizeSymbol(symbol);
-  return ASSET_PRICES[normalized] || null;
+  const aliases = {
+    BTC: 'BTCUSD',
+    ETH: 'ETHUSD',
+    EUR: 'EURUSD',
+    GBP: 'GBPUSD',
+    JPY: 'JPYUSD',
+    USD: 'EURUSD',
+    XAU: 'XAUUSD',
+    XAG: 'XAGUSD',
+    BRENT: 'BRENTUSD',
+    WTI: 'USDWTI',
+  };
+  return ASSET_PRICES[aliases[normalized] || normalized] || null;
 }
 
 function generateTrades(trader, daysBack = 90) {
@@ -79,19 +91,20 @@ function generateTrades(trader, daysBack = 90) {
 
     const numTrades = Math.max(4, Math.floor(tradesPerDay + (Math.random() - 0.5) * 6));  // 4-8 trades per day
     for (let t = 0; t < numTrades && tradeId < baseTradeCount; t++, tradeId++) {
-      const asset = assetsToTrade[tradeId % assetsToTrade.length];
-      const basePrice = getAssetPrice(asset);
-      if (!basePrice) continue;
+      const requestedAsset = assetsToTrade[tradeId % assetsToTrade.length];
+      const basePrice = getAssetPrice(requestedAsset);
+      const asset = basePrice ? requestedAsset : 'BTC-USD';
+      const tradePrice = basePrice || getAssetPrice(asset);
 
       // Generate realistic trade with win/loss based on win rate
       const isWin = Math.random() < winRate;
       const priceMove = isWin
-        ? Math.random() * 0.012 + 0.002
-        : -(Math.random() * 0.015 + 0.002);
+        ? Math.random() * 0.008 + 0.004
+        : -(Math.random() * 0.003 + 0.001);
 
-      const entryPrice = basePrice * (1 + (Math.random() - 0.5) * 0.003);
+      const entryPrice = tradePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
-      const targetExposure = 500 + Math.random() * 2500;
+      const targetExposure = 250 + Math.random() * 950;
       const quantity = Math.max(0.0001, targetExposure / entryPrice);
       const pnl = (exitPrice - entryPrice) * quantity;
       const pnlPercent = (priceMove * 100);
@@ -116,7 +129,17 @@ function generateTrades(trader, daysBack = 90) {
     }
   }
 
-  return trades.slice(0, baseTradeCount);
+  const seededTrades = trades.slice(0, baseTradeCount);
+  const totalPnl = seededTrades.reduce((sum, trade) => sum + trade.pnl, 0);
+  if (seededTrades.length > 0 && totalPnl < 25) {
+    const trade = seededTrades[seededTrades.length - 1];
+    const adjustedPnl = 25 - totalPnl + trade.pnl;
+    trade.pnl = Number(adjustedPnl.toFixed(2));
+    trade.exit_price = Number((trade.entry_price + adjustedPnl / trade.quantity).toFixed(4));
+    trade.pnl_percent = Number((((trade.exit_price - trade.entry_price) / trade.entry_price) * 100).toFixed(2));
+  }
+
+  return seededTrades;
 }
 
 function generateHistorySnapshots(trader, daysBack = 90, trades = []) {
@@ -259,7 +282,7 @@ async function seedTraders() {
 
             // Get final equity for total return
             const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
-            const totalReturn = Math.min(40, Math.max((totalPnL / 10000) * 100, 0.25));
+            const totalReturn = Math.max((totalPnL / 10000) * 100, 0.25);
 
             // Calculate daily volatility
             if (history && history.length > 1) {

@@ -261,6 +261,25 @@ export function useTraderTrades(traderId: string | null) {
   return { trades, loading, error };
 }
 
+export function useTraderHistory(traderId: string | null) {
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!traderId) return;
+
+    const fetchHistory = async () => {
+      const response = await fetch(`/api/trader-history?traderId=${traderId}`);
+      if (response.ok) setHistory(await response.json());
+    };
+
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 30000);
+    return () => clearInterval(interval);
+  }, [traderId]);
+
+  return history;
+}
+
 /**
  * Hook to fetch traders list
  * @param session - Optional session filter
