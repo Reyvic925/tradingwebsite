@@ -291,7 +291,7 @@ export default function TraderProfile() {
             <h2 className="text-lg font-semibold text-white">Trading activity</h2>
             <p className="mt-1 text-xs text-gray-500">BUY and SELL activity for {trader.name}'s configured assets</p>
           </div>
-          <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
+          <div className="text-right text-xs text-gray-500">{trades.length} biggest wins &amp; losses</div>
         </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {typeof navigator !== 'undefined' && !navigator.onLine ? (

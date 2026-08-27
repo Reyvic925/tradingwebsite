@@ -15,17 +15,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Trader ID must be an integer' });
     }
 
-    // Get last 50 trades for this trader
-    const { data, error } = await supabase
-      .from('trade_logs')
-      .select('*')
-      .eq('trader_id', traderId)
-      .order('traded_at', { ascending: false })
-      .limit(50);
+    // Show the 25 largest wins and 25 largest losses, rather than an arbitrary
+    // recent slice that can hide the trader's actual risk and performance.
+    const [winsResult, lossesResult] = await Promise.all([
+      supabase
+        .from('trade_logs')
+        .select('*')
+        .eq('trader_id', traderId)
+        .gt('pnl', 0)
+        .order('pnl', { ascending: false })
+        .limit(25),
+      supabase
+        .from('trade_logs')
+        .select('*')
+        .eq('trader_id', traderId)
+        .lt('pnl', 0)
+        .order('pnl', { ascending: true })
+        .limit(25),
+    ]);
 
-    if (error) throw error;
+    if (winsResult.error) throw winsResult.error;
+    if (lossesResult.error) throw lossesResult.error;
 
-    return res.status(200).json(data || []);
+    const wins = winsResult.data || [];
+    const losses = lossesResult.data || [];
+    return res.status(200).json([...wins, ...losses]);
   } catch (err) {
     console.error('API error:', err);
     res.status(500).json({ error: err.message });
