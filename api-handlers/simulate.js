@@ -18,7 +18,13 @@ import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-d
 const STARTING_EQUITY = 100000;
 
 export function normalizeTradingSymbol(symbol) {
-  return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
+  const normalized = String(symbol || '').toUpperCase().replace(/[-/]/g, '');
+  const aliases = {
+    BTC: 'BTCUSD', ETH: 'ETHUSD', SOL: 'SOLUSD', AVAX: 'AVAXUSD', BNB: 'BNBUSD',
+    EUR: 'EURUSD', GBP: 'GBPUSD', XAU: 'XAUUSD', XAG: 'XAGUSD',
+    WTI: 'USOIL', BRENT: 'USOIL', GOLD: 'XAUUSD', SILVER: 'XAGUSD',
+  };
+  return aliases[normalized] || normalized;
 }
 
 let cryptoQuotesPromise;
@@ -50,11 +56,19 @@ export async function getAssetPrice(symbol) {
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
-  const provided = (req.headers['x-cron-secret'] || req.query?.cron_secret || '').toString();
+  const authorization = String(req.headers.authorization || '');
+  const bearerSecret = authorization.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length)
+    : '';
+  const provided = (
+    req.headers['x-cron-secret'] ||
+    req.query?.cron_secret ||
+    bearerSecret
+  ).toString();
   if (!secret || provided !== secret) {
     return res.status(401).json({ error: 'Invalid or missing cron secret' });
   }
-  if (req.method !== 'POST') {
+  if (!['GET', 'POST'].includes(req.method)) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -95,7 +109,9 @@ export default async function handler(req, res) {
 
       // Step 2A: Calculate market change
       const changePercent = calculateMarketChange(trader);
-      const oldEquity = Number(trader.current_equity);
+      const oldEquity = Number.isFinite(Number(trader.current_equity))
+        ? Number(trader.current_equity)
+        : STARTING_EQUITY;
       const newEquity = oldEquity * (1 + changePercent);
       const pnlDelta = newEquity - oldEquity;
 
@@ -109,7 +125,13 @@ export default async function handler(req, res) {
           : ['BTC-USD', 'ETH-USD', 'AAPL', 'MSFT'];
         const symbol = normalizeTradingSymbol(assetList[Math.floor(Math.random() * assetList.length)]);
 
-        const currentPrice = await getAssetPrice(symbol);
+        let currentPrice;
+        try {
+          currentPrice = await getAssetPrice(symbol);
+        } catch (priceError) {
+          console.error(`[CRON] Skipping trade for trader ${trader.id}:`, priceError.message);
+          continue;
+        }
 
         // Generate realistic entry price
         const entryPrice = generateRealisticEntryPrice(currentPrice, Math.abs(changePercent), isProfit);
