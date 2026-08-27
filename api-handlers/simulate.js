@@ -31,7 +31,7 @@ let cryptoQuotesPromise;
 let assetPricePromises = new Map();
 let invocationQuotes = {};
 
-export async function getAssetPrice(symbol, quoteMap = invocationQuotes) {
+export async function getAssetPrice(symbol, quoteMap = invocationQuotes, allowRemote = true) {
   const normalizedSymbol = normalizeTradingSymbol(symbol);
   const cachedPrice = Number(quoteMap[normalizedSymbol]?.price);
   if (Number.isFinite(cachedPrice) && cachedPrice > 0) return cachedPrice;
@@ -39,7 +39,7 @@ export async function getAssetPrice(symbol, quoteMap = invocationQuotes) {
     return assetPricePromises.get(normalizedSymbol);
   }
 
-  const pricePromise = resolveAssetPrice(normalizedSymbol).catch((error) => {
+  const pricePromise = resolveAssetPrice(normalizedSymbol, allowRemote).catch((error) => {
     assetPricePromises.delete(normalizedSymbol);
     throw error;
   });
@@ -47,14 +47,15 @@ export async function getAssetPrice(symbol, quoteMap = invocationQuotes) {
   return pricePromise;
 }
 
-async function resolveAssetPrice(normalizedSymbol) {
-  cryptoQuotesPromise ||= fetchLiveMarketSnapshot().catch((error) => {
-    console.error('Error fetching live market prices:', error);
-    return {};
-  });
-  const quotes = await cryptoQuotesPromise;
+async function resolveAssetPrice(normalizedSymbol, allowRemote = true) {
+  const quotes = allowRemote
+    ? await (cryptoQuotesPromise ||= fetchLiveMarketSnapshot().catch((error) => {
+      console.error('Error fetching live market prices:', error);
+      return {};
+    }))
+    : {};
   let livePrice = Number(quotes[normalizedSymbol]?.price);
-  if (!Number.isFinite(livePrice) || livePrice <= 0) {
+  if (allowRemote && (!Number.isFinite(livePrice) || livePrice <= 0)) {
     const yahooQuotes = await fetchYahooMarketQuotes([normalizedSymbol]).catch(() => ({}));
     livePrice = Number(yahooQuotes[normalizedSymbol]?.price);
   }
@@ -107,11 +108,19 @@ export default async function handler(req, res) {
     const symbols = [...new Set((traders || []).flatMap((trader) => trader.asset_focus || []))]
       .map(normalizeTradingSymbol)
       .filter(Boolean);
-    const [liveQuotes, yahooQuotes] = await Promise.all([
+    const { data: marketRows } = await supabase
+      .from('markets')
+      .select('symbol, price')
+      .in('symbol', symbols);
+    const marketQuotes = Object.fromEntries((marketRows || []).map((row) => [
+      normalizeTradingSymbol(row.symbol),
+      { price: Number(row.price) },
+    ]));
+    const liveQuotes = await Promise.race([
       fetchLiveMarketSnapshot().catch(() => ({})),
-      fetchYahooMarketQuotes(symbols).catch(() => ({})),
+      new Promise((resolve) => setTimeout(() => resolve({}), 2500)),
     ]);
-    invocationQuotes = { ...liveQuotes, ...yahooQuotes };
+    invocationQuotes = { ...marketQuotes, ...liveQuotes };
 
     let simulatedTraders = 0;
     let skippedTraders = 0;
@@ -158,7 +167,7 @@ export default async function handler(req, res) {
 
         let currentPrice;
         try {
-          currentPrice = await getAssetPrice(symbol, invocationQuotes);
+          currentPrice = await getAssetPrice(symbol, invocationQuotes, false);
         } catch (priceError) {
           console.error(`[CRON] Skipping trade for trader ${trader.id}:`, priceError.message);
           return;
