@@ -143,7 +143,7 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
     const losingPnl = Math.abs(seededTrades.filter((trade) => trade.pnl < 0).reduce((sum, trade) => sum + trade.pnl, 0));
     const pnlScale = totalPnl > 0 ? targetPnl / totalPnl : (targetPnl + losingPnl) / Math.max(winningPnl, 1);
     for (const trade of seededTrades) {
-      const scaledPnl = trade.pnl > 0 ? trade.pnl * pnlScale : trade.pnl;
+      const scaledPnl = totalPnl > 0 || trade.pnl > 0 ? trade.pnl * pnlScale : trade.pnl;
       const priceDelta = scaledPnl / trade.quantity;
       trade.pnl = Number(scaledPnl.toFixed(2));
       trade.exit_price = Number((trade.side === 'BUY' ? trade.entry_price + priceDelta : trade.entry_price - priceDelta).toFixed(4));
@@ -333,7 +333,7 @@ async function seedTraders() {
               const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
               const dailyVolatility = Math.sqrt(variance);
               const currentCopiers = Math.max(Number(trader.copiers_current || trader.followers || 0), 1);
-              const averageAllocation = 1000;
+              const averageAllocation = 2500;
               const assetsUnderManagement = currentCopiers * averageAllocation;
               const copierProfit = (totalReturn / 100) * assetsUnderManagement;
               const feeRate = Math.min(Math.max(Number(trader.profit_sharing_fee || 20), 0), 100) / 100;

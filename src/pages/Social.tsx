@@ -257,7 +257,7 @@ function LeaderboardSection() {
             <div className="text-2xl font-bold text-emerald-400 mb-2">
               {formatPct(Math.max(Number(trader.total_return || 0), 0))}
             </div>
-            <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">30-day ROI</div>
+            <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">90-day ROI</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="text-gray-400">Win rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
               <div className="text-gray-400">Copiers: <span className="text-white font-semibold">{trader.copiers_current ?? trader.followers ?? 0}</span></div>
@@ -409,7 +409,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
               {formatPct(traderRoi)}
             </div>
-            <div className="text-gray-500">30-day ROI</div>
+            <div className="text-gray-500">90-day ROI</div>
           </div>
           <div>
             <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades || 50).toFixed(0)}%</div>
