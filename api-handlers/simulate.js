@@ -29,9 +29,12 @@ export function normalizeTradingSymbol(symbol) {
 
 let cryptoQuotesPromise;
 let assetPricePromises = new Map();
+let invocationQuotes = {};
 
-export async function getAssetPrice(symbol) {
+export async function getAssetPrice(symbol, quoteMap = invocationQuotes) {
   const normalizedSymbol = normalizeTradingSymbol(symbol);
+  const cachedPrice = Number(quoteMap[normalizedSymbol]?.price);
+  if (Number.isFinite(cachedPrice) && cachedPrice > 0) return cachedPrice;
   if (assetPricePromises.has(normalizedSymbol)) {
     return assetPricePromises.get(normalizedSymbol);
   }
@@ -100,6 +103,16 @@ export default async function handler(req, res) {
 
     if (traderError) throw traderError;
 
+    // Fetch market data once per invocation instead of once per trader.
+    const symbols = [...new Set((traders || []).flatMap((trader) => trader.asset_focus || []))]
+      .map(normalizeTradingSymbol)
+      .filter(Boolean);
+    const [liveQuotes, yahooQuotes] = await Promise.all([
+      fetchLiveMarketSnapshot().catch(() => ({})),
+      fetchYahooMarketQuotes(symbols).catch(() => ({})),
+    ]);
+    invocationQuotes = { ...liveQuotes, ...yahooQuotes };
+
     let simulatedTraders = 0;
     let skippedTraders = 0;
     const skippedSessions = [];
@@ -145,7 +158,7 @@ export default async function handler(req, res) {
 
         let currentPrice;
         try {
-          currentPrice = await getAssetPrice(symbol);
+          currentPrice = await getAssetPrice(symbol, invocationQuotes);
         } catch (priceError) {
           console.error(`[CRON] Skipping trade for trader ${trader.id}:`, priceError.message);
           return;
@@ -266,7 +279,7 @@ export default async function handler(req, res) {
       }
     };
 
-    const concurrency = 8;
+    const concurrency = 16;
     for (let index = 0; index < (traders || []).length; index += concurrency) {
       await Promise.all((traders || []).slice(index, index + concurrency).map(processTrader));
     }
