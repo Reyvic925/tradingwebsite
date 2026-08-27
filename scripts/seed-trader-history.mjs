@@ -17,7 +17,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-const STARTING_EQUITY = 50000;
+const STARTING_EQUITY = 100000;
 
 // Realistic asset prices for seeding trades
 const ASSET_PRICES = {
@@ -109,7 +109,7 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
       const entryPrice = tradePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
       const side = Math.random() < 0.5 ? 'BUY' : 'SELL';
-      const targetExposure = 1500 + Math.random() * 6500;
+      const targetExposure = 5000 + Math.random() * 25000;
       const quantity = Math.max(0.0001, targetExposure / entryPrice);
       const pnl = (side === 'BUY' ? exitPrice - entryPrice : entryPrice - exitPrice) * quantity;
       const pnlPercent = (priceMove * 100);
@@ -136,13 +136,19 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
 
   const seededTrades = trades.slice(0, baseTradeCount);
   const totalPnl = seededTrades.reduce((sum, trade) => sum + trade.pnl, 0);
-  if (seededTrades.length > 0 && totalPnl < 25) {
-    const trade = seededTrades[seededTrades.length - 1];
-    const adjustedPnl = 25 - totalPnl + trade.pnl;
-    trade.pnl = Number(adjustedPnl.toFixed(2));
-    const priceDelta = adjustedPnl / trade.quantity;
-    trade.exit_price = Number((trade.side === 'BUY' ? trade.entry_price + priceDelta : trade.entry_price - priceDelta).toFixed(4));
-    trade.pnl_percent = Number((((trade.exit_price - trade.entry_price) / trade.entry_price) * 100).toFixed(2));
+  const targetReturn = Math.min(145, Math.max(50, 40 + (Number(trader.risk_score) || 5) * 7 + (Number(trader.id) % 6) * 3));
+  const targetPnl = STARTING_EQUITY * targetReturn / 100;
+  if (seededTrades.length > 0 && totalPnl !== 0) {
+    const winningPnl = seededTrades.filter((trade) => trade.pnl > 0).reduce((sum, trade) => sum + trade.pnl, 0);
+    const losingPnl = Math.abs(seededTrades.filter((trade) => trade.pnl < 0).reduce((sum, trade) => sum + trade.pnl, 0));
+    const pnlScale = totalPnl > 0 ? targetPnl / totalPnl : (targetPnl + losingPnl) / Math.max(winningPnl, 1);
+    for (const trade of seededTrades) {
+      const scaledPnl = trade.pnl > 0 ? trade.pnl * pnlScale : trade.pnl;
+      const priceDelta = scaledPnl / trade.quantity;
+      trade.pnl = Number(scaledPnl.toFixed(2));
+      trade.exit_price = Number((trade.side === 'BUY' ? trade.entry_price + priceDelta : trade.entry_price - priceDelta).toFixed(4));
+      trade.pnl_percent = Number((((trade.exit_price - trade.entry_price) / trade.entry_price) * 100).toFixed(2));
+    }
   }
 
   return seededTrades;
@@ -183,7 +189,7 @@ async function seedTraders() {
     // Fetch all active traders
     const { data: traders, error: traderError } = await supabase
       .from('traders')
-      .select('id, name, total_trades, win_rate_trades, total_return, asset_focus, followers, copiers_all_time')
+      .select('id, name, total_trades, win_rate_trades, total_return, asset_focus, followers, copiers_all_time, copiers_current, risk_score, profit_sharing_fee')
       .eq('is_active', true);
 
     if (traderError) throw traderError;
@@ -313,7 +319,7 @@ async function seedTraders() {
             }
 
             // Get final equity for total return
-            const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : 10000;
+            const finalEquity = history && history.length > 0 ? history[history.length - 1].equity : STARTING_EQUITY;
             const totalReturn = Math.max((totalPnL / STARTING_EQUITY) * 100, 0.25);
 
             // Calculate daily volatility

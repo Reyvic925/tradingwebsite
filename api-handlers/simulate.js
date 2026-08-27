@@ -15,7 +15,7 @@ import {
 } from './session-utils.js';
 import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-data.js';
 
-const STARTING_EQUITY = 50000;
+const STARTING_EQUITY = 100000;
 
 export function normalizeTradingSymbol(symbol) {
   return String(symbol || '').toUpperCase().replace(/[-/]/g, '');
