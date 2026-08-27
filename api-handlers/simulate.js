@@ -199,6 +199,7 @@ export default async function handler(req, res) {
             allocatedAmount: follow.allocated_amount,
             traderChange: changePercent,
             riskMultiplier: follow.leverage_multiplier,
+            performanceFee: trader.profit_sharing_fee,
           });
           const newFollowValue = followerTick.currentValue;
           const followPnL = followerTick.pnl;

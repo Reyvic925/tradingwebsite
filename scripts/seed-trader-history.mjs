@@ -103,14 +103,15 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
       // Generate realistic trade with win/loss based on win rate
       const isWin = Math.random() < winRate;
       const priceMove = isWin
-        ? Math.random() * 0.008 + 0.004
-        : -(Math.random() * 0.003 + 0.001);
+        ? Math.random() * 0.006 + 0.003
+        : -(Math.random() * 0.005 + 0.002);
 
       const entryPrice = tradePrice * (1 + (Math.random() - 0.5) * 0.003);
       const exitPrice = entryPrice * (1 + priceMove);
+      const side = Math.random() < 0.5 ? 'BUY' : 'SELL';
       const targetExposure = 1500 + Math.random() * 6500;
       const quantity = Math.max(0.0001, targetExposure / entryPrice);
-      const pnl = (exitPrice - entryPrice) * quantity;
+      const pnl = (side === 'BUY' ? exitPrice - entryPrice : entryPrice - exitPrice) * quantity;
       const pnlPercent = (priceMove * 100);
 
       // Randomize trade time within trading hours
@@ -120,7 +121,7 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
       trades.push({
         trader_id: trader.id,
         symbol: asset,
-        side: 'BUY',  // Simplified: all buys for consistency
+        side,
         quantity: Number(quantity.toFixed(6)),
         entry_price: Number(entryPrice.toFixed(4)),
         exit_price: Number(exitPrice.toFixed(4)),
@@ -139,7 +140,8 @@ function generateTrades(trader, daysBack = 90, livePrices = {}) {
     const trade = seededTrades[seededTrades.length - 1];
     const adjustedPnl = 25 - totalPnl + trade.pnl;
     trade.pnl = Number(adjustedPnl.toFixed(2));
-    trade.exit_price = Number((trade.entry_price + adjustedPnl / trade.quantity).toFixed(4));
+    const priceDelta = adjustedPnl / trade.quantity;
+    trade.exit_price = Number((trade.side === 'BUY' ? trade.entry_price + priceDelta : trade.entry_price - priceDelta).toFixed(4));
     trade.pnl_percent = Number((((trade.exit_price - trade.entry_price) / trade.entry_price) * 100).toFixed(2));
   }
 
@@ -276,6 +278,22 @@ async function seedTraders() {
             const winTrades = traderTrades.filter(t => t.pnl > 0).length;
             const totalPnL = traderTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
             const winRate = totalTrades > 0 ? Number(((winTrades / totalTrades) * 100).toFixed(2)) : 0;
+            const winningPnl = traderTrades.filter(t => Number(t.pnl) > 0).reduce((sum, t) => sum + Number(t.pnl), 0);
+            const losingPnl = Math.abs(traderTrades.filter(t => Number(t.pnl) < 0).reduce((sum, t) => sum + Number(t.pnl), 0));
+            const averageWin = winTrades > 0 ? winningPnl / winTrades : 0;
+            const lossTrades = totalTrades - winTrades;
+            const averageLoss = lossTrades > 0 ? losingPnl / lossTrades : 0;
+            const riskReward = averageLoss > 0 ? averageWin / averageLoss : 0;
+
+            // Measure drawdown at every trade close, not only at daily snapshots.
+            let intradayEquity = STARTING_EQUITY;
+            let intradayPeak = STARTING_EQUITY;
+            let tradeDrawdown = 0;
+            for (const trade of [...traderTrades].sort((a, b) => new Date(a.traded_at) - new Date(b.traded_at))) {
+              intradayEquity = Math.max(STARTING_EQUITY * 0.5, intradayEquity + Number(trade.pnl || 0));
+              intradayPeak = Math.max(intradayPeak, intradayEquity);
+              tradeDrawdown = Math.max(tradeDrawdown, ((intradayPeak - intradayEquity) / intradayPeak) * 100);
+            }
 
             // Calculate max drawdown from history
             const { data: history, error: historyError } = await supabase
@@ -308,8 +326,13 @@ async function seedTraders() {
               const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
               const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
               const dailyVolatility = Math.sqrt(variance);
-              const currentCopiers = Math.max(Number(trader.followers || 0), 1);
-              const copierProfit = Math.max(totalReturn, 0) / 100 * 1000 * currentCopiers;
+              const currentCopiers = Math.max(Number(trader.copiers_current || trader.followers || 0), 1);
+              const averageAllocation = 1000;
+              const assetsUnderManagement = currentCopiers * averageAllocation;
+              const copierProfit = (totalReturn / 100) * assetsUnderManagement;
+              const feeRate = Math.min(Math.max(Number(trader.profit_sharing_fee || 20), 0), 100) / 100;
+              const performanceFees = copierProfit * feeRate;
+              const netCopierProfit = copierProfit - performanceFees;
 
               // Update every profile metric from this trader's generated history.
               const { error: updateError } = await supabase
@@ -320,12 +343,12 @@ async function seedTraders() {
                   total_return: Number(totalReturn.toFixed(2)),
                   current_equity: Number((STARTING_EQUITY * (1 + totalReturn / 100)).toFixed(2)),
                   daily_return: Number(returns[returns.length - 1].toFixed(2)),
-                  max_drawdown: Number(maxDrawdown.toFixed(2)),
+                  max_drawdown: Number(Math.max(maxDrawdown, tradeDrawdown).toFixed(2)),
                   volatility: Number((dailyVolatility / 100).toFixed(6)),
                   copiers_current: currentCopiers,
                   copiers_all_time: Math.max(Number(trader.copiers_all_time || 0), currentCopiers),
-                  under_management: Number((currentCopiers * 1000).toFixed(2)),
-                  profit_for_copiers: Number(copierProfit.toFixed(2)),
+                  under_management: Number(assetsUnderManagement.toFixed(2)),
+                  profit_for_copiers: Number(netCopierProfit.toFixed(2)),
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', trader.id);
