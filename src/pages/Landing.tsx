@@ -155,7 +155,7 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeVid, setActiveVid] = useState<Testimonial | null>(null);
-  const [walletStatus, setWalletStatus] = useState('Wallet not connected');
+  const [walletStatus, setWalletStatus] = useState('No wallet connected yet');
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   const connectWallet = async () => {
@@ -182,7 +182,7 @@ export default function Landing() {
 
     const walletProvider = providerCandidates[0];
     if (!walletProvider) {
-      setWalletStatus('No compatible browser wallet found');
+      setWalletStatus('No compatible browser wallet found. Install one to test the connection flow.');
       return;
     }
 
