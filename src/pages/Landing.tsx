@@ -164,44 +164,53 @@ export default function Landing() {
       return;
     }
 
-    const anyWindow = window as Window & {
+    const anyWindow = window as unknown as Window & {
       ethereum?: BrowserWalletProvider | { providers?: BrowserWalletProvider[] };
-      trustwallet?: BrowserWalletProvider;
-      coinbaseWalletExtension?: BrowserWalletProvider;
-      rabby?: BrowserWalletProvider;
-      bitkeep?: BrowserWalletProvider;
-      okxwallet?: BrowserWalletProvider;
-      oneInchIOSWallet?: BrowserWalletProvider;
-      phantom?: BrowserWalletProvider;
+      web3?: { currentProvider?: BrowserWalletProvider };
+      [key: string]: unknown;
     };
 
     const providerCandidates: BrowserWalletProvider[] = [];
-    const candidates = [
-      anyWindow.ethereum,
-      anyWindow.trustwallet,
-      anyWindow.coinbaseWalletExtension,
-      anyWindow.rabby,
-      anyWindow.bitkeep,
-      anyWindow.okxwallet,
-      anyWindow.oneInchIOSWallet,
-      anyWindow.phantom,
-    ];
+    const seen = new Set<object>();
 
-    for (const candidate of candidates) {
-      if (!candidate) continue;
+    const pushCandidate = (candidate: unknown) => {
+      if (!candidate || typeof candidate !== 'object') return;
+      if (seen.has(candidate as object)) return;
+      seen.add(candidate as object);
       if (typeof (candidate as BrowserWalletProvider).request === 'function') {
         providerCandidates.push(candidate as BrowserWalletProvider);
       }
+
       if ('providers' in candidate && Array.isArray((candidate as { providers?: BrowserWalletProvider[] }).providers)) {
         const multiProviders = (candidate as { providers?: BrowserWalletProvider[] }).providers ?? [];
-        providerCandidates.push(...multiProviders.filter((provider) => provider && typeof provider.request === 'function'));
+        for (const provider of multiProviders) {
+          if (provider && typeof provider.request === 'function') {
+            if (!seen.has(provider as object)) {
+              seen.add(provider as object);
+              providerCandidates.push(provider);
+            }
+          }
+        }
       }
+    };
+
+    pushCandidate(anyWindow.ethereum);
+    if (anyWindow.web3 && anyWindow.web3.currentProvider) {
+      pushCandidate(anyWindow.web3.currentProvider);
     }
+
+    Object.keys(anyWindow).forEach((key) => {
+      const value = anyWindow[key];
+      if (key === 'ethereum' || key === 'web3') return;
+      if (value && typeof value === 'object') {
+        pushCandidate(value);
+      }
+    });
 
     const walletProvider = providerCandidates[0];
     if (!walletProvider) {
-      setWalletStatus('No compatible browser wallet found. Install MetaMask, Trust Wallet, or another injected EVM wallet.');
-      window.open('https://metamask.io/download/', '_blank', 'noopener,noreferrer');
+      setWalletStatus('No compatible browser wallet found. Install any EVM wallet such as MetaMask, Trust Wallet, Rabby, or Coinbase Wallet.');
+      window.open('https://wallets.coingecko.com/', '_blank', 'noopener,noreferrer');
       return;
     }
 
