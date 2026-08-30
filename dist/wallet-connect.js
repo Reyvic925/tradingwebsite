@@ -1,10 +1,5 @@
-const state = {
-  provider: null,
-  address: null,
-};
-
 function setStatus(message) {
-  const el = document.getElementById('status');
+  const el = document.getElementById('walletStatus');
   if (el) el.textContent = message;
 }
 
@@ -14,7 +9,7 @@ function setAddress(address) {
 }
 
 function detectProvider() {
-  const candidates = [];
+  const providers = [];
   const seen = new Set();
 
   const pushCandidate = (candidate) => {
@@ -23,60 +18,49 @@ function detectProvider() {
     seen.add(candidate);
 
     if (typeof candidate.request === 'function') {
-      candidates.push(candidate);
+      providers.push(candidate);
     }
 
     if (Array.isArray(candidate.providers)) {
       for (const provider of candidate.providers) {
         if (provider && typeof provider.request === 'function' && !seen.has(provider)) {
           seen.add(provider);
-          candidates.push(provider);
+          providers.push(provider);
         }
       }
     }
   };
 
   pushCandidate(window.ethereum);
-
   if (window.web3 && window.web3.currentProvider) {
     pushCandidate(window.web3.currentProvider);
   }
 
-  const knownWalletGlobals = [
-    'trustwallet',
-    'coinbaseWallet',
-    'metamask',
-    'rabby',
-    'bitkeep',
-    'okxwallet',
-    'walletconnect',
-    'safe',
-    'phantom',
-  ];
+  const walletKeys = ['trustwallet', 'coinbaseWallet', 'metamask', 'rabby', 'bitkeep', 'okxwallet', 'walletconnect', 'safe', 'phantom'];
 
-  for (const key of knownWalletGlobals) {
+  for (const key of walletKeys) {
     if (window[key]) {
       pushCandidate(window[key]);
     }
   }
 
   for (const key in window) {
-    if (key === 'ethereum' || key === 'web3' || knownWalletGlobals.includes(key)) continue;
-
+    if (key === 'ethereum' || key === 'web3' || walletKeys.includes(key)) continue;
     const value = window[key];
     if (value && typeof value === 'object') {
       pushCandidate(value);
     }
   }
 
-  return candidates[0] || null;
+  return providers[0] || null;
 }
 
 async function connectWallet() {
   const provider = detectProvider();
 
   if (!provider) {
-    setStatus('No compatible wallet found. Install MetaMask, Trust Wallet, Rabby, Coinbase Wallet, or another EVM wallet, then refresh.');
+    setStatus('No compatible browser wallet found. Install MetaMask, Trust Wallet, Rabby, or another EVM wallet and refresh.');
+    setAddress('Not connected');
     try {
       window.open('https://wallets.coingecko.com/', '_blank', 'noopener,noreferrer');
     } catch (error) {
@@ -85,19 +69,17 @@ async function connectWallet() {
     return;
   }
 
-  state.provider = provider;
-
   try {
     setStatus('Requesting wallet access...');
     const accounts = await provider.request({ method: 'eth_requestAccounts' });
     const nextAddress = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
 
     if (!nextAddress) {
-      setStatus('No account selected');
+      setStatus('No wallet account selected');
+      setAddress('Not connected');
       return;
     }
 
-    state.address = nextAddress;
     setAddress(nextAddress);
     setStatus(`Connected: ${nextAddress.slice(0, 6)}...${nextAddress.slice(-4)}`);
   } catch (error) {
@@ -106,46 +88,19 @@ async function connectWallet() {
       setStatus('Connection cancelled by user');
       return;
     }
-
     console.error('Wallet connection failed:', error);
     setStatus('Connection failed');
   }
 }
 
-async function signMessage() {
-  if (!state.provider || !state.address) {
-    setStatus('Connect a wallet first');
-    return;
+function attachWalletHandlers() {
+  const connectBtn = document.getElementById('walletConnectBtn');
+  if (connectBtn) {
+    connectBtn.addEventListener('click', connectWallet);
   }
 
-  try {
-    setStatus('Requesting signature...');
-    const message = `Apex Prime wallet check for ${state.address}`;
-    const signature = await state.provider.request({
-      method: 'personal_sign',
-      params: [message, state.address],
-    });
-
-    setStatus(`Signature generated: ${String(signature).slice(0, 16)}...`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.toLowerCase().includes('rejected')) {
-      setStatus('Signature cancelled by user');
-      return;
-    }
-
-    console.error('Signature failed:', error);
-    setStatus('Signature failed');
-  }
+  setStatus('No wallet connected yet');
+  setAddress('Not connected');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const connectBtn = document.getElementById('connectBtn');
-  const signBtn = document.getElementById('signBtn');
-
-  if (connectBtn) connectBtn.addEventListener('click', connectWallet);
-  if (signBtn) signBtn.addEventListener('click', signMessage);
-
-  setStatus('Wallet not connected');
-  setAddress('Not connected');
-});
+document.addEventListener('DOMContentLoaded', attachWalletHandlers);

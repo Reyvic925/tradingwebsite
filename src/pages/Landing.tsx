@@ -155,87 +155,6 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeVid, setActiveVid] = useState<Testimonial | null>(null);
-  const [walletStatus, setWalletStatus] = useState('No wallet connected yet');
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-
-  const connectWallet = async () => {
-    if (typeof window === 'undefined') {
-      setWalletStatus('Browser unavailable');
-      return;
-    }
-
-    const anyWindow = window as unknown as Window & {
-      ethereum?: BrowserWalletProvider | { providers?: BrowserWalletProvider[] };
-      web3?: { currentProvider?: BrowserWalletProvider };
-      [key: string]: unknown;
-    };
-
-    const providerCandidates: BrowserWalletProvider[] = [];
-    const seen = new Set<object>();
-
-    const pushCandidate = (candidate: unknown) => {
-      if (!candidate || typeof candidate !== 'object') return;
-      if (seen.has(candidate as object)) return;
-      seen.add(candidate as object);
-      if (typeof (candidate as BrowserWalletProvider).request === 'function') {
-        providerCandidates.push(candidate as BrowserWalletProvider);
-      }
-
-      if ('providers' in candidate && Array.isArray((candidate as { providers?: BrowserWalletProvider[] }).providers)) {
-        const multiProviders = (candidate as { providers?: BrowserWalletProvider[] }).providers ?? [];
-        for (const provider of multiProviders) {
-          if (provider && typeof provider.request === 'function') {
-            if (!seen.has(provider as object)) {
-              seen.add(provider as object);
-              providerCandidates.push(provider);
-            }
-          }
-        }
-      }
-    };
-
-    pushCandidate(anyWindow.ethereum);
-    if (anyWindow.web3 && anyWindow.web3.currentProvider) {
-      pushCandidate(anyWindow.web3.currentProvider);
-    }
-
-    Object.keys(anyWindow).forEach((key) => {
-      const value = anyWindow[key];
-      if (key === 'ethereum' || key === 'web3') return;
-      if (value && typeof value === 'object') {
-        pushCandidate(value);
-      }
-    });
-
-    const walletProvider = providerCandidates[0];
-    if (!walletProvider) {
-      setWalletStatus('No compatible browser wallet found. Install any EVM wallet such as MetaMask, Trust Wallet, Rabby, or Coinbase Wallet.');
-      window.open('https://wallets.coingecko.com/', '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    try {
-      setWalletStatus('Requesting wallet access...');
-      const accounts = await walletProvider.request({ method: 'eth_requestAccounts' });
-      const nextAddress = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
-
-      if (!nextAddress) {
-        setWalletStatus('No wallet account selected');
-        return;
-      }
-
-      setWalletAddress(nextAddress);
-      setWalletStatus(`Connected: ${nextAddress.slice(0, 6)}...${nextAddress.slice(-4)}`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.toLowerCase().includes('rejected')) {
-        setWalletStatus('Connection cancelled');
-        return;
-      }
-      console.error('[wallet]', err);
-      setWalletStatus('Connection failed');
-    }
-  };
 
   useEffect(() => {
     const updateOpenSessions = () => {
@@ -374,21 +293,19 @@ export default function Landing() {
                   <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet, including Trust Wallet and other browser wallets.</div>
                 </div>
                 <button
+                  id="walletConnectBtn"
                   type="button"
-                  onClick={connectWallet}
                   className="inline-flex items-center rounded-sm border border-amber-300/50 bg-amber-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:bg-amber-400/20"
                 >
                   Connect wallet
                 </button>
               </div>
-              <div className="mt-3 rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-stone-300">
-                {walletStatus}
+              <div id="walletStatus" className="mt-3 rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-stone-300">
+                No wallet connected yet
               </div>
-              {walletAddress && (
-                <div className="mt-2 text-[11px] uppercase tracking-[0.2em] text-stone-500">
-                  Address: {walletAddress}
-                </div>
-              )}
+              <div id="walletAddress" className="mt-2 text-[11px] uppercase tracking-[0.2em] text-stone-500">
+                Not connected
+              </div>
             </div>
           </motion.div>
         </div>
