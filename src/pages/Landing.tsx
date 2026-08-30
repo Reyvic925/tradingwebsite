@@ -171,8 +171,8 @@ export default function Landing() {
     const providerCandidates: BrowserWalletProvider[] = [];
     const primary = anyWindow.ethereum;
 
-    if (primary && typeof primary.request === 'function') {
-      providerCandidates.push(primary);
+    if (primary && typeof (primary as BrowserWalletProvider).request === 'function') {
+      providerCandidates.push(primary as BrowserWalletProvider);
     }
 
     if (primary && 'providers' in primary && Array.isArray((primary as { providers?: BrowserWalletProvider[] }).providers)) {
