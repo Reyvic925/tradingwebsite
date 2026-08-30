@@ -182,7 +182,8 @@ export default function Landing() {
 
     const walletProvider = providerCandidates[0];
     if (!walletProvider) {
-      setWalletStatus('No compatible browser wallet found. Install one to test the connection flow.');
+      setWalletStatus('No compatible browser wallet found. Installing a wallet will let the connection prompt open normally.');
+      window.open('https://metamask.io/download/', '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -342,8 +343,8 @@ export default function Landing() {
             <div className="mt-8 max-w-lg rounded-md border border-amber-300/20 bg-black/30 p-4 backdrop-blur-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Wallet demo</div>
-                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet. No transfer is triggered.</div>
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Wallet test</div>
+                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet. If none is installed, the page will open the official install link.</div>
                 </div>
                 <button
                   type="button"
