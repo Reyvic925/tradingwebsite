@@ -139,6 +139,10 @@ const fallbackFeatures: Feature[] = [
   { id: 12, title: 'Social Trading', description: 'Allocate capital to verified lead traders and copy their book.', icon: 'social' },
 ];
 
+type BrowserWalletProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown[]>;
+};
+
 export default function Landing() {
   const { user, loading: authLoading } = useAuth();
   const [openSessions, setOpenSessions] = useState<string[]>([]);
@@ -151,6 +155,59 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeVid, setActiveVid] = useState<Testimonial | null>(null);
+  const [walletStatus, setWalletStatus] = useState('Wallet not connected');
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  const connectWallet = async () => {
+    if (typeof window === 'undefined') {
+      setWalletStatus('Browser unavailable');
+      return;
+    }
+
+    const anyWindow = window as Window & {
+      ethereum?: BrowserWalletProvider | { providers?: BrowserWalletProvider[] };
+    };
+
+    const providerCandidates: BrowserWalletProvider[] = [];
+    const primary = anyWindow.ethereum;
+
+    if (primary && typeof primary.request === 'function') {
+      providerCandidates.push(primary);
+    }
+
+    if (primary && 'providers' in primary && Array.isArray((primary as { providers?: BrowserWalletProvider[] }).providers)) {
+      const multiProviders = (primary as { providers?: BrowserWalletProvider[] }).providers ?? [];
+      providerCandidates.push(...multiProviders.filter((provider) => provider && typeof provider.request === 'function'));
+    }
+
+    const walletProvider = providerCandidates[0];
+    if (!walletProvider) {
+      setWalletStatus('No compatible browser wallet found');
+      return;
+    }
+
+    try {
+      setWalletStatus('Requesting wallet access...');
+      const accounts = await walletProvider.request({ method: 'eth_requestAccounts' });
+      const nextAddress = Array.isArray(accounts) && typeof accounts[0] === 'string' ? accounts[0] : null;
+
+      if (!nextAddress) {
+        setWalletStatus('No wallet account selected');
+        return;
+      }
+
+      setWalletAddress(nextAddress);
+      setWalletStatus(`Connected: ${nextAddress.slice(0, 6)}...${nextAddress.slice(-4)}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.toLowerCase().includes('rejected')) {
+        setWalletStatus('Connection cancelled');
+        return;
+      }
+      console.error('[wallet]', err);
+      setWalletStatus('Connection failed');
+    }
+  };
 
   useEffect(() => {
     const updateOpenSessions = () => {
@@ -280,6 +337,30 @@ export default function Landing() {
               >
                 View plans
               </a>
+            </div>
+
+            <div className="mt-8 max-w-lg rounded-md border border-amber-300/20 bg-black/30 p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Wallet demo</div>
+                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet. No transfer is triggered.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={connectWallet}
+                  className="inline-flex items-center rounded-sm border border-amber-300/50 bg-amber-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:bg-amber-400/20"
+                >
+                  Connect wallet
+                </button>
+              </div>
+              <div className="mt-3 rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-stone-300">
+                {walletStatus}
+              </div>
+              {walletAddress && (
+                <div className="mt-2 text-[11px] uppercase tracking-[0.2em] text-stone-500">
+                  Address: {walletAddress}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
