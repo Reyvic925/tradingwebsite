@@ -14,25 +14,74 @@ function setAddress(address) {
 }
 
 function detectProvider() {
-  const injected = window.ethereum;
-  if (!injected) return null;
+  const candidates = [];
+  const seen = new Set();
 
-  if (Array.isArray(injected.providers)) {
-    return injected.providers.find((provider) => provider && typeof provider.request === 'function') || null;
+  const pushCandidate = (candidate) => {
+    if (!candidate || typeof candidate !== 'object') return;
+    if (seen.has(candidate)) return;
+    seen.add(candidate);
+
+    if (typeof candidate.request === 'function') {
+      candidates.push(candidate);
+    }
+
+    if (Array.isArray(candidate.providers)) {
+      for (const provider of candidate.providers) {
+        if (provider && typeof provider.request === 'function' && !seen.has(provider)) {
+          seen.add(provider);
+          candidates.push(provider);
+        }
+      }
+    }
+  };
+
+  pushCandidate(window.ethereum);
+
+  if (window.web3 && window.web3.currentProvider) {
+    pushCandidate(window.web3.currentProvider);
   }
 
-  if (typeof injected.request === 'function') {
-    return injected;
+  const knownWalletGlobals = [
+    'trustwallet',
+    'coinbaseWallet',
+    'metamask',
+    'rabby',
+    'bitkeep',
+    'okxwallet',
+    'walletconnect',
+    'safe',
+    'phantom',
+  ];
+
+  for (const key of knownWalletGlobals) {
+    if (window[key]) {
+      pushCandidate(window[key]);
+    }
   }
 
-  return null;
+  for (const key in window) {
+    if (key === 'ethereum' || key === 'web3' || knownWalletGlobals.includes(key)) continue;
+
+    const value = window[key];
+    if (value && typeof value === 'object') {
+      pushCandidate(value);
+    }
+  }
+
+  return candidates[0] || null;
 }
 
 async function connectWallet() {
   const provider = detectProvider();
 
   if (!provider) {
-    setStatus('No compatible wallet found. Install a browser wallet and refresh.');
+    setStatus('No compatible wallet found. Install MetaMask, Trust Wallet, Rabby, Coinbase Wallet, or another EVM wallet, then refresh.');
+    try {
+      window.open('https://wallets.coingecko.com/', '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.warn('Wallet install redirect failed:', error);
+    }
     return;
   }
 
