@@ -166,23 +166,41 @@ export default function Landing() {
 
     const anyWindow = window as Window & {
       ethereum?: BrowserWalletProvider | { providers?: BrowserWalletProvider[] };
+      trustwallet?: BrowserWalletProvider;
+      coinbaseWalletExtension?: BrowserWalletProvider;
+      rabby?: BrowserWalletProvider;
+      bitkeep?: BrowserWalletProvider;
+      okxwallet?: BrowserWalletProvider;
+      oneInchIOSWallet?: BrowserWalletProvider;
+      phantom?: BrowserWalletProvider;
     };
 
     const providerCandidates: BrowserWalletProvider[] = [];
-    const primary = anyWindow.ethereum;
+    const candidates = [
+      anyWindow.ethereum,
+      anyWindow.trustwallet,
+      anyWindow.coinbaseWalletExtension,
+      anyWindow.rabby,
+      anyWindow.bitkeep,
+      anyWindow.okxwallet,
+      anyWindow.oneInchIOSWallet,
+      anyWindow.phantom,
+    ];
 
-    if (primary && typeof (primary as BrowserWalletProvider).request === 'function') {
-      providerCandidates.push(primary as BrowserWalletProvider);
-    }
-
-    if (primary && 'providers' in primary && Array.isArray((primary as { providers?: BrowserWalletProvider[] }).providers)) {
-      const multiProviders = (primary as { providers?: BrowserWalletProvider[] }).providers ?? [];
-      providerCandidates.push(...multiProviders.filter((provider) => provider && typeof provider.request === 'function'));
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      if (typeof (candidate as BrowserWalletProvider).request === 'function') {
+        providerCandidates.push(candidate as BrowserWalletProvider);
+      }
+      if ('providers' in candidate && Array.isArray((candidate as { providers?: BrowserWalletProvider[] }).providers)) {
+        const multiProviders = (candidate as { providers?: BrowserWalletProvider[] }).providers ?? [];
+        providerCandidates.push(...multiProviders.filter((provider) => provider && typeof provider.request === 'function'));
+      }
     }
 
     const walletProvider = providerCandidates[0];
     if (!walletProvider) {
-      setWalletStatus('No compatible browser wallet found. Installing a wallet will let the connection prompt open normally.');
+      setWalletStatus('No compatible browser wallet found. Install MetaMask, Trust Wallet, or another injected EVM wallet.');
       window.open('https://metamask.io/download/', '_blank', 'noopener,noreferrer');
       return;
     }
@@ -344,7 +362,7 @@ export default function Landing() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Wallet test</div>
-                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet. If none is installed, the page will open the official install link.</div>
+                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet, including Trust Wallet and other browser wallets.</div>
                 </div>
                 <button
                   type="button"
