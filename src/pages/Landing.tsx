@@ -322,7 +322,7 @@ export default function Landing() {
   if (!authLoading && user && isSignupConfirmationCallback) return <Navigate to="/login?confirmed=1" replace />;
 
   return (
-    <div id="top" className="bg-[#05070b] text-stone-100">
+    <div id="top" className="bg-[#f6f3ee] text-slate-900">
       <Navbar />
 
       <section className="relative min-h-screen overflow-hidden grain">
