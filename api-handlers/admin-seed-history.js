@@ -127,6 +127,9 @@ function generateHistorySnapshots(trader, daysBack = 7) {
 export default async function handler(req, res) {
   const adminSecret = process.env.ADMIN_SECRET;
   const provided = (req.headers['x-admin-secret'] || '').toString();
+  return res.status(410).json({
+    error: 'Legacy history seeding is disabled. Use the persistent synthetic trader simulation and cron-traders endpoint.',
+  });
   
   if (!adminSecret || provided !== adminSecret) {
     return res.status(401).json({ error: 'Invalid or missing admin secret' });

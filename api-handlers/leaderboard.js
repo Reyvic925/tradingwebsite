@@ -1,5 +1,5 @@
 import supabase from './db-client.js';
-import { sanitizeTraderRecord, filterVisibleTraders } from './trader-validation.js';
+import { validateTraderRecord, filterVisibleTraders } from './trader-validation.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,11 +23,18 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     // Add rankings and medals after filtering to active traders.
-    const activeTraders = filterVisibleTraders((data || []).map((trader) => sanitizeTraderRecord(trader)));
+    const activeTraders = filterVisibleTraders((data || []).map((trader) => {
+      try {
+        return validateTraderRecord(trader);
+      } catch (error) {
+        console.error(`[leaderboard] Rejected invalid trader ${trader?.id ?? 'unknown'}: ${error.message}`);
+        return null;
+      }
+    }).filter(Boolean));
     const leaderboard = activeTraders.map((trader, index) => ({
       ...trader,
-      total_return: Math.max(Number(trader.total_return) || 0, 0),
-      monthly_return: Math.max(Number(trader.monthly_return) || 0, 0),
+      total_return: Number(trader.total_return),
+      monthly_return: Number(trader.monthly_return),
       rank: index + 1,
       medal: index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : null,
       medalIcon: index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null

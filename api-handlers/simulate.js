@@ -14,6 +14,7 @@ import {
   generateRealisticEntryPrice
 } from './session-utils.js';
 import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from './live-market-data.js';
+import deterministicTraderCron from './cron-traders.js';
 
 const STARTING_EQUITY = 100000;
 
@@ -74,6 +75,9 @@ async function resolveAssetPrice(normalizedSymbol, allowRemote = true) {
 }
 
 export default async function handler(req, res) {
+  return deterministicTraderCron(req, res);
+
+  /* Legacy implementation retained below only for helper compatibility. */
   const secret = process.env.CRON_SECRET;
   const authorization = String(req.headers.authorization || '');
   const bearerSecret = authorization.startsWith('Bearer ')

@@ -1,5 +1,10 @@
 -- Add the lead traders requested for the copy-trading roster.
 -- Safe to rerun: records are matched by name case-insensitively.
+-- DEPRECATED: this legacy file wrote display metrics directly. Run
+-- 20260912-synthetic-trader-simulation.sql and npm run traders:migrate instead.
+DO $$ BEGIN
+  RAISE EXCEPTION 'Legacy trader metric seed disabled; use deterministic simulation migration';
+END $$;
 
 ALTER TABLE IF EXISTS traders
   ADD COLUMN IF NOT EXISTS country TEXT,

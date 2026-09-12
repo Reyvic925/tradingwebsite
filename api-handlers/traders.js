@@ -1,7 +1,7 @@
 import supabase from './db-client.js';
 import { first } from './helpers.js';
 import { requireAdmin } from './auth-admin.js';
-import { sanitizeTraderRecord, normalizeAssetFocus, filterVisibleTraders } from './trader-validation.js';
+import { sanitizeTraderRecord, normalizeAssetFocus, filterVisibleTraders, validateTraderRecord } from './trader-validation.js';
 
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -84,9 +84,14 @@ export default async function handler(req, res) {
       
       const { data, error } = await query;
       if (error) throw error;
-      const normalized = (data || [])
-        .map((trader) => sanitizeTraderRecord(trader))
-        .filter((trader) => filterVisibleTraders([trader]).length > 0 || include_inactive === '1');
+      const normalized = (data || []).map((trader) => {
+        try {
+          return validateTraderRecord(trader);
+        } catch (validationError) {
+          console.error(`[traders] Invalid record rejected: ${trader?.id ?? 'unknown'} ${trader?.name ?? 'unknown'}: ${validationError.message}`);
+          return null;
+        }
+      }).filter(Boolean).filter((trader) => include_inactive === '1' || trader.is_active !== false);
       return res.status(200).json(normalized);
     }
 
@@ -108,7 +113,7 @@ export default async function handler(req, res) {
       }
 
       const resolvedAvatarUrl = await resolveAvatarUrl(avatar_data, avatar_url);
-      const safePayload = sanitizeTraderRecord({
+      const safePayload = validateTraderRecord({
         name,
         bio: bio || '',
         country: country || '',
@@ -116,7 +121,7 @@ export default async function handler(req, res) {
         specialty: specialty || '',
         badge: badge || 'Gold',
         risk_level: risk_level || 'Medium',
-        asset_focus: normalizeAssetFocus(asset_focus, ['BTC-USD', 'ETH-USD', 'SOL-USD']),
+        asset_focus: asset_focus || ['BTC-USD', 'ETH-USD', 'SOL-USD'],
         current_equity: current_equity,
         total_return: total_return,
         daily_return: daily_return,
@@ -144,9 +149,9 @@ export default async function handler(req, res) {
         .insert({
           ...safePayload,
           current_equity: Number.isFinite(Number(safePayload.current_equity)) ? Math.max(Number(safePayload.current_equity), 0) : 10000.00,
-          total_return: Number.isFinite(Number(safePayload.total_return)) ? Math.max(Number(safePayload.total_return), 0) : 0.00,
+          total_return: Number.isFinite(Number(safePayload.total_return)) ? Number(safePayload.total_return) : 0.00,
           daily_return: Number.isFinite(Number(safePayload.daily_return)) ? Number(safePayload.daily_return) : 0.00,
-          monthly_return: Number.isFinite(Number(safePayload.monthly_return)) ? Math.max(Number(safePayload.monthly_return), 0) : 0.00,
+          monthly_return: Number.isFinite(Number(safePayload.monthly_return)) ? Number(safePayload.monthly_return) : 0.00,
           total_trades: Number.isFinite(Number(safePayload.total_trades)) ? Math.max(Math.trunc(Number(safePayload.total_trades)), 0) : 0,
           win_rate_trades: Number.isFinite(Number(safePayload.win_rate_trades)) ? Math.min(Math.max(Number(safePayload.win_rate_trades), 0), 100) : 50.00,
           max_drawdown: Number.isFinite(Number(safePayload.max_drawdown)) ? Math.max(Number(safePayload.max_drawdown), 0) : 0.00,
@@ -188,12 +193,15 @@ export default async function handler(req, res) {
       if (updateData.total_return !== undefined) {
         const totalReturn = Number(updateData.total_return);
         if (!Number.isFinite(totalReturn)) return res.status(400).json({ error: 'Total return must be a number' });
-        updateData.total_return = Math.min(Math.max(totalReturn, 0), 250);
+        updateData.total_return = totalReturn;
       }
       if (updateData.monthly_return !== undefined) {
         const monthlyReturn = Number(updateData.monthly_return);
         if (!Number.isFinite(monthlyReturn)) return res.status(400).json({ error: 'Monthly return must be a number' });
-        updateData.monthly_return = Math.min(Math.max(monthlyReturn, 0), 150);
+        if (monthlyReturn < -100 || monthlyReturn > 2000) {
+          return res.status(400).json({ error: 'Monthly return is outside the supported range (-100 to 2000)' });
+        }
+        updateData.monthly_return = monthlyReturn;
       }
       if (updateData.win_rate_trades !== undefined) {
         const winRate = Number(updateData.win_rate_trades);
@@ -205,7 +213,7 @@ export default async function handler(req, res) {
         if (!Number.isFinite(followers)) return res.status(400).json({ error: 'Followers must be a number' });
         updateData.followers = Math.max(Math.trunc(followers), 0);
       }
-      const sanitizedUpdate = sanitizeTraderRecord(updateData);
+      const sanitizedUpdate = validateTraderRecord(updateData);
 
       const { data, error } = await supabase
         .from('traders')

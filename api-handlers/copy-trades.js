@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       // Check if trader exists
       const trader = await findById(supabase, 'traders', traderId);
       if (!trader) return res.status(400).json({ error: 'Trader not found' });
+      if (trader.is_active !== true) return res.status(409).json({ error: 'Trader is closed and cannot accept new copiers' });
 
       // Check wallet balance
       const wallet = await getUsdWallet(supabase, user.id);
@@ -97,6 +98,7 @@ export default async function handler(req, res) {
         take_profit_percent: takeProfitPercent,
         leverage_multiplier: leverageMultiplier,
         is_copying: true,
+        copy_start_date: existingFollow?.[0]?.copy_start_date || new Date(),
         updated_at: new Date(),
       };
       const followQuery = existingFollow?.[0]

@@ -22,6 +22,7 @@ export default async function handler(req, res) {
         .from('trade_logs')
         .select('*')
         .eq('trader_id', traderId)
+        .not('event_id', 'is', null)
         .gt('pnl', 0)
         .order('pnl', { ascending: false })
         .limit(25),
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
         .from('trade_logs')
         .select('*')
         .eq('trader_id', traderId)
+        .not('event_id', 'is', null)
         .lt('pnl', 0)
         .order('pnl', { ascending: true })
         .limit(25),

@@ -5,35 +5,11 @@ const CRYPTO_TOKENS = new Set(['BTC', 'ETH', 'SOL', 'AVAX', 'BNB', 'MATIC', 'ADA
 const COMMODITY_TOKENS = new Set(['WTI', 'BRENT', 'XAU', 'GOLD', 'OIL', 'USD']);
 const FX_TOKENS = new Set(['EUR', 'GBP', 'USD', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD']);
 
-function clampNumber(value, min, max) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return min;
-  return Math.min(Math.max(numeric, min), max);
-}
-
-function normalizeToken(value) {
+export function normalizeToken(value) {
   if (value === null || value === undefined) return '';
   const candidate = String(value).trim().replace(/^#/, '').replace(/\s+/g, '').toUpperCase();
   if (!candidate || SUSPICIOUS_PLACEHOLDERS.has(candidate) || /^\+\d+$/.test(candidate)) return '';
   return candidate;
-}
-
-function looksLikeCryptoDescription(name = '', bio = '', specialty = '', assetFocus = []) {
-  const haystack = [name, bio, specialty, assetFocus.join(' ')].join(' ').toLowerCase();
-  return /(crypto|digital asset|digital-asset|btc|eth|sol|avax|bnb|matic|market sentiment|momentum)/i.test(haystack);
-}
-
-function prefersCryptoFallback(assetFocus = []) {
-  const values = (Array.isArray(assetFocus) ? assetFocus : []).map(normalizeToken).filter(Boolean);
-  if (!values.length) return true;
-
-  const levels = values.map((value) => {
-    if (CRYPTO_TOKENS.has(value)) return 'crypto';
-    if (COMMODITY_TOKENS.has(value) || FX_TOKENS.has(value)) return 'macro';
-    return 'other';
-  });
-
-  return levels.every((level) => level === 'macro') && values.some((value) => COMMODITY_TOKENS.has(value));
 }
 
 export function normalizeAssetFocus(assetFocus = [], fallback = DEFAULT_CRYPTO_ASSETS) {
@@ -44,69 +20,138 @@ export function normalizeAssetFocus(assetFocus = [], fallback = DEFAULT_CRYPTO_A
   for (const item of rawItems) {
     const token = normalizeToken(item);
     if (!token) continue;
-
     const canonical = token.includes('-') ? token : `${token}-USD`;
     if (!seen.has(canonical)) {
       seen.add(canonical);
       cleaned.push(canonical);
     }
-
     if (cleaned.length >= 6) break;
   }
 
   if (!cleaned.length) return [...fallback];
 
-  const prioritised = cleaned.filter((token) => {
-    if (token.startsWith('BTC-') || token.startsWith('ETH-') || token.startsWith('SOL-') || token.startsWith('AVAX-') || token.startsWith('BNB-')) return true;
-    if (token.startsWith('USD-') || token.startsWith('EUR-') || token.startsWith('GBP-') || token.startsWith('JPY-') || token.startsWith('CHF-')) return true;
-    if (token === 'XAU' || token === 'WTI' || token === 'BRENT' || token === 'GOLD') return false;
-    return true;
-  });
+  const deduped = [...new Set(cleaned)];
+  return deduped.slice(0, 3);
+}
 
-  if (!prioritised.length) return [...fallback];
-  if (prioritised.every((token) => token === 'XAU' || token === 'WTI' || token === 'BRENT' || token === 'GOLD' || token === 'USD')) {
-    return [...fallback];
+export function validateTraderRecord(trader = {}) {
+  const candidate = { ...trader };
+  const name = String(candidate.name || 'Unknown trader').trim() || 'Unknown trader';
+  const bio = String(candidate.bio || '').trim();
+
+  if (!name || name === 'Unknown trader') {
+    throw new Error('Trader name is required');
   }
 
-  const deduped = [...new Set(prioritised)];
-  return deduped.length >= 3 ? deduped.slice(0, 3) : deduped;
+  if (candidate.asset_focus) {
+    candidate.asset_focus = normalizeAssetFocus(candidate.asset_focus, DEFAULT_CRYPTO_ASSETS);
+    if (!candidate.asset_focus.length) {
+      throw new Error('Trader asset focus must not be empty');
+    }
+  }
+
+  if (candidate.starting_equity !== undefined) {
+    const startingEquity = Number(candidate.starting_equity);
+    if (!Number.isFinite(startingEquity) || startingEquity <= 0) {
+      throw new Error('starting_equity must be a positive number');
+    }
+  }
+
+  if (candidate.current_equity !== undefined) {
+    const currentEquity = Number(candidate.current_equity);
+    if (!Number.isFinite(currentEquity) || currentEquity < 0) {
+      throw new Error('current_equity must be a non-negative number');
+    }
+  }
+
+  if (candidate.total_return !== undefined) {
+    const totalReturn = Number(candidate.total_return);
+    if (!Number.isFinite(totalReturn)) {
+      throw new Error('total_return must be a finite number');
+    }
+  }
+
+  if (candidate.monthly_return !== undefined) {
+    const monthlyReturn = Number(candidate.monthly_return);
+    if (!Number.isFinite(monthlyReturn)) {
+      throw new Error('monthly_return must be a finite number');
+    }
+  }
+
+  if (candidate.win_rate_trades !== undefined) {
+    const winRate = Number(candidate.win_rate_trades);
+    if (!Number.isFinite(winRate) || winRate < 0 || winRate > 100) {
+      throw new Error('win_rate_trades must be between 0 and 100');
+    }
+  }
+
+  if (candidate.max_drawdown !== undefined) {
+    const drawdown = Number(candidate.max_drawdown);
+    if (!Number.isFinite(drawdown) || drawdown < 0 || drawdown > 100) {
+      throw new Error('max_drawdown must be between 0 and 100');
+    }
+  }
+
+  if (candidate.volatility !== undefined) {
+    const volatility = Number(candidate.volatility);
+    if (!Number.isFinite(volatility) || volatility < 0) {
+      throw new Error('volatility must be a non-negative number');
+    }
+  }
+
+  if (candidate.risk_score !== undefined) {
+    const riskScore = Number(candidate.risk_score);
+    if (!Number.isFinite(riskScore) || Math.trunc(riskScore) < 1 || Math.trunc(riskScore) > 10) {
+      throw new Error('risk_score must be an integer between 1 and 10');
+    }
+  }
+
+  if (candidate.followers !== undefined) {
+    const followers = Number(candidate.followers);
+    if (!Number.isFinite(followers) || followers < 0) {
+      throw new Error('followers must be a non-negative number');
+    }
+  }
+
+  if (candidate.total_trades !== undefined) {
+    const totalTrades = Number(candidate.total_trades);
+    if (!Number.isFinite(totalTrades) || totalTrades < 0) {
+      throw new Error('total_trades must be a non-negative integer');
+    }
+  }
+
+  if (candidate.profit_for_copiers !== undefined) {
+    const profitForCopiers = Number(candidate.profit_for_copiers);
+    if (!Number.isFinite(profitForCopiers)) {
+      throw new Error('profit_for_copiers must be a finite number');
+    }
+  }
+
+  if (candidate.under_management !== undefined) {
+    const underManagement = Number(candidate.under_management);
+    if (!Number.isFinite(underManagement) || underManagement < 0) {
+      throw new Error('under_management must be a non-negative number');
+    }
+  }
+
+  if (candidate.is_active !== undefined && typeof candidate.is_active !== 'boolean') {
+    throw new Error('is_active must be a boolean');
+  }
+
+  if (bio && bio.length > 500) {
+    throw new Error('Trader bio exceeds the maximum supported length');
+  }
+
+  return {
+    ...candidate,
+    name,
+    bio,
+    asset_focus: candidate.asset_focus || normalizeAssetFocus([], DEFAULT_CRYPTO_ASSETS),
+  };
 }
 
 export function sanitizeTraderRecord(trader = {}) {
-  const name = String(trader.name || 'Unknown trader').trim() || 'Unknown trader';
-  const bio = String(trader.bio || '').trim();
-  const specialty = String(trader.specialty || '').trim();
-
-  let assetFocus = Array.isArray(trader.asset_focus) ? trader.asset_focus : [];
-  const shouldUseCryptoFallback = looksLikeCryptoDescription(name, bio, specialty, assetFocus) || prefersCryptoFallback(assetFocus);
-
-  if (shouldUseCryptoFallback) {
-    assetFocus = normalizeAssetFocus(assetFocus, DEFAULT_CRYPTO_ASSETS);
-    if (!assetFocus.some((token) => CRYPTO_TOKENS.has(token.split('-')[0]))) {
-      assetFocus = [...DEFAULT_CRYPTO_ASSETS];
-    }
-  } else {
-    assetFocus = normalizeAssetFocus(assetFocus, DEFAULT_FX_ASSETS);
-  }
-
-  const totalReturn = clampNumber(trader.total_return ?? 0, 0, 250);
-  const monthlyReturn = clampNumber(trader.monthly_return ?? totalReturn * 0.35, 0, 150);
-  const winRateTrades = clampNumber(trader.win_rate_trades ?? trader.win_rate ?? 50, 0, 100);
-  const followers = Math.max(0, Math.trunc(Number(trader.followers ?? trader.copiers_current ?? 0) || 0));
-  const isActive = trader.is_active === undefined ? true : Boolean(trader.is_active);
-
-  return {
-    ...trader,
-    name,
-    bio,
-    specialty,
-    asset_focus: assetFocus,
-    total_return: Number(totalReturn.toFixed(2)),
-    monthly_return: Number(monthlyReturn.toFixed(2)),
-    win_rate_trades: Number(winRateTrades.toFixed(2)),
-    followers,
-    is_active: isActive,
-  };
+  return validateTraderRecord(trader);
 }
 
 export function filterVisibleTraders(traders = []) {
@@ -116,5 +161,6 @@ export function filterVisibleTraders(traders = []) {
 export default {
   normalizeAssetFocus,
   sanitizeTraderRecord,
+  validateTraderRecord,
   filterVisibleTraders
 };

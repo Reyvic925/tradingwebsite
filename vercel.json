@@ -1,4 +1,7 @@
 {
+  "crons": [
+    { "path": "/api/cron/traders", "schedule": "*/5 * * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     {

@@ -1,6 +1,11 @@
 -- Seed a varied trader roster for the copy-trading platform.
 -- Run this file in the Supabase SQL editor.
 -- Safe to rerun: existing traders are matched by name and are not duplicated.
+-- DEPRECATED: this legacy file wrote performance metrics directly. Run
+-- 20260912-synthetic-trader-simulation.sql and npm run traders:migrate instead.
+DO $$ BEGIN
+  RAISE EXCEPTION 'Legacy trader metric seed disabled; use deterministic simulation migration';
+END $$;
 
 ALTER TABLE IF EXISTS traders
   ADD COLUMN IF NOT EXISTS country TEXT,

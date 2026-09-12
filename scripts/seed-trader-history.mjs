@@ -8,6 +8,9 @@ import 'dotenv/config.js';
 import { createClient } from '@supabase/supabase-js';
 import { fetchLiveMarketSnapshot, fetchYahooMarketQuotes } from '../api-handlers/live-market-data.js';
 
+console.error('This legacy seeder is disabled. Use `npm run traders:migrate`, then `/api/cron-traders` to advance deterministic simulation state.');
+process.exit(1);
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
