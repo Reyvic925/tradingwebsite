@@ -24,7 +24,7 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 -- First, check if we need to create user_follows table
 CREATE TABLE IF NOT EXISTS user_follows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   trader_id INTEGER REFERENCES traders(id) ON DELETE CASCADE,
   
   allocated_amount DECIMAL DEFAULT 0.00,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS leaderboard_cache (
 -- Step 7: Create gamification tables for levels and badges
 CREATE TABLE IF NOT EXISTS user_gamification (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   level INTEGER DEFAULT 1,
   experience_points INTEGER DEFAULT 0,
   badges TEXT[] DEFAULT '{}',
