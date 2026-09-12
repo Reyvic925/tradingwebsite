@@ -1,10 +1,8 @@
--- Add the lead traders requested for the copy-trading roster.
--- Safe to rerun: records are matched by name case-insensitively.
--- DEPRECATED: this legacy file wrote display metrics directly. Run
--- 20260912-synthetic-trader-simulation.sql and npm run traders:migrate instead.
 DO $$ BEGIN
-  RAISE EXCEPTION 'Legacy trader metric seed disabled; use deterministic simulation migration';
+  RAISE NOTICE 'Skipped deprecated trader metric seed; use deterministic synthetic trader simulation migration instead.';
 END $$;
+
+/*
 
 ALTER TABLE IF EXISTS traders
   ADD COLUMN IF NOT EXISTS country TEXT,
@@ -88,13 +86,11 @@ WHERE NOT EXISTS (
   SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(requested.name)
 );
 
--- Split legacy Asia assignments across the two named Forex sessions.
 UPDATE traders
 SET session_type = CASE WHEN id % 2 = 0 THEN 'tokyo' ELSE 'sydney' END,
     updated_at = NOW()
 WHERE session_type = 'asia';
 
--- Keep displayed demo performance plausible for established traders and consistent with the $10,000 starting balance.
 UPDATE traders
 SET total_return = ROUND(GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35))::numeric, 2),
     monthly_return = ROUND((GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8) + 35)) / 6)::numeric, 2),
@@ -109,7 +105,6 @@ SET total_return = ROUND(GREATEST(35, LEAST(85, (COALESCE(total_return, 0) * 0.8
     updated_at = NOW()
 WHERE is_active = true;
 
--- Add non-copier trader metadata for every active trader.
 UPDATE traders
 SET badge = CASE
       WHEN total_return >= 78 THEN 'Diamond'
@@ -120,7 +115,6 @@ SET badge = CASE
     profit_sharing_fee = 20
 WHERE is_active = true;
 
--- Preserve the supplied reference metrics for Ingrid's profile.
 UPDATE traders
 SET badge = 'Diamond',
     current_equity = 32198.00,
@@ -131,7 +125,6 @@ SET badge = 'Diamond',
     updated_at = NOW()
 WHERE LOWER(name) = 'ingrid martingale';
 
--- Replace fragile remote avatars with bundled images for the requested traders.
 UPDATE traders
 SET avatar_url = CASE LOWER(name)
       WHEN 'helena costa' THEN '/images/avatar-1.jpg'
@@ -182,3 +175,4 @@ SELECT
   ROUND(SUM(under_management)::numeric, 2) AS total_assets_under_management
 FROM traders
 WHERE is_active = true;
+*/
