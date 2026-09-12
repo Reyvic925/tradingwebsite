@@ -123,6 +123,9 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Step 10: Add constraints to ensure data integrity
 ALTER TABLE traders
+DROP CONSTRAINT IF EXISTS risk_score_range;
+
+ALTER TABLE traders
 ADD CONSTRAINT risk_score_range CHECK (risk_score BETWEEN 1 AND 10);
 
 -- Create view for easy leaderboard queries
@@ -146,6 +149,6 @@ SELECT
     WHEN ROW_NUMBER() OVER (ORDER BY t.total_return DESC) = 3 THEN 'bronze'
     ELSE NULL
   END as medal
-FROM traders
-WHERE is_active = true
+FROM traders AS t
+WHERE t.is_active = true
 ORDER BY t.total_return DESC;
