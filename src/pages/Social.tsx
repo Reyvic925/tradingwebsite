@@ -423,10 +423,11 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
 
         <button
           onClick={() => setShowModal(true)}
-          className="w-full py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition text-sm font-semibold flex items-center justify-center gap-2"
+          disabled={trader.is_active === false}
+          className={`w-full py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition ${trader.is_active === false ? 'cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
         >
           <Plus size={16} />
-          Copy Trader
+          {trader.is_active === false ? 'Closed' : 'Copy Trader'}
         </button>
       </div>
 
@@ -702,12 +703,14 @@ export default function Social() {
 
   const visibleTraders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const filtered = ((traders as any[]) || []).filter((trader: Trader) => {
-      if (!normalizedQuery) return true;
-      return [trader.name, trader.bio, trader.specialty, ...(trader.asset_focus || [])]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalizedQuery));
-    });
+    const filtered = ((traders as any[]) || [])
+      .filter((trader: Trader) => trader.is_active !== false)
+      .filter((trader: Trader) => {
+        if (!normalizedQuery) return true;
+        return [trader.name, trader.bio, trader.specialty, ...(trader.asset_focus || [])]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+      });
 
     return [...filtered].sort((first: Trader, second: Trader) => {
       if (sortBy === 'return') return Number(second.total_return) - Number(first.total_return);
@@ -795,7 +798,7 @@ export default function Social() {
 
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
             <Zap size={20} className="text-yellow-500" />
-            Available traders <span className="text-xs font-normal text-stone-500">{visibleTraders.length} strategies</span>
+            Open strategies <span className="text-xs font-normal text-stone-500">{visibleTraders.length} active</span>
           </h2>
           {tradersLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -1,4 +1,5 @@
 import supabase from './db-client.js';
+import { sanitizeTraderRecord, filterVisibleTraders } from './trader-validation.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,7 +23,8 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     // Add rankings and medals after filtering to active traders.
-    const leaderboard = (data || []).map((trader, index) => ({
+    const activeTraders = filterVisibleTraders((data || []).map((trader) => sanitizeTraderRecord(trader)));
+    const leaderboard = activeTraders.map((trader, index) => ({
       ...trader,
       total_return: Math.max(Number(trader.total_return) || 0, 0),
       monthly_return: Math.max(Number(trader.monthly_return) || 0, 0),

@@ -1,6 +1,7 @@
 import supabase from './db-client.js';
 import { first } from './helpers.js';
 import { requireAdmin } from './auth-admin.js';
+import { sanitizeTraderRecord, normalizeAssetFocus, filterVisibleTraders } from './trader-validation.js';
 
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -83,11 +84,9 @@ export default async function handler(req, res) {
       
       const { data, error } = await query;
       if (error) throw error;
-      const normalized = (data || []).map((trader) => ({
-        ...trader,
-        total_return: Math.max(Number(trader.total_return) || 0, 0),
-        monthly_return: Math.max(Number(trader.monthly_return) || 0, 0),
-      }));
+      const normalized = (data || [])
+        .map((trader) => sanitizeTraderRecord(trader))
+        .filter((trader) => filterVisibleTraders([trader]).length > 0 || include_inactive === '1');
       return res.status(200).json(normalized);
     }
 
@@ -109,38 +108,54 @@ export default async function handler(req, res) {
       }
 
       const resolvedAvatarUrl = await resolveAvatarUrl(avatar_data, avatar_url);
+      const safePayload = sanitizeTraderRecord({
+        name,
+        bio: bio || '',
+        country: country || '',
+        avatar_url: resolvedAvatarUrl,
+        specialty: specialty || '',
+        badge: badge || 'Gold',
+        risk_level: risk_level || 'Medium',
+        asset_focus: normalizeAssetFocus(asset_focus, ['BTC-USD', 'ETH-USD', 'SOL-USD']),
+        current_equity: current_equity,
+        total_return: total_return,
+        daily_return: daily_return,
+        monthly_return: monthly_return,
+        total_trades: total_trades,
+        win_rate_trades: win_rate_trades,
+        max_drawdown: max_drawdown,
+        volatility: volatility || 0.005,
+        drift: drift || 0.001,
+        risk_score: risk_score || 5,
+        session_type: session_type || 'nyc',
+        is_active: true,
+        followers: followers,
+        copiers_current: copiers_current,
+        copiers_all_time: copiers_all_time,
+        profit_for_copiers: profit_for_copiers,
+        profit_sharing_fee: profit_sharing_fee,
+        under_management: under_management,
+        session_start: session_start || new Date().toISOString().slice(0, 10),
+        session_end: session_end || null
+      });
 
       const { data, error } = await supabase
         .from('traders')
         .insert({
-          name,
-          bio: bio || '',
-          country: country || '',
-          avatar_url: resolvedAvatarUrl,
-          specialty: specialty || '',
-          badge: badge || 'Gold',
-          risk_level: risk_level || 'Medium',
-          asset_focus: asset_focus || ['BTC-USD', 'ETH-USD'],
-          current_equity: Number.isFinite(Number(current_equity)) ? Math.max(Number(current_equity), 0) : 10000.00,
-          total_return: Number.isFinite(Number(total_return)) ? Math.max(Number(total_return), 0) : 0.00,
-          daily_return: Number.isFinite(Number(daily_return)) ? Number(daily_return) : 0.00,
-          monthly_return: Number.isFinite(Number(monthly_return)) ? Math.max(Number(monthly_return), 0) : 0.00,
-          total_trades: Number.isFinite(Number(total_trades)) ? Math.max(Math.trunc(Number(total_trades)), 0) : 0,
-          win_rate_trades: Number.isFinite(Number(win_rate_trades)) ? Math.min(Math.max(Number(win_rate_trades), 0), 100) : 50.00,
-          max_drawdown: Number.isFinite(Number(max_drawdown)) ? Math.max(Number(max_drawdown), 0) : 0.00,
-          volatility: volatility || 0.005,
-          drift: drift || 0.001,
-          risk_score: Math.min(Math.max(risk_score || 5, 1), 10),
-          session_type: session_type || 'nyc',
-          is_active: true,
-          followers: Number.isFinite(Number(followers)) ? Math.max(Math.trunc(Number(followers)), 0) : 0,
-          copiers_current: Number.isFinite(Number(copiers_current)) ? Math.max(Math.trunc(Number(copiers_current)), 0) : 0,
-          copiers_all_time: Number.isFinite(Number(copiers_all_time)) ? Math.max(Math.trunc(Number(copiers_all_time)), 0) : 0,
-          profit_for_copiers: Number.isFinite(Number(profit_for_copiers)) ? Math.max(Number(profit_for_copiers), 0) : 0,
-          profit_sharing_fee: Number.isFinite(Number(profit_sharing_fee)) ? Math.min(Math.max(Number(profit_sharing_fee), 0), 100) : 20,
-          under_management: Number.isFinite(Number(under_management)) ? Math.max(Number(under_management), 0) : 0,
-          session_start: session_start || new Date().toISOString().slice(0, 10),
-          session_end: session_end || null
+          ...safePayload,
+          current_equity: Number.isFinite(Number(safePayload.current_equity)) ? Math.max(Number(safePayload.current_equity), 0) : 10000.00,
+          total_return: Number.isFinite(Number(safePayload.total_return)) ? Math.max(Number(safePayload.total_return), 0) : 0.00,
+          daily_return: Number.isFinite(Number(safePayload.daily_return)) ? Number(safePayload.daily_return) : 0.00,
+          monthly_return: Number.isFinite(Number(safePayload.monthly_return)) ? Math.max(Number(safePayload.monthly_return), 0) : 0.00,
+          total_trades: Number.isFinite(Number(safePayload.total_trades)) ? Math.max(Math.trunc(Number(safePayload.total_trades)), 0) : 0,
+          win_rate_trades: Number.isFinite(Number(safePayload.win_rate_trades)) ? Math.min(Math.max(Number(safePayload.win_rate_trades), 0), 100) : 50.00,
+          max_drawdown: Number.isFinite(Number(safePayload.max_drawdown)) ? Math.max(Number(safePayload.max_drawdown), 0) : 0.00,
+          followers: Number.isFinite(Number(safePayload.followers)) ? Math.max(Math.trunc(Number(safePayload.followers)), 0) : 0,
+          copiers_current: Number.isFinite(Number(safePayload.copiers_current)) ? Math.max(Math.trunc(Number(safePayload.copiers_current)), 0) : 0,
+          copiers_all_time: Number.isFinite(Number(safePayload.copiers_all_time)) ? Math.max(Math.trunc(Number(safePayload.copiers_all_time)), 0) : 0,
+          profit_for_copiers: Number.isFinite(Number(safePayload.profit_for_copiers)) ? Math.max(Number(safePayload.profit_for_copiers), 0) : 0,
+          profit_sharing_fee: Number.isFinite(Number(safePayload.profit_sharing_fee)) ? Math.min(Math.max(Number(safePayload.profit_sharing_fee), 0), 100) : 20,
+          under_management: Number.isFinite(Number(safePayload.under_management)) ? Math.max(Number(safePayload.under_management), 0) : 0,
         })
         .select();
       
@@ -167,15 +182,18 @@ export default async function handler(req, res) {
       if (updateData.risk_score) {
         updateData.risk_score = Math.min(Math.max(updateData.risk_score, 1), 10);
       }
+      if (updateData.asset_focus) {
+        updateData.asset_focus = normalizeAssetFocus(updateData.asset_focus, ['BTC-USD', 'ETH-USD', 'SOL-USD']);
+      }
       if (updateData.total_return !== undefined) {
         const totalReturn = Number(updateData.total_return);
         if (!Number.isFinite(totalReturn)) return res.status(400).json({ error: 'Total return must be a number' });
-        updateData.total_return = Math.max(totalReturn, 0);
+        updateData.total_return = Math.min(Math.max(totalReturn, 0), 250);
       }
       if (updateData.monthly_return !== undefined) {
         const monthlyReturn = Number(updateData.monthly_return);
         if (!Number.isFinite(monthlyReturn)) return res.status(400).json({ error: 'Monthly return must be a number' });
-        updateData.monthly_return = Math.max(monthlyReturn, 0);
+        updateData.monthly_return = Math.min(Math.max(monthlyReturn, 0), 150);
       }
       if (updateData.win_rate_trades !== undefined) {
         const winRate = Number(updateData.win_rate_trades);
@@ -187,10 +205,11 @@ export default async function handler(req, res) {
         if (!Number.isFinite(followers)) return res.status(400).json({ error: 'Followers must be a number' });
         updateData.followers = Math.max(Math.trunc(followers), 0);
       }
+      const sanitizedUpdate = sanitizeTraderRecord(updateData);
 
       const { data, error } = await supabase
         .from('traders')
-        .update({ ...updateData, updated_at: new Date() })
+        .update({ ...sanitizedUpdate, updated_at: new Date() })
         .eq('id', id)
         .select();
       
