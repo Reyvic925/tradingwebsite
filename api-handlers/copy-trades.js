@@ -1,6 +1,7 @@
 import supabase from './db-client.js';
 import { createNotification } from './notification-service.js';
 import { getUsdWallet, first, findById, requireUser as authUser } from './helpers.js';
+import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 
 async function requireUser(req) {
   return authUser(supabase, req);
@@ -111,11 +112,7 @@ export default async function handler(req, res) {
 
       if (error) throw error;
 
-      // Update trader followers count
-      await supabase
-        .from('traders')
-        .update({ followers: Number(trader.followers || 0) + (existingFollow?.[0] ? 0 : 1) })
-        .eq('id', traderId);
+      await reconcileTraderCopierMetrics(supabase, traderId);
 
       // Create notification
       await createNotification(supabase, {
@@ -158,6 +155,7 @@ export default async function handler(req, res) {
         .select();
 
       if (error) throw error;
+
       if (!data || data.length === 0) {
         return res.status(404).json({ error: 'Follow not found' });
       }
@@ -198,6 +196,8 @@ export default async function handler(req, res) {
         .eq('id', id);
 
       if (error) throw error;
+
+  await reconcileTraderCopierMetrics(supabase, follow.trader_id);
 
       // Create notification
       const { data: traderData } = await supabase

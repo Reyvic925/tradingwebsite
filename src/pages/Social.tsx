@@ -259,7 +259,7 @@ function LeaderboardSection() {
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">90-day ROI</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="text-gray-400">Win rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
-              <div className="text-gray-400">Copiers: <span className="text-white font-semibold">{trader.copiers_current ?? trader.followers ?? 0}</span></div>
+              <div className="text-gray-400">Followers: <span className="text-white font-semibold">{trader.followers || 0}</span></div>
             </div>
           </div>
         ))}
@@ -330,7 +330,6 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
   const [showModal, setShowModal] = useState<boolean>(false);
   const [, refreshStatus] = useState(Date.now());
   const isProfit = Number(trader.total_return ?? 0) >= 0;
-  const copierCount = trader.copiers_current ?? trader.followers ?? 0;
 
   useEffect(() => {
     const interval = window.setInterval(() => refreshStatus(Date.now()), 60000);
@@ -401,7 +400,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
         )}
 
         {/* Metrics */}
-        <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
+        <div className="grid grid-cols-2 gap-2 mb-4 text-center text-xs">
           <div>
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
               {formatPct(Number(trader.total_return ?? 0))}
@@ -411,10 +410,6 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
           <div>
             <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(0)}%</div>
             <div className="text-gray-500">Win Rate</div>
-          </div>
-          <div>
-              <div className="font-mono font-bold text-white">{copierCount}</div>
-            <div className="text-gray-500">Copiers</div>
           </div>
         </div>
 

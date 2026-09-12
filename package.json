@@ -37,6 +37,8 @@
     ,"traders:reconcile-status": "node scripts/reconcile-trader-status.mjs"
     ,"traders:backfill-history": "node scripts/backfill-trader-history.mjs"
     ,"traders:bootstrap-history": "node scripts/bootstrap-trader-history.mjs"
+    ,"audit:copiers": "node scripts/reconcile-trader-copiers.mjs"
+    ,"seed:copiers": "node scripts/reconcile-trader-copiers.mjs --seed"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

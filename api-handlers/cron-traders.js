@@ -2,6 +2,7 @@ import supabase from './db-client.js';
 import { calculateCopyFollowerValue } from './copy-trading-tick.js';
 import { normalizeSyntheticConfig, simulateTick } from './synthetic-simulation.js';
 import { calculateSyntheticMetrics } from './synthetic-metrics.js';
+import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 
 const TICK_MS = 5 * 60 * 1000;
 const MAX_CATCH_UP_TICKS = 288;
@@ -167,20 +168,7 @@ async function updateCopiers(trader, eventId, tickAt, traderChange) {
     void previousPnl;
   }
 
-  const { data: allFollows, error: allError } = await supabase.from('user_follows').select('user_id, is_copying, current_value, allocated_amount').eq('trader_id', trader.id);
-  if (allError) throw allError;
-  const active = (allFollows || []).filter((follow) => follow.is_copying);
-  const uniqueAllTime = new Set((allFollows || []).map((follow) => follow.user_id)).size;
-  const underManagement = active.reduce((sum, follow) => sum + Number(follow.current_value || 0), 0);
-  const profitForCopiers = active.reduce((sum, follow) => sum + Number(follow.current_value || 0) - Number(follow.allocated_amount || 0), 0);
-  const { error: traderError } = await supabase.from('traders').update({
-    followers: active.length,
-    copiers_current: active.length,
-    copiers_all_time: uniqueAllTime,
-    under_management: Number(underManagement.toFixed(2)),
-    profit_for_copiers: Number(profitForCopiers.toFixed(2)),
-  }).eq('id', trader.id).eq('is_active', true);
-  if (traderError) throw traderError;
+  await reconcileTraderCopierMetrics(supabase, trader.id);
 }
 
 export default async function handler(req, res) {

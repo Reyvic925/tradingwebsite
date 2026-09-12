@@ -5,9 +5,6 @@ import { useTraderTrades, useTraderHistory, usePnlAnimation, useCopyTrading } fr
 import {
   ChevronUp,
   ChevronDown,
-  TrendingUp,
-  Shield,
-  Users,
   Clock,
   Plus
 } from 'lucide-react';
@@ -154,7 +151,7 @@ export default function TraderProfile() {
       </div>
 
       {/* Key Metrics */}
-      <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="mb-8 grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                   <div className="text-xs text-gray-400 mb-1">Trader Equity</div>
                   <div className="text-2xl font-bold text-white">{formatMoney(trader.current_equity ?? 0)}</div>
@@ -180,58 +177,11 @@ export default function TraderProfile() {
           <div className="text-2xl font-bold text-red-400">{Number(trader.max_drawdown || 0).toFixed(2)}%</div>
           <div className="text-xs text-gray-500 mt-1">Peak-to-trough loss</div>
         </div>
-      </div>
 
-      {/* Secondary Metrics */}
-      <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Users size={16} className="text-blue-400" />
-            <div className="text-sm text-gray-300">Followers</div>
-          </div>
-          <div className="text-2xl font-bold text-white">{trader.followers || 0}</div>
-        </div>
-
-        <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp size={16} className="text-purple-400" />
-            <div className="text-sm text-gray-300">Daily Volatility</div>
-          </div>
-          <div className="text-2xl font-bold text-white">{(Number(trader.volatility || 0.005) * 100).toFixed(3)}%</div>
-        </div>
-
-        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield size={16} className="text-amber-400" />
-            <div className="text-sm text-gray-300">Risk Score</div>
-          </div>
-          <div className="text-2xl font-bold text-white">{trader.risk_score}/10</div>
-        </div>
-      </div>
-
-      {/* Copier performance */}
-      <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-          <div className="text-sm text-gray-300">Profit for copiers</div>
-          <div className="mt-2 text-xl font-bold text-emerald-300">{formatMoney(trader.profit_for_copiers || 0)}</div>
-        </div>
-        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-          <div className="text-sm text-gray-300">Profit sharing fee</div>
-          <div className="mt-2 text-xl font-bold text-amber-300">{Number(trader.profit_sharing_fee ?? 20).toFixed(0)}%</div>
-        </div>
-        <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-          <div className="text-sm text-gray-300">Copiers</div>
-          <div className="mt-2 text-xl font-bold text-blue-300">{trader.copiers_current ?? trader.followers ?? 0}</div>
-          <div className="mt-1 text-xs text-gray-500">Current</div>
-        </div>
-        <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-          <div className="text-sm text-gray-300">Copiers</div>
-          <div className="mt-2 text-xl font-bold text-cyan-300">{trader.copiers_all_time ?? trader.followers ?? 0}</div>
-          <div className="mt-1 text-xs text-gray-500">All-time</div>
-        </div>
-        <div className="p-4 rounded-lg bg-violet-500/10 border border-violet-500/30">
-          <div className="text-sm text-gray-300">Under management</div>
-          <div className="mt-2 text-xl font-bold text-violet-300">{formatMoney(trader.under_management || 0)}</div>
+        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+          <div className="text-xs text-gray-400 mb-1">Copiers</div>
+          <div className="text-2xl font-bold text-white">{trader.copiers_current ?? 0}</div>
+          <div className="text-xs text-gray-500 mt-1">Currently copying</div>
         </div>
       </div>
 
