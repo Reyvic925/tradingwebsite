@@ -19,15 +19,36 @@ function classify(trader) {
 
 function targetFor(trader, strategyType) {
   const risk = Math.max(1, Number(trader.risk_score) || 5);
+  const name = String(trader.name || '').toLowerCase();
+  if (name === 'apex traders') return 420;
+  if (name === 'ingrid martingale') return 380;
+  if (name === 'victor mensah') return 320;
   const base = {
-    conservative: 24,
-    swing: 38,
-    momentum: 55,
-    scalper: 70,
-    martingale: 120,
-    mean_reversion: 32,
+    conservative: 18,
+    swing: 35,
+    momentum: 42,
+    scalper: 58,
+    martingale: 180,
+    mean_reversion: 28,
   }[strategyType] || 55;
-  return Number((base * (0.75 + risk * 0.08)).toFixed(2));
+  return Number(Math.min(240, base * (0.7 + risk * 0.06)).toFixed(2));
+}
+
+function shouldCompound(trader, strategyType, targetReturnProfile) {
+  const name = String(trader.name || '').toLowerCase();
+  return strategyType === 'martingale'
+    || name === 'apex traders'
+    || name === 'ingrid martingale'
+    || name === 'victor mensah'
+    || (strategyType === 'momentum' && targetReturnProfile >= 180);
+}
+
+function leverageFor(strategyType, targetReturnProfile) {
+  if (strategyType === 'conservative') return 2;
+  if (strategyType === 'swing') return 3;
+  if (strategyType === 'scalper') return 4;
+  if (strategyType === 'martingale' || targetReturnProfile >= 300) return 8;
+  return 5;
 }
 
 async function backfill() {
@@ -45,11 +66,16 @@ async function backfill() {
       }
       if (!row) break;
       const strategyType = classify(trader);
-      const existingTarget = Number(row.config?.targetReturnProfile);
-      const targetReturnProfile = Number.isFinite(existingTarget) && existingTarget !== 0 && existingTarget !== 45
-        ? existingTarget
-        : targetFor(trader, strategyType);
-      const config = normalizeSyntheticConfig({ ...row.config, strategyType, riskProfile: trader.risk_score, targetReturnProfile, riskFraction: undefined });
+      const targetReturnProfile = targetFor(trader, strategyType);
+      const config = normalizeSyntheticConfig({
+        ...row.config,
+        strategyType,
+        riskProfile: trader.risk_score,
+        targetReturnProfile,
+        riskFraction: undefined,
+        compounding: shouldCompound(trader, strategyType, targetReturnProfile),
+        maxLeverage: leverageFor(strategyType, targetReturnProfile),
+      });
       const { error: updateError } = await supabase.from('trader_simulation_state').update({ config, updated_at: new Date().toISOString() }).eq('trader_id', trader.id);
       if (!updateError) {
         updated++;

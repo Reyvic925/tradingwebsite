@@ -13,12 +13,12 @@ const ASSET_SPECS = {
 };
 
 const STRATEGY_PROFILES = {
-  momentum: { tradeProbability: 0.72, holdingTicks: 1, directionBias: 0.68, riskFraction: 0.012 },
-  mean_reversion: { tradeProbability: 0.58, holdingTicks: 1, directionBias: 0.42, riskFraction: 0.008 },
-  scalper: { tradeProbability: 0.9, holdingTicks: 1, directionBias: 0.52, riskFraction: 0.004 },
-  swing: { tradeProbability: 0.28, holdingTicks: 3, directionBias: 0.62, riskFraction: 0.018 },
-  martingale: { tradeProbability: 0.7, holdingTicks: 1, directionBias: 0.56, riskFraction: 0.02 },
-  conservative: { tradeProbability: 0.2, holdingTicks: 4, directionBias: 0.58, riskFraction: 0.004 },
+  momentum: { tradeProbability: 0.72, holdingTicks: 1, directionBias: 0.68, riskFraction: 0.012, maxExposureFraction: 0.5 },
+  mean_reversion: { tradeProbability: 0.58, holdingTicks: 1, directionBias: 0.42, riskFraction: 0.008, maxExposureFraction: 0.35 },
+  scalper: { tradeProbability: 0.9, holdingTicks: 1, directionBias: 0.52, riskFraction: 0.004, maxExposureFraction: 0.2 },
+  swing: { tradeProbability: 0.28, holdingTicks: 3, directionBias: 0.62, riskFraction: 0.018, maxExposureFraction: 0.75 },
+  martingale: { tradeProbability: 0.7, holdingTicks: 1, directionBias: 0.56, riskFraction: 0.02, maxExposureFraction: 1 },
+  conservative: { tradeProbability: 0.2, holdingTicks: 4, directionBias: 0.58, riskFraction: 0.004, maxExposureFraction: 0.15 },
 };
 
 function hashString(value) {
@@ -70,6 +70,7 @@ export function normalizeSyntheticConfig(config = {}) {
     riskProfile: Math.min(10, Math.max(1, Math.trunc(Number(config.riskProfile) || 5))),
     compounding: config.compounding !== false,
     riskFraction: Math.max(0.001, Number(config.riskFraction) || profile.riskFraction * targetScale),
+    maxExposureFraction: Math.max(0.05, Number(config.maxExposureFraction) || profile.maxExposureFraction),
   };
 }
 
@@ -147,7 +148,9 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const leverage = Math.min(normalizedConfig.maxLeverage, 1 + random() * (normalizedConfig.maxLeverage - 1));
   const riskDistance = Math.max(0.0005, getAssetSpec(asset).volatility * normalizedConfig.volatilityProfile);
   const rewardRisk = winningDecision ? normalizedConfig.averageWinR : normalizedConfig.averageLossR;
-  const quantity = margin * leverage * rewardRisk / (previousPrice * riskDistance);
+  const riskQuantity = margin * leverage * rewardRisk / (previousPrice * riskDistance);
+  const maxQuantity = accountBase * normalizedConfig.maxExposureFraction / previousPrice;
+  const quantity = Math.min(riskQuantity, maxQuantity);
   const tradeMove = side === 'BUY' ? price - previousPrice : previousPrice - price;
   const pnl = opensTrade ? tradeMove * quantity : 0;
   const nextEquity = Math.max(0.01, equity + pnl);
@@ -161,6 +164,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
     exit_price: Number(price.toFixed(8)),
     margin: Number(margin.toFixed(2)),
     leverage: Number(leverage.toFixed(4)),
+    notional: Number((quantity * previousPrice).toFixed(2)),
     pnl: Number(pnl.toFixed(2)),
     price_move_percent: Number((((price - previousPrice) / previousPrice) * 100).toFixed(4)),
     trade_return_percent: Number(((pnl / Math.max(margin, 0.01)) * 100).toFixed(4)),

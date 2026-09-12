@@ -21,8 +21,23 @@ async function retry(label, operation, attempts = 5) {
 }
 
 async function insertBatches(table, rows, size = 500) {
+  let includeNotional = true;
   for (let index = 0; index < rows.length; index += size) {
-    await retry(`${table} batch ${index}`, () => supabase.from(table).insert(rows.slice(index, index + size)));
+    const batch = rows.slice(index, index + size).map((trade) => {
+      if (table !== 'trade_logs' || includeNotional) return trade;
+      const { notional, ...withoutNotional } = trade;
+      void notional;
+      return withoutNotional;
+    });
+    try {
+      await retry(`${table} batch ${index}`, () => supabase.from(table).insert(batch));
+    } catch (error) {
+      if (table === 'trade_logs' && includeNotional && /notional/i.test(String(error.message || ''))) {
+        includeNotional = false;
+        const fallbackBatch = rows.slice(index, index + size).map(({ notional, ...trade }) => trade);
+        await retry(`${table} batch ${index} without optional notional`, () => supabase.from(table).insert(fallbackBatch));
+      } else throw error;
+    }
   }
 }
 

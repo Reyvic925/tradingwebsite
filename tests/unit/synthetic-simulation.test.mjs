@@ -26,6 +26,7 @@ if (next.trade) {
     ? next.trade.quantity * (next.trade.exit_price - next.trade.entry_price)
     : next.trade.quantity * (next.trade.entry_price - next.trade.exit_price);
   assert.equal(next.trade.pnl, Number(expectedPnl.toFixed(2)));
+  assert(next.trade.notional <= config.startingEquity * config.maxExposureFraction + 0.01);
 }
 
 const metrics = deriveMetrics({

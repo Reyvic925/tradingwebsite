@@ -15,12 +15,16 @@ export default async function handler(req, res) {
 
   try {
     const { data, error } = await supabase
-      .from('trader_history')
-      .select('snapshot_date, equity, daily_return')
+      .from('synthetic_equity_snapshots')
+      .select('snapshot_at, equity, daily_return')
       .eq('trader_id', traderId)
-      .order('snapshot_date', { ascending: true });
+      .order('snapshot_at', { ascending: true });
     if (error) throw error;
-    return res.status(200).json(data || []);
+    return res.status(200).json((data || []).map((snapshot) => ({
+      snapshot_date: snapshot.snapshot_at,
+      equity: snapshot.equity,
+      daily_return: snapshot.daily_return,
+    })));
   } catch (error) {
     console.error('API error:', error);
     return res.status(500).json({ error: error.message });

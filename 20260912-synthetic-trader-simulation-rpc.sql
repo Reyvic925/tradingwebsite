@@ -40,7 +40,7 @@ BEGIN
   IF trade_value IS NOT NULL AND trade_value <> 'null'::JSONB THEN
     INSERT INTO trade_logs (
       event_id, trader_id, symbol, side, quantity, entry_price, exit_price,
-      margin, leverage, pnl, pnl_percent, status, traded_at, closed_at,
+      margin, leverage, notional, pnl, pnl_percent, status, traded_at, closed_at,
       entry_time, exit_time, price_move_percent, trade_return_percent,
       account_return_percent
     ) VALUES (
@@ -53,6 +53,7 @@ BEGIN
       (trade_value->>'exit_price')::NUMERIC,
       (trade_value->>'margin')::NUMERIC,
       (trade_value->>'leverage')::NUMERIC,
+      (trade_value->>'notional')::NUMERIC,
       (trade_value->>'pnl')::NUMERIC,
       (trade_value->>'pnl_percent')::NUMERIC,
       COALESCE(trade_value->>'status', 'CLOSED'),
