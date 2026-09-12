@@ -46,7 +46,7 @@ async function backfill() {
       if (!row) break;
       const strategyType = classify(trader);
       const existingTarget = Number(row.config?.targetReturnProfile);
-      const targetReturnProfile = Number.isFinite(existingTarget) && existingTarget !== 0
+      const targetReturnProfile = Number.isFinite(existingTarget) && existingTarget !== 0 && existingTarget !== 45
         ? existingTarget
         : targetFor(trader, strategyType);
       const config = normalizeSyntheticConfig({ ...row.config, strategyType, riskProfile: trader.risk_score, targetReturnProfile, riskFraction: undefined });

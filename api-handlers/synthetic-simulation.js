@@ -134,13 +134,8 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const price = nextPrices[asset];
   const previousPrice = Number(previousPrices[asset]) || getAssetSpec(asset).basePrice;
   const trendSignal = move >= 0;
-  const followsSignal = random() <= profile.directionBias;
-  const strategySignal = normalizedConfig.strategyType === 'mean_reversion'
-    ? !trendSignal
-    : trendSignal;
-  const expectedBullish = followsSignal ? strategySignal : !strategySignal;
   const winningDecision = random() <= normalizedConfig.targetWinRate;
-  const bullishDecision = winningDecision ? expectedBullish : !expectedBullish;
+  const bullishDecision = winningDecision ? trendSignal : !trendSignal;
   const side = bullishDecision ? 'BUY' : 'SELL';
   const equity = Number(state.equity) || normalizedConfig.startingEquity;
   const lossStreak = Number(state.lossStreak) || 0;
@@ -150,7 +145,9 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const accountBase = normalizedConfig.compounding ? equity : normalizedConfig.startingEquity;
   const margin = accountBase * profile.riskFraction * martingaleMultiplier;
   const leverage = Math.min(normalizedConfig.maxLeverage, 1 + random() * (normalizedConfig.maxLeverage - 1));
-  const quantity = margin * leverage / previousPrice;
+  const riskDistance = Math.max(0.0005, getAssetSpec(asset).volatility * normalizedConfig.volatilityProfile);
+  const rewardRisk = winningDecision ? normalizedConfig.averageWinR : normalizedConfig.averageLossR;
+  const quantity = margin * leverage * rewardRisk / (previousPrice * riskDistance);
   const tradeMove = side === 'BUY' ? price - previousPrice : previousPrice - price;
   const pnl = opensTrade ? tradeMove * quantity : 0;
   const nextEquity = Math.max(0.01, equity + pnl);
