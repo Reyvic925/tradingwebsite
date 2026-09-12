@@ -1,5 +1,6 @@
 import 'dotenv/config.js';
 import { createClient } from '@supabase/supabase-js';
+import { reconcileTraderCopierMetrics } from '../api-handlers/copier-metrics.js';
 
 const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -27,21 +28,7 @@ async function reconcile() {
       }, { onConflict: 'event_id' });
       if (snapshotError) throw snapshotError;
     }
-    const { data: follows, error: followsError } = await supabase.from('user_follows').select('user_id, is_copying, current_value, allocated_amount').eq('trader_id', trader.id);
-    if (followsError) throw followsError;
-    const active = (follows || []).filter((follow) => follow.is_copying);
-    const allTime = new Set((follows || []).map((follow) => follow.user_id)).size;
-    const aum = active.reduce((sum, follow) => sum + Number(follow.current_value || 0), 0);
-    const profit = active.reduce((sum, follow) => sum + Number(follow.current_value || 0) - Number(follow.allocated_amount || 0), 0);
-    const { error: metricsError } = await supabase.from('traders').update({
-      followers: active.length,
-      copiers_current: active.length,
-      copiers_all_time: allTime,
-      under_management: Number(aum.toFixed(2)),
-      profit_for_copiers: Number(profit.toFixed(2)),
-      updated_at: new Date().toISOString(),
-    }).eq('id', trader.id);
-    if (metricsError) throw metricsError;
+    await reconcileTraderCopierMetrics(supabase, trader.id);
     console.log(`${trader.name}: closed relationships reconciled`);
   }
 

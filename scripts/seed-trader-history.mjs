@@ -335,15 +335,7 @@ async function seedTraders() {
               const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
               const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
               const dailyVolatility = Math.sqrt(variance);
-              const currentCopiers = Math.max(Number(trader.copiers_current || trader.followers || 0), 1);
-              const averageAllocation = 2500;
-              const assetsUnderManagement = currentCopiers * averageAllocation;
-              const copierProfit = (totalReturn / 100) * assetsUnderManagement;
-              const feeRate = Math.min(Math.max(Number(trader.profit_sharing_fee || 20), 0), 100) / 100;
-              const performanceFees = copierProfit * feeRate;
-              const netCopierProfit = copierProfit - performanceFees;
-
-              // Update every profile metric from this trader's generated history.
+              // Update only synthetic trader performance metrics from generated history.
               const { error: updateError } = await supabase
                 .from('traders')
                 .update({
@@ -354,10 +346,6 @@ async function seedTraders() {
                   daily_return: Number(returns[returns.length - 1].toFixed(2)),
                   max_drawdown: Number(Math.max(maxDrawdown, tradeDrawdown).toFixed(2)),
                   volatility: Number((dailyVolatility / 100).toFixed(6)),
-                  copiers_current: currentCopiers,
-                  copiers_all_time: Math.max(Number(trader.copiers_all_time || 0), currentCopiers),
-                  under_management: Number(assetsUnderManagement.toFixed(2)),
-                  profit_for_copiers: Number(netCopierProfit.toFixed(2)),
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', trader.id);

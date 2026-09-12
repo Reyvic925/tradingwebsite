@@ -2,6 +2,7 @@ import supabase from './db-client.js';
 import { first } from './helpers.js';
 import { requireAdmin } from './auth-admin.js';
 import { sanitizeTraderRecord, normalizeAssetFocus, filterVisibleTraders, validateTraderRecord } from './trader-validation.js';
+import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
         name, bio, country, avatar_url, avatar_data, asset_focus, session_type,
         specialty, badge, risk_level, current_equity, drift, volatility, risk_score,
         total_return, daily_return, monthly_return, total_trades, win_rate_trades,
-        max_drawdown, followers, copiers_current, copiers_all_time,
+        max_drawdown, profit_sharing_fee, session_start, session_end
         profit_for_copiers, profit_sharing_fee, under_management, session_start, session_end
       } = req.body || {};
 
@@ -134,12 +135,7 @@ export default async function handler(req, res) {
         risk_score: risk_score || 5,
         session_type: session_type || 'nyc',
         is_active: true,
-        followers: followers,
-        copiers_current: copiers_current,
-        copiers_all_time: copiers_all_time,
-        profit_for_copiers: profit_for_copiers,
         profit_sharing_fee: profit_sharing_fee,
-        under_management: under_management,
         session_start: session_start || new Date().toISOString().slice(0, 10),
         session_end: session_end || null
       });
@@ -155,16 +151,12 @@ export default async function handler(req, res) {
           total_trades: Number.isFinite(Number(safePayload.total_trades)) ? Math.max(Math.trunc(Number(safePayload.total_trades)), 0) : 0,
           win_rate_trades: Number.isFinite(Number(safePayload.win_rate_trades)) ? Math.min(Math.max(Number(safePayload.win_rate_trades), 0), 100) : 50.00,
           max_drawdown: Number.isFinite(Number(safePayload.max_drawdown)) ? Math.max(Number(safePayload.max_drawdown), 0) : 0.00,
-          followers: Number.isFinite(Number(safePayload.followers)) ? Math.max(Math.trunc(Number(safePayload.followers)), 0) : 0,
-          copiers_current: Number.isFinite(Number(safePayload.copiers_current)) ? Math.max(Math.trunc(Number(safePayload.copiers_current)), 0) : 0,
-          copiers_all_time: Number.isFinite(Number(safePayload.copiers_all_time)) ? Math.max(Math.trunc(Number(safePayload.copiers_all_time)), 0) : 0,
-          profit_for_copiers: Number.isFinite(Number(safePayload.profit_for_copiers)) ? Math.max(Number(safePayload.profit_for_copiers), 0) : 0,
           profit_sharing_fee: Number.isFinite(Number(safePayload.profit_sharing_fee)) ? Math.min(Math.max(Number(safePayload.profit_sharing_fee), 0), 100) : 20,
-          under_management: Number.isFinite(Number(safePayload.under_management)) ? Math.max(Number(safePayload.under_management), 0) : 0,
         })
         .select();
       
       if (error) throw error;
+      await reconcileTraderCopierMetrics(supabase, first(data).id);
       return res.status(201).json(first(data));
     }
 
@@ -178,6 +170,11 @@ export default async function handler(req, res) {
 
       const updateData = { ...req.body };
       delete updateData.id; // Prevent ID modification
+      delete updateData.followers;
+      delete updateData.copiers_current;
+      delete updateData.copiers_all_time;
+      delete updateData.under_management;
+      delete updateData.profit_for_copiers;
 
       if (updateData.avatar_data) {
         updateData.avatar_url = await resolveAvatarUrl(updateData.avatar_data, updateData.avatar_url);
@@ -208,11 +205,6 @@ export default async function handler(req, res) {
         if (!Number.isFinite(winRate)) return res.status(400).json({ error: 'Win rate must be a number' });
         updateData.win_rate_trades = Math.min(Math.max(winRate, 0), 100);
       }
-      if (updateData.followers !== undefined) {
-        const followers = Number(updateData.followers);
-        if (!Number.isFinite(followers)) return res.status(400).json({ error: 'Followers must be a number' });
-        updateData.followers = Math.max(Math.trunc(followers), 0);
-      }
       const sanitizedUpdate = validateTraderRecord(updateData);
 
       const { data, error } = await supabase
@@ -222,6 +214,7 @@ export default async function handler(req, res) {
         .select();
       
       if (error) throw error;
+      await reconcileTraderCopierMetrics(supabase, id);
       return res.status(200).json(first(data));
     }
 

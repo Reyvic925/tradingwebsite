@@ -23,6 +23,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+      "audit": "npm run audit:copiers",
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
     "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs && node tests/unit/investment-tick.test.mjs && node tests/unit/trader-validation.test.mjs && node tests/unit/synthetic-simulation.test.mjs && node tests/unit/synthetic-metrics.test.mjs && node tests/unit/roi-simulator.test.mjs && node tests/unit/copy-trading-tick.test.mjs",

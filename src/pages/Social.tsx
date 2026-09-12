@@ -259,7 +259,7 @@ function LeaderboardSection() {
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">90-day ROI</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="text-gray-400">Win rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
-              <div className="text-gray-400">Followers: <span className="text-white font-semibold">{trader.followers || 0}</span></div>
+              <div className="text-gray-400">Copiers: <span className="text-white font-semibold">{trader.copiers_current ?? 0}</span></div>
             </div>
           </div>
         ))}
