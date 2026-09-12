@@ -8,6 +8,7 @@ if (!url || !key) throw new Error('Missing VITE_SUPABASE_URL and SUPABASE_SERVIC
 const supabase = createClient(url, key);
 const DAYS = 90;
 const TICKS_PER_DAY = 24;
+let supportsNotional = true;
 
 async function retry(label, operation, attempts = 5) {
   let lastError;
@@ -21,10 +22,9 @@ async function retry(label, operation, attempts = 5) {
 }
 
 async function insertBatches(table, rows, size = 500) {
-  let includeNotional = true;
   for (let index = 0; index < rows.length; index += size) {
     const batch = rows.slice(index, index + size).map((trade) => {
-      if (table !== 'trade_logs' || includeNotional) return trade;
+      if (table !== 'trade_logs' || supportsNotional) return trade;
       const { notional, ...withoutNotional } = trade;
       void notional;
       return withoutNotional;
@@ -32,8 +32,8 @@ async function insertBatches(table, rows, size = 500) {
     try {
       await retry(`${table} batch ${index}`, () => supabase.from(table).insert(batch));
     } catch (error) {
-      if (table === 'trade_logs' && includeNotional && /notional/i.test(String(error.message || ''))) {
-        includeNotional = false;
+      if (table === 'trade_logs' && supportsNotional && /notional/i.test(String(error.message || ''))) {
+        supportsNotional = false;
         const fallbackBatch = rows.slice(index, index + size).map(({ notional, ...trade }) => trade);
         await retry(`${table} batch ${index} without optional notional`, () => supabase.from(table).insert(fallbackBatch));
       } else throw error;
@@ -73,6 +73,9 @@ async function backfillTrader(trader) {
 async function main() {
   const { data: traders, error } = await supabase.from('traders').select('id, name').order('id');
   if (error) throw error;
+  const schemaProbe = await supabase.from('trade_logs').select('notional').limit(1);
+  supportsNotional = !schemaProbe.error;
+  console.log(`trade_logs.notional=${supportsNotional ? 'available' : 'not applied; using compatible columns'}`);
   const failures = [];
   for (const trader of traders || []) {
     try {

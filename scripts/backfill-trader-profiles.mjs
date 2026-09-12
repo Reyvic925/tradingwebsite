@@ -51,6 +51,24 @@ function leverageFor(strategyType, targetReturnProfile) {
   return 5;
 }
 
+function winRateFor(trader, strategyType, targetReturnProfile) {
+  const name = String(trader.name || '').toLowerCase();
+  if (name === 'apex traders' || name === 'ingrid martingale' || name === 'victor mensah') return 0.62;
+  return {
+    conservative: 0.57,
+    swing: 0.58,
+    momentum: targetReturnProfile >= 150 ? 0.58 : 0.56,
+    scalper: 0.56,
+    martingale: 0.6,
+  }[strategyType] || 0.56;
+}
+
+function exposureFor(trader, strategyType, targetReturnProfile) {
+  const name = String(trader.name || '').toLowerCase();
+  if (name === 'apex traders' || name === 'ingrid martingale' || name === 'victor mensah') return 1.25;
+  return strategyType === 'martingale' ? 0.75 : targetReturnProfile >= 150 ? 0.65 : undefined;
+}
+
 async function backfill() {
   const { data: traders, error: tradersError } = await supabase.from('traders').select('id, name, bio, specialty, risk_score');
   if (tradersError) throw tradersError;
@@ -75,6 +93,8 @@ async function backfill() {
         riskFraction: undefined,
         compounding: shouldCompound(trader, strategyType, targetReturnProfile),
         maxLeverage: leverageFor(strategyType, targetReturnProfile),
+        targetWinRate: winRateFor(trader, strategyType, targetReturnProfile),
+        maxExposureFraction: exposureFor(trader, strategyType, targetReturnProfile),
       });
       const { error: updateError } = await supabase.from('trader_simulation_state').update({ config, updated_at: new Date().toISOString() }).eq('trader_id', trader.id);
       if (!updateError) {
