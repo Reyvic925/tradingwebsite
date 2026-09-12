@@ -51,12 +51,10 @@ async function report() {
       supabase.from('user_follows').select('is_copying, current_value, allocated_amount').eq('trader_id', trader.id),
     ]);
     if (stateResult.error) throw stateResult.error;
-    if (tradesResult.error) throw tradesResult.error;
-    if (snapshotsResult.error) throw snapshotsResult.error;
     if (followsResult.error) throw followsResult.error;
     const state = stateResult.data;
-    const trades = tradesResult.data || [];
-    const snapshots = snapshotsResult.data || [];
+    const trades = tradesResult || [];
+    const snapshots = snapshotsResult || [];
     const follows = followsResult.data || [];
     const metrics = calculateSyntheticMetrics({
       startingEquity: number(state?.config?.startingEquity) || 100000,

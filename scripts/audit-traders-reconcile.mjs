@@ -64,10 +64,8 @@ async function reconcile() {
       allRows('synthetic_equity_snapshots', trader.id, 'snapshot_at'),
       supabase.from('user_follows').select('user_id, is_copying, current_value, allocated_amount').eq('trader_id', trader.id),
     ]);
-    if (tradesResult.error) throw tradesResult.error;
-    if (snapshotsResult.error) throw snapshotsResult.error;
     if (followsResult.error) throw followsResult.error;
-    const metrics = calculateSyntheticMetrics({ startingEquity: Number(state.config?.startingEquity) || 100000, trades: tradesResult.data || [], snapshots: snapshotsResult.data || [] });
+    const metrics = calculateSyntheticMetrics({ startingEquity: Number(state.config?.startingEquity) || 100000, trades: tradesResult || [], snapshots: snapshotsResult || [] });
     for (const field of ['current_equity', 'total_return', 'daily_return', 'total_trades', 'win_rate_trades', 'max_drawdown', 'volatility']) mismatch(trader, field, trader[field], metrics[field]);
     const follows = followsResult.data || [];
     const active = follows.filter((follow) => follow.is_copying);
