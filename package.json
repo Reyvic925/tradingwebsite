@@ -35,6 +35,7 @@
     ,"traders:migration-report": "node scripts/report-trader-migration.mjs"
     ,"traders:backfill-profiles": "node scripts/backfill-trader-profiles.mjs"
     ,"traders:reconcile-status": "node scripts/reconcile-trader-status.mjs"
+    ,"traders:backfill-history": "node scripts/backfill-trader-history.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

@@ -8,11 +8,16 @@ if (!url || !key) throw new Error('Missing VITE_SUPABASE_URL and SUPABASE_SERVIC
 const supabase = createClient(url, key);
 
 async function rows(table, traderId, order) {
-  let query = supabase.from(table).select('*').eq('trader_id', traderId);
-  if (table === 'trade_logs') query = query.not('event_id', 'is', null);
-  const { data, error } = await query.order(order, { ascending: true });
-  if (error) throw error;
-  return data || [];
+  const result = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase.from(table).select('*').eq('trader_id', traderId);
+    if (table === 'trade_logs') query = query.not('event_id', 'is', null);
+    const { data, error } = await query.order(order, { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    result.push(...(data || []));
+    if (!data || data.length < pageSize) return result;
+  }
 }
 
 async function rebuild() {

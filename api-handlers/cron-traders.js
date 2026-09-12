@@ -18,11 +18,16 @@ function tickTime(value) {
 }
 
 async function loadRows(table, traderId, order = 'id') {
-  let query = supabase.from(table).select('*').eq('trader_id', traderId);
-  if (table === 'trade_logs') query = query.not('event_id', 'is', null);
-  const { data, error } = await query.order(order, { ascending: true });
-  if (error) throw error;
-  return data || [];
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase.from(table).select('*').eq('trader_id', traderId);
+    if (table === 'trade_logs') query = query.not('event_id', 'is', null);
+    const { data, error } = await query.order(order, { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return rows;
+  }
 }
 
 async function processTrader(trader, now) {

@@ -48,12 +48,19 @@ export function normalizeSyntheticConfig(config = {}) {
     .map((asset) => String(asset).trim().toUpperCase())
     .filter((asset) => ASSET_SPECS[asset]))];
 
+  const targetReturnProfile = Number.isFinite(Number(config.targetReturnProfile))
+    ? Number(config.targetReturnProfile)
+    : 45;
+  const targetScale = Math.max(0.5, Math.sqrt(Math.max(1, Math.abs(targetReturnProfile)) / 45));
+
   return {
+    ...profile,
     strategyType: STRATEGY_PROFILES[strategyType] ? strategyType : 'momentum',
     assetClass: config.assetClass || 'multi_asset',
     assets: assets.length ? assets : ['BTC-USD'],
     session: config.session || 'crypto',
     startingEquity: Math.max(0.01, Number(config.startingEquity) || 100000),
+    targetReturnProfile,
     targetWinRate: Math.min(0.99, Math.max(0.01, Number(config.targetWinRate) || 0.575)),
     averageWinR: Math.max(0.01, Number(config.averageWinR) || 1.2),
     averageLossR: Math.max(0.01, Number(config.averageLossR) || 1),
@@ -62,7 +69,7 @@ export function normalizeSyntheticConfig(config = {}) {
     tradeFrequency: config.tradeFrequency || strategyType,
     riskProfile: Math.min(10, Math.max(1, Math.trunc(Number(config.riskProfile) || 5))),
     compounding: config.compounding !== false,
-    ...profile,
+    riskFraction: Math.max(0.001, Number(config.riskFraction) || profile.riskFraction * targetScale),
   };
 }
 

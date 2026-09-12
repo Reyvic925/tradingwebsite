@@ -15,6 +15,19 @@ const mismatch = (trader, field, stored, calculated) => {
   }
 };
 
+async function allRows(table, traderId, order = 'id') {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase.from(table).select('*').eq('trader_id', traderId);
+    if (table === 'trade_logs') query = query.not('event_id', 'is', null);
+    const { data, error } = await query.order(order, { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return rows;
+  }
+}
+
 async function reconcile() {
   const { data: traders, error } = await supabase.from('traders').select('*');
   if (error) throw error;
@@ -47,8 +60,8 @@ async function reconcile() {
       continue;
     }
     const [tradesResult, snapshotsResult, followsResult] = await Promise.all([
-      supabase.from('trade_logs').select('*').eq('trader_id', trader.id).not('event_id', 'is', null),
-      supabase.from('synthetic_equity_snapshots').select('*').eq('trader_id', trader.id).order('snapshot_at', { ascending: true }),
+      allRows('trade_logs', trader.id, 'traded_at'),
+      allRows('synthetic_equity_snapshots', trader.id, 'snapshot_at'),
       supabase.from('user_follows').select('user_id, is_copying, current_value, allocated_amount').eq('trader_id', trader.id),
     ]);
     if (tradesResult.error) throw tradesResult.error;

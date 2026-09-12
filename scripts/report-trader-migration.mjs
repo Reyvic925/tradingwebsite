@@ -8,6 +8,18 @@ if (!url || !key) throw new Error('Missing VITE_SUPABASE_URL and SUPABASE_SERVIC
 const supabase = createClient(url, key);
 
 const number = (value) => Number(value || 0);
+async function allRows(table, traderId, order = 'id') {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase.from(table).select('*').eq('trader_id', traderId);
+    if (table === 'trade_logs') query = query.not('event_id', 'is', null);
+    const { data, error } = await query.order(order, { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return rows;
+  }
+}
 const flagsFor = ({ trader, state, trades, snapshots, follows, metrics }) => {
   const flags = [];
   if (!state) flags.push('missing_state');
@@ -34,8 +46,8 @@ async function report() {
   for (const trader of traders || []) {
     const [stateResult, tradesResult, snapshotsResult, followsResult] = await Promise.all([
       supabase.from('trader_simulation_state').select('*').eq('trader_id', trader.id).maybeSingle(),
-      supabase.from('trade_logs').select('*').eq('trader_id', trader.id).not('event_id', 'is', null),
-      supabase.from('synthetic_equity_snapshots').select('*').eq('trader_id', trader.id).order('snapshot_at', { ascending: true }),
+      allRows('trade_logs', trader.id, 'traded_at'),
+      allRows('synthetic_equity_snapshots', trader.id, 'snapshot_at'),
       supabase.from('user_follows').select('is_copying, current_value, allocated_amount').eq('trader_id', trader.id),
     ]);
     if (stateResult.error) throw stateResult.error;

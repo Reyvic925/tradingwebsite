@@ -17,6 +17,19 @@ function classify(trader) {
   return 'momentum';
 }
 
+function targetFor(trader, strategyType) {
+  const risk = Math.max(1, Number(trader.risk_score) || 5);
+  const base = {
+    conservative: 24,
+    swing: 38,
+    momentum: 55,
+    scalper: 70,
+    martingale: 120,
+    mean_reversion: 32,
+  }[strategyType] || 55;
+  return Number((base * (0.75 + risk * 0.08)).toFixed(2));
+}
+
 async function backfill() {
   const { data: traders, error: tradersError } = await supabase.from('traders').select('id, name, bio, specialty, risk_score');
   if (tradersError) throw tradersError;
@@ -32,7 +45,11 @@ async function backfill() {
       }
       if (!row) break;
       const strategyType = classify(trader);
-      const config = normalizeSyntheticConfig({ ...row.config, strategyType, riskProfile: trader.risk_score });
+      const existingTarget = Number(row.config?.targetReturnProfile);
+      const targetReturnProfile = Number.isFinite(existingTarget) && existingTarget !== 0
+        ? existingTarget
+        : targetFor(trader, strategyType);
+      const config = normalizeSyntheticConfig({ ...row.config, strategyType, riskProfile: trader.risk_score, targetReturnProfile, riskFraction: undefined });
       const { error: updateError } = await supabase.from('trader_simulation_state').update({ config, updated_at: new Date().toISOString() }).eq('trader_id', trader.id);
       if (!updateError) {
         updated++;
