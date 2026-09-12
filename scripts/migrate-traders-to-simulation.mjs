@@ -9,10 +9,11 @@ const supabase = createClient(url, key);
 
 const classify = (trader) => {
   const text = `${trader.name} ${trader.bio || ''} ${trader.specialty || ''}`.toLowerCase();
+  if (/martingale/.test(text)) return 'martingale';
   if (text.includes('scalp')) return 'scalper';
   if (text.includes('mean reversion')) return 'mean_reversion';
   if (text.includes('swing')) return 'swing';
-  if (text.includes('martingale')) return 'martingale';
+  if (/conservative|capital preservation|low-risk|low risk|risk-aware|steady|stable|measured/.test(text)) return 'conservative';
   return 'momentum';
 };
 
@@ -21,6 +22,16 @@ async function migrate() {
   if (error) throw error;
   let migrated = 0;
   for (const trader of traders || []) {
+    const { data: existingState, error: existingStateError } = await supabase
+      .from('trader_simulation_state')
+      .select('config')
+      .eq('trader_id', trader.id)
+      .maybeSingle();
+    if (existingStateError) throw existingStateError;
+    if (existingState) {
+      console.log(`Skipping ${trader.name}: simulation state already exists.`);
+      continue;
+    }
     const targetReturn = Number(trader.total_return) || 0;
     const config = normalizeSyntheticConfig({
       strategyType: classify(trader),

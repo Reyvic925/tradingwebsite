@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
 import { apiGet } from '../lib/api';
-import { getMarketStatus } from '../lib/session-utils';
 import type { Trader, UserFollow, Wallet } from '../types';
 
 // Follow Modal Component
@@ -255,7 +254,7 @@ function LeaderboardSection() {
               </div>
             </div>
             <div className="text-2xl font-bold text-emerald-400 mb-2">
-              {formatPct(Math.max(Number(trader.total_return || 0), 0))}
+              {formatPct(Number(trader.total_return ?? 0))}
             </div>
             <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">90-day ROI</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -330,8 +329,7 @@ function PortfolioSummary() {
 function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [, refreshStatus] = useState(Date.now());
-  const isProfit = true;
-  const traderRoi = Math.max(Number(trader.total_return || 0), 0);
+  const isProfit = Number(trader.total_return ?? 0) >= 0;
   const copierCount = trader.copiers_current ?? trader.followers ?? 0;
 
   useEffect(() => {
@@ -352,8 +350,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
   };
 
   const badge = getSessionBadge(trader.session_type);
-  const marketStatus = getMarketStatus(trader.session_type);
-  const sessionOpen = marketStatus.status === 'Live';
+  const strategyOpen = trader.is_active === true;
 
   return (
     <>
@@ -376,9 +373,9 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
                 {trader.name}
               </Link>
               <div className="text-xs text-gray-500">{badge.emoji} {badge.label}</div>
-              <div className={`mt-1 text-[10px] uppercase tracking-wider ${sessionOpen ? 'text-emerald-400' : 'text-gray-500'}`}>
-                <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${sessionOpen ? 'bg-emerald-400' : 'bg-gray-600'}`} />
-                {sessionOpen ? 'Open' : 'Closed'}
+              <div className={`mt-1 text-[10px] uppercase tracking-wider ${strategyOpen ? 'text-emerald-400' : 'text-gray-500'}`}>
+                <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${strategyOpen ? 'bg-emerald-400' : 'bg-gray-600'}`} />
+                {strategyOpen ? 'Open' : 'Closed'}
               </div>
             </div>
           </div>
@@ -407,12 +404,12 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
         <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
           <div>
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-              {formatPct(traderRoi)}
+              {formatPct(Number(trader.total_return ?? 0))}
             </div>
             <div className="text-gray-500">90-day ROI</div>
           </div>
           <div>
-            <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades || 50).toFixed(0)}%</div>
+            <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(0)}%</div>
             <div className="text-gray-500">Win Rate</div>
           </div>
           <div>
@@ -423,11 +420,11 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
 
         <button
           onClick={() => setShowModal(true)}
-          disabled={trader.is_active === false}
-          className={`w-full py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition ${trader.is_active === false ? 'cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+          disabled={!strategyOpen}
+          className={`w-full py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition ${!strategyOpen ? 'cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
         >
           <Plus size={16} />
-          {trader.is_active === false ? 'Closed' : 'Copy Trader'}
+          {!strategyOpen ? 'Closed' : 'Copy Trader'}
         </button>
       </div>
 

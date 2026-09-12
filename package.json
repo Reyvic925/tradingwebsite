@@ -32,6 +32,9 @@
     ,"traders:migrate": "node scripts/migrate-traders-to-simulation.mjs"
     ,"traders:rebuild-metrics": "node scripts/rebuild-trader-metrics.mjs"
     ,"traders:24h-test": "node scripts/test-trader-simulation-24h.mjs"
+    ,"traders:migration-report": "node scripts/report-trader-migration.mjs"
+    ,"traders:backfill-profiles": "node scripts/backfill-trader-profiles.mjs"
+    ,"traders:reconcile-status": "node scripts/reconcile-trader-status.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

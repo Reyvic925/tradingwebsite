@@ -18,6 +18,7 @@ const STRATEGY_PROFILES = {
   scalper: { tradeProbability: 0.9, holdingTicks: 1, directionBias: 0.52, riskFraction: 0.004 },
   swing: { tradeProbability: 0.28, holdingTicks: 3, directionBias: 0.62, riskFraction: 0.018 },
   martingale: { tradeProbability: 0.7, holdingTicks: 1, directionBias: 0.56, riskFraction: 0.02 },
+  conservative: { tradeProbability: 0.2, holdingTicks: 4, directionBias: 0.58, riskFraction: 0.004 },
 };
 
 function hashString(value) {
@@ -126,10 +127,14 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const price = nextPrices[asset];
   const previousPrice = Number(previousPrices[asset]) || getAssetSpec(asset).basePrice;
   const trendSignal = move >= 0;
-  const followsTrend = random() <= profile.directionBias;
-  const side = normalizedConfig.strategyType === 'mean_reversion'
-    ? (trendSignal ? 'SELL' : 'BUY')
-    : (followsTrend === trendSignal ? 'BUY' : 'SELL');
+  const followsSignal = random() <= profile.directionBias;
+  const strategySignal = normalizedConfig.strategyType === 'mean_reversion'
+    ? !trendSignal
+    : trendSignal;
+  const expectedBullish = followsSignal ? strategySignal : !strategySignal;
+  const winningDecision = random() <= normalizedConfig.targetWinRate;
+  const bullishDecision = winningDecision ? expectedBullish : !expectedBullish;
+  const side = bullishDecision ? 'BUY' : 'SELL';
   const equity = Number(state.equity) || normalizedConfig.startingEquity;
   const lossStreak = Number(state.lossStreak) || 0;
   const martingaleMultiplier = normalizedConfig.strategyType === 'martingale'
