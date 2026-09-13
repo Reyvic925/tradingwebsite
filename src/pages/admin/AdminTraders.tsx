@@ -10,9 +10,8 @@ function createEmptyFormData() {
     name: '', bio: '', country: '', avatar_url: '', specialty: '', badge: 'Gold',
     asset_focus: ['BTC-USD', 'ETH-USD'], session_type: 'nyc', risk_level: 'Medium',
     current_equity: 10000, total_return: 0, daily_return: 0, monthly_return: 0,
-    total_trades: 0, win_rate_trades: 50, max_drawdown: 0, followers: 0,
-    copiers_current: 0, copiers_all_time: 0, profit_for_copiers: 0,
-    profit_sharing_fee: 20, under_management: 0, drift: 0.001, volatility: 0.005,
+    total_trades: 0, win_rate_trades: 50, max_drawdown: 0,
+    profit_sharing_fee: 20, drift: 0.001, volatility: 0.005,
     risk_score: 5, session_start: '', session_end: ''
   };
 }
@@ -139,12 +138,7 @@ export default function AdminTraders() {
       total_trades: trader.total_trades || 0,
       win_rate_trades: trader.win_rate_trades,
       max_drawdown: trader.max_drawdown || 0,
-      followers: trader.followers || 0,
-      copiers_current: trader.copiers_current || trader.followers || 0,
-      copiers_all_time: trader.copiers_all_time || trader.followers || 0,
-      profit_for_copiers: trader.profit_for_copiers || 0,
       profit_sharing_fee: trader.profit_sharing_fee ?? 20,
-      under_management: trader.under_management || 0,
       drift: trader.drift,
       volatility: trader.volatility,
       risk_score: trader.risk_score,
@@ -318,22 +312,7 @@ export default function AdminTraders() {
               <div><label className="block text-sm text-gray-300 mb-1">Monthly Return (%)</label><input type="number" step="0.01" value={formData.monthly_return} onChange={(e) => setFormData({ ...formData, monthly_return: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Total Trades</label><input type="number" min="0" step="1" value={formData.total_trades} onChange={(e) => setFormData({ ...formData, total_trades: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Max Drawdown (%)</label><input type="number" min="0" step="0.01" value={formData.max_drawdown} onChange={(e) => setFormData({ ...formData, max_drawdown: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Followers</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.followers}
-                  onChange={(e) => setFormData({ ...formData, followers: parseInt(e.target.value, 10) })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-                />
-              </div>
-              <div><label className="block text-sm text-gray-300 mb-1">Current Copiers</label><input type="number" min="0" step="1" value={formData.copiers_current} onChange={(e) => setFormData({ ...formData, copiers_current: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">All-time Copiers</label><input type="number" min="0" step="1" value={formData.copiers_all_time} onChange={(e) => setFormData({ ...formData, copiers_all_time: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Profit for Copiers ($)</label><input type="number" min="0" step="0.01" value={formData.profit_for_copiers} onChange={(e) => setFormData({ ...formData, profit_for_copiers: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Profit Sharing Fee (%)</label><input type="number" min="0" max="100" step="0.01" value={formData.profit_sharing_fee} onChange={(e) => setFormData({ ...formData, profit_sharing_fee: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Under Management ($)</label><input type="number" min="0" step="0.01" value={formData.under_management} onChange={(e) => setFormData({ ...formData, under_management: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Volatility (0-1)</label>
                 <input
