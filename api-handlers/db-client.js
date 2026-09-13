@@ -3,7 +3,8 @@ import { triggerRestore } from './db-wake.js';
 import { default as devClient } from './dev-db.js';
 
 // Resolve Supabase configuration from several possible env vars to be robust
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseUrl = configuredSupabaseUrl?.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
 let supabase;

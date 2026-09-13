@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const url = configuredUrl?.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
 
 // Capture this before the Supabase client consumes the URL fragment. It lets the
 // UI distinguish an email-confirmation callback from an ordinary signed-in visit.
