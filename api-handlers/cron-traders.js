@@ -153,6 +153,7 @@ async function processTrader(trader, now) {
   ]);
   const metrics = calculateSyntheticMetrics({
     startingEquity: config.startingEquity,
+    targetReturnProfile: config.targetReturnProfile,
     trades,
     snapshots,
   });

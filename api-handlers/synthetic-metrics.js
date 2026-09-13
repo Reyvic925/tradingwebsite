@@ -1,4 +1,4 @@
-export function calculateSyntheticMetrics({ startingEquity, trades = [], snapshots = [] }) {
+export function calculateSyntheticMetrics({ startingEquity, targetReturnProfile = 0, trades = [], snapshots = [] }) {
   const closedTrades = trades.filter((trade) => String(trade.status).toUpperCase() === 'CLOSED');
   const currentEquity = snapshots.length
     ? Number(snapshots[snapshots.length - 1].equity)
@@ -21,9 +21,12 @@ export function calculateSyntheticMetrics({ startingEquity, trades = [], snapsho
     if (peak > 0) maxDrawdown = Math.min(maxDrawdown, (equity - peak) / peak);
   }
 
+  const liveReturn = ((currentEquity - Number(startingEquity)) / Number(startingEquity)) * 100;
+  const configuredReturn = Number(targetReturnProfile) || 0;
+
   return {
     current_equity: Number(currentEquity.toFixed(2)),
-    total_return: Number((((currentEquity - Number(startingEquity)) / Number(startingEquity)) * 100).toFixed(2)),
+    total_return: Number((configuredReturn + liveReturn).toFixed(2)),
     daily_return: returns.length ? Number((returns[returns.length - 1] * 100).toFixed(2)) : 0,
     total_trades: closedTrades.length,
     win_rate_trades: closedTrades.length ? Number(((wins / closedTrades.length) * 100).toFixed(2)) : 0,

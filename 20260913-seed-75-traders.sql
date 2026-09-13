@@ -83,7 +83,13 @@ numbered AS (
 prepared AS (
   SELECT
     *,
-    ROUND((18 + ((n * 17) % 430) / 10.0)::numeric, 2) AS trader_return,
+    CASE
+      WHEN n % 17 = 0 THEN -22 - (n % 9) * 3
+      WHEN n % 13 = 0 THEN 280 + (n % 5) * 12
+      WHEN n % 7 = 0 THEN 120 + (n % 6) * 8
+      WHEN n % 5 = 0 THEN 50 + (n % 8) * 7
+      ELSE ROUND((12 + ((n * 29) % 340) / 10.0)::numeric, 2)
+    END AS trader_return,
     0.25 + ((n * 13) % 120) / 100.0 AS trader_daily,
     280 + ((n * 83) % 1100) AS trader_trades,
     61 + ((n * 7) % 190) / 10.0 AS trader_win_rate,
