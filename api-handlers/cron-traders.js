@@ -10,7 +10,7 @@ const TRADER_CONCURRENCY = 8;
 
 function authorized(req) {
   const secret = process.env.CRON_SECRET;
-  const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const provided = String(req.headers['x-cron-secret'] || req.query?.cron_secret || bearer);
   return Boolean(secret && provided === secret);
 }
