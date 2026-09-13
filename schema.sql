@@ -339,6 +339,34 @@ create table if not exists traders (
   updated_at timestamptz default now()
 );
 
+create table if not exists trade_logs (
+  id uuid primary key default gen_random_uuid(),
+  event_id text,
+  trader_id integer references traders(id) on delete cascade,
+  symbol varchar(20) not null,
+  side varchar(4) not null check (side in ('BUY', 'SELL')),
+  quantity numeric(20, 4) not null,
+  entry_price numeric(20, 4) not null,
+  exit_price numeric(20, 4),
+  pnl numeric(20, 2),
+  pnl_percent numeric(10, 2),
+  price_move_percent numeric,
+  trade_return_percent numeric,
+  account_return_percent numeric,
+  entry_time timestamptz,
+  exit_time timestamptz,
+  margin numeric(30, 8),
+  leverage numeric(12, 4),
+  notional numeric(30, 8),
+  status varchar(10) not null default 'CLOSED' check (status in ('OPEN', 'CLOSED')),
+  traded_at timestamptz not null default now(),
+  closed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_trade_logs_trader_time
+  on trade_logs (trader_id, traded_at desc);
+
 create table if not exists copy_trades (
   id serial primary key,
   user_id text,
