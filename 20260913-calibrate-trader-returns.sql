@@ -16,7 +16,12 @@ WITH calibrated AS (
 )
 UPDATE public.traders t
 SET total_return = calibrated.target_return,
-    avatar_url = '/images/avatar-' || ((t.id - 1) % 8 + 1) || '.jpg',
+    avatar_url = CASE
+      WHEN t.avatar_url IS NULL OR t.avatar_url = '' OR t.avatar_url LIKE '/images/avatar-%'
+        THEN 'https://i.pravatar.cc/300?u='
+          || replace(lower(regexp_replace(t.name, '[^a-zA-Z0-9]+', '-', 'g')), '--', '-')
+      ELSE t.avatar_url
+    END,
     updated_at = NOW()
 FROM calibrated
 WHERE t.id = calibrated.id;

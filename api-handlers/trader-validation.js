@@ -66,8 +66,8 @@ export function validateTraderRecord(trader = {}) {
 
   if (candidate.total_return !== undefined) {
     const totalReturn = Number(candidate.total_return);
-    if (!Number.isFinite(totalReturn)) {
-      throw new Error('total_return must be a finite number');
+    if (!Number.isFinite(totalReturn) || totalReturn < -99.99 || totalReturn > 499.99) {
+      throw new Error('total_return must be between -99.99 and 499.99');
     }
   }
 

@@ -7,6 +7,47 @@ import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
+async function syncTraderSimulationState(trader) {
+  const { data: existing, error: lookupError } = await supabase
+    .from('trader_simulation_state')
+    .select('trader_id, state, tick_index, last_processed_at, window_started_at')
+    .eq('trader_id', trader.id)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+
+  const startingEquity = Number(trader.current_equity) || 10000;
+  const config = {
+    strategyType: 'momentum',
+    assetClass: 'multi_asset',
+    assets: trader.asset_focus,
+    session: trader.session_type || 'crypto',
+    startingEquity,
+    targetReturnProfile: Number(trader.total_return) || 0,
+    targetWinRate: (Number(trader.win_rate_trades) || 50) / 100,
+    riskProfile: Number(trader.risk_score) || 5,
+  };
+
+  const payload = {
+    trader_id: trader.id,
+    seed: `trader-${trader.id}`,
+    config,
+    state: existing?.state || {
+      equity: startingEquity,
+      peakEquity: startingEquity,
+      prices: {},
+      lossStreak: 0,
+    },
+    tick_index: existing?.tick_index || 0,
+    last_processed_at: existing?.last_processed_at || null,
+    window_started_at: existing?.window_started_at || new Date().toISOString(),
+  };
+
+  const { error: saveError } = await supabase
+    .from('trader_simulation_state')
+    .upsert(payload, { onConflict: 'trader_id' });
+  if (saveError) throw saveError;
+}
+
 async function resolveAvatarUrl(avatarData, existingUrl = '') {
   if (!avatarData) return existingUrl;
   if (typeof avatarData !== 'string' || !avatarData.startsWith('data:image/')) {
@@ -155,8 +196,10 @@ export default async function handler(req, res) {
         .select();
       
       if (error) throw error;
-      await reconcileTraderCopierMetrics(supabase, first(data).id);
-      return res.status(201).json(first(data));
+      const trader = first(data);
+      await syncTraderSimulationState(trader);
+      await reconcileTraderCopierMetrics(supabase, trader.id);
+      return res.status(201).json(trader);
     }
 
     // PUT: Update trader (Admin only)
@@ -189,6 +232,9 @@ export default async function handler(req, res) {
       if (updateData.total_return !== undefined) {
         const totalReturn = Number(updateData.total_return);
         if (!Number.isFinite(totalReturn)) return res.status(400).json({ error: 'Total return must be a number' });
+        if (totalReturn < -99.99 || totalReturn > 499.99) {
+          return res.status(400).json({ error: 'Total return must be between -99.99 and 499.99' });
+        }
         updateData.total_return = totalReturn;
       }
       if (updateData.monthly_return !== undefined) {
@@ -213,8 +259,10 @@ export default async function handler(req, res) {
         .select();
       
       if (error) throw error;
+      const trader = first(data);
+      await syncTraderSimulationState(trader);
       await reconcileTraderCopierMetrics(supabase, id);
-      return res.status(200).json(first(data));
+      return res.status(200).json(trader);
     }
 
     // DELETE: Delete trader (Admin only)
