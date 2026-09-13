@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
 import { apiGet } from '../lib/api';
+import { getMarketStatus } from '../lib/session-utils';
 import type { Trader, UserFollow, Wallet } from '../types';
 
 // Follow Modal Component
@@ -350,6 +351,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
 
   const badge = getSessionBadge(trader.session_type);
   const strategyOpen = trader.is_active === true;
+  const sessionOpen = getMarketStatus(trader.session_type).status === 'Live';
 
   return (
     <>
@@ -372,9 +374,9 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
                 {trader.name}
               </Link>
               <div className="text-xs text-gray-500">{badge.emoji} {badge.label}</div>
-              <div className={`mt-1 text-[10px] uppercase tracking-wider ${strategyOpen ? 'text-emerald-400' : 'text-gray-500'}`}>
-                <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${strategyOpen ? 'bg-emerald-400' : 'bg-gray-600'}`} />
-                {strategyOpen ? 'Open' : 'Closed'}
+              <div className={`mt-1 text-[10px] uppercase tracking-wider ${sessionOpen ? 'text-emerald-400' : 'text-gray-500'}`}>
+                <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${sessionOpen ? 'bg-emerald-400' : 'bg-gray-600'}`} />
+                {sessionOpen ? 'Session open' : 'Session closed'}
               </div>
             </div>
           </div>
