@@ -4,8 +4,8 @@
 
 UPDATE public.traders
 SET avatar_url = CASE
-  -- A few profiles intentionally use a branded mark rather than a portrait.
-  WHEN id % 11 = 0 THEN
+  -- Use branded marks for a larger portion of the roster.
+  WHEN id % 5 IN (0, 1) THEN
     'https://api.dicebear.com/9.x/shapes/svg?seed='
     || replace(lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g')), '--', '-')
   -- Use gendered portrait pools for the named roster; unknown names use a
@@ -15,8 +15,8 @@ SET avatar_url = CASE
     'layla', 'sakura', 'aisha', 'aoife', 'zainab', 'noura', 'yara',
     'clara', 'mariam', 'anika', 'lucia', 'mina', 'nadine', 'lena',
     'hana', 'nia', 'helena', 'irene', 'emilia', 'leila', 'valentina',
-    'nadia', 'sienna', 'elena', 'mei', 'freja', 'camila', 'miriam',
-    'yuki', 'elife'
+    'nadia', 'sienna', 'elena', 'mei', 'freja', 'camila',
+    'yuki', 'elif'
   ) THEN
     'https://randomuser.me/api/portraits/women/' || ((id * 7) % 90) || '.jpg'
   WHEN split_part(lower(name), ' ', 1) IN (
@@ -37,6 +37,9 @@ WHERE is_active = true
     avatar_url IS NULL
     OR avatar_url = ''
     OR avatar_url LIKE '/images/avatar-%'
+    OR avatar_url LIKE 'https://i.pravatar.cc/%'
+    OR avatar_url LIKE 'https://randomuser.me/%'
+    OR avatar_url LIKE 'https://api.dicebear.com/%'
   );
 
 NOTIFY pgrST, 'reload schema';
