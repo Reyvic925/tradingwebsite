@@ -106,7 +106,6 @@ export default async function handler(req, res) {
         specialty, badge, risk_level, current_equity, drift, volatility, risk_score,
         total_return, daily_return, monthly_return, total_trades, win_rate_trades,
         max_drawdown, profit_sharing_fee, session_start, session_end
-        profit_for_copiers, profit_sharing_fee, under_management, session_start, session_end
       } = req.body || {};
 
       if (!name || (!avatar_url && !avatar_data)) {
