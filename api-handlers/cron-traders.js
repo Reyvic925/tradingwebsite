@@ -6,6 +6,7 @@ import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 
 const TICK_MS = 5 * 60 * 1000;
 const MAX_CATCH_UP_TICKS = 288;
+const TRADER_CONCURRENCY = 8;
 
 function authorized(req) {
   const secret = process.env.CRON_SECRET;
@@ -16,6 +17,24 @@ function authorized(req) {
 
 function tickTime(value) {
   return new Date(Math.floor(value.getTime() / TICK_MS) * TICK_MS);
+}
+
+async function processTradersConcurrently(traders, now) {
+  const results = new Array(traders.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= traders.length) return;
+      results[index] = await processTrader(traders[index], now);
+    }
+  }
+
+  const workerCount = Math.min(TRADER_CONCURRENCY, traders.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
 }
 
 async function loadRows(table, traderId, order = 'id') {
@@ -210,8 +229,8 @@ export default async function handler(req, res) {
       .select('id, name, is_active, profit_sharing_fee, asset_focus, session_type, current_equity, total_return, win_rate_trades, risk_score')
       .eq('is_active', true);
     if (error) throw error;
-    const results = [];
-    for (const trader of traders || []) results.push(await processTrader(trader, new Date()));
+    const now = new Date();
+    const results = await processTradersConcurrently(traders || [], now);
     return res.status(200).json({ ok: true, results, timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('[cron-traders] error', error);
