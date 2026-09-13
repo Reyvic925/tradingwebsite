@@ -106,14 +106,14 @@ export default function Markets() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
+      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.24em] text-amber-300/70">Universe</div>
-          <h1 className="font-display text-4xl">Global markets</h1>
-          <p className="mt-1 text-sm text-stone-500">{total.toLocaleString()} listed names · USA · Japan · Canada · UK · Europe · India</p>
+          <h1 className="font-display text-3xl sm:text-4xl">Global markets</h1>
+          <p className="mt-1 max-w-full text-sm text-stone-500">{total.toLocaleString()} listed names · USA · Japan · Canada · UK · Europe · India</p>
         </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="min-w-0 max-w-full flex flex-col gap-2">
+          <div className="flex max-w-full flex-wrap gap-2">
             {assetFilters.map((f: any) => (
               <button
                 key={f.id}
@@ -124,7 +124,7 @@ export default function Markets() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex max-w-full flex-wrap gap-2">
             {regionFilters.map((f: any) => (
               <button
                 key={f.id}
@@ -138,7 +138,7 @@ export default function Markets() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search ticker or name"
-              className="min-w-[180px] rounded-sm border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none"
+              className="w-full min-w-0 rounded-sm border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none sm:w-auto sm:min-w-[180px]"
             />
           </div>
         </div>
@@ -148,29 +148,29 @@ export default function Markets() {
       </div>
       {loading && <div className="mt-8 h-40 animate-pulse rounded-md bg-white/5" />}
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
-      <div className="mt-6 overflow-hidden rounded-md border border-white/5">
-        <table className="w-full text-left text-sm">
+      <div className="mt-6 max-w-full overflow-x-auto rounded-md border border-white/5">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-white/[0.02] text-[10px] uppercase tracking-widest text-stone-500">
             <tr>
-              <th className="px-5 py-3">Symbol</th>
+              <th className="px-3 py-3 sm:px-5">Symbol</th>
               <th className="px-3 py-3">Name</th>
               <th className="px-3 py-3">Class</th>
               <th className="px-3 py-3">Last</th>
               <th className="px-3 py-3">24h</th>
               <th className="px-3 py-3">High / Low</th>
-              <th className="px-5 py-3" />
+              <th className="px-3 py-3 sm:px-5" />
             </tr>
           </thead>
           <tbody>
             {markets.map((m) => (
               <tr key={m.id} className="border-t border-white/5 hover:bg-white/[0.02]">
-                <td className="px-5 py-3 font-mono">{m.symbol}</td>
+                <td className="px-3 py-3 font-mono sm:px-5">{m.symbol}</td>
                 <td className="px-3 py-3 text-stone-400">{m.name}</td>
                 <td className="px-3 py-3 uppercase text-[11px] text-stone-500">{m.asset_class}</td>
                 <td className="px-3 py-3 font-mono">{formatPrice(Number(m.price))}</td>
                 <td className={`px-3 py-3 font-mono ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
                 <td className="px-3 py-3 font-mono text-xs text-stone-500">{formatPrice(Number(m.high_24h))} / {formatPrice(Number(m.low_24h))}</td>
-                <td className="px-5 py-3 text-right">
+                <td className="px-3 py-3 text-right sm:px-5">
                   <Link to={`/app/trade/${encodeURIComponent(m.symbol)}`} className="text-xs text-amber-300">Trade</Link>
                 </td>
               </tr>
@@ -183,11 +183,11 @@ export default function Markets() {
           </tbody>
         </table>
       </div>
-      <div className="mt-4 flex items-center justify-between text-xs text-stone-500">
-        <span>
+      <div className="mt-4 flex flex-col gap-3 text-xs text-stone-500 sm:flex-row sm:items-center sm:justify-between">
+        <span className="order-2 sm:order-1">
           Showing {total === 0 ? 0 : page * pageSize + 1}–{Math.min(total, (page + 1) * pageSize)} of {total.toLocaleString()}
         </span>
-        <div className="flex gap-2">
+        <div className="order-1 flex items-center justify-between gap-2 sm:order-2 sm:justify-start">
           <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-sm border border-white/10 px-3 py-1 disabled:opacity-30">
             Prev
           </button>
