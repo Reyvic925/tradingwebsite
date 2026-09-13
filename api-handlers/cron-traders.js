@@ -91,7 +91,6 @@ async function processTrader(trader, now) {
   }
 
   const config = normalizeSyntheticConfig(simulation.config || {});
-  const now = new Date();
   const windowStartedAt = simulation.window_started_at
     ? new Date(simulation.window_started_at)
     : now;
