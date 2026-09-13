@@ -383,6 +383,20 @@ create table if not exists deposits (
   created_at timestamptz not null default now()
 );
 
+-- Unified wallet transaction history used by deposits, withdrawals, and payouts.
+create table if not exists transactions (
+  id bigserial primary key,
+  user_id text not null,
+  type text not null,
+  amount numeric not null,
+  currency text default 'USD',
+  method text,
+  status text default 'pending',
+  reference text,
+  tx_hash text,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_wallets_user on wallets (user_id);
 create index if not exists idx_profiles_user on profiles (user_id);
 create index if not exists idx_orders_user on orders (user_id);
