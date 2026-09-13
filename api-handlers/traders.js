@@ -217,6 +217,8 @@ export default async function handler(req, res) {
       delete updateData.copiers_all_time;
       delete updateData.under_management;
       delete updateData.profit_for_copiers;
+      if (updateData.session_start === '') delete updateData.session_start;
+      if (updateData.session_end === '') updateData.session_end = null;
 
       if (updateData.avatar_data) {
         updateData.avatar_url = await resolveAvatarUrl(updateData.avatar_data, updateData.avatar_url);

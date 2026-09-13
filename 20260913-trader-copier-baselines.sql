@@ -6,23 +6,26 @@ ALTER TABLE traders
   ADD COLUMN IF NOT EXISTS synthetic_copiers_all_time INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS synthetic_under_management NUMERIC NOT NULL DEFAULT 0;
 
--- Initialize missing public baselines from the existing roster popularity.
+-- Initialize public baselines from the existing roster popularity.
 -- Existing real follow records are not included in these synthetic values.
 UPDATE traders
 SET synthetic_copiers_current = CASE
-      WHEN COALESCE(followers, 0) > 0 THEN GREATEST(12, ROUND(followers * 0.12)::INTEGER)
-      ELSE 12
+      WHEN COALESCE(followers, 0) > 0
+        THEN GREATEST(201, COALESCE(synthetic_copiers_current, 0), ROUND(followers * 0.12)::INTEGER)
+      ELSE GREATEST(201, COALESCE(synthetic_copiers_current, 0))
     END,
     synthetic_copiers_all_time = CASE
-      WHEN COALESCE(followers, 0) > 0 THEN GREATEST(18, ROUND(followers * 0.16)::INTEGER)
-      ELSE 18
+      WHEN COALESCE(followers, 0) > 0
+        THEN GREATEST(251, COALESCE(synthetic_copiers_current, 0) + 50, COALESCE(synthetic_copiers_all_time, 0), ROUND(followers * 0.16)::INTEGER)
+      ELSE GREATEST(251, COALESCE(synthetic_copiers_current, 0) + 50, COALESCE(synthetic_copiers_all_time, 0))
     END,
     synthetic_under_management = CASE
-      WHEN COALESCE(followers, 0) > 0 THEN ROUND(GREATEST(12, ROUND(followers * 0.12)::INTEGER) * 1500, 2)
-      ELSE 18000
+      WHEN COALESCE(followers, 0) > 0
+        THEN ROUND(GREATEST(201, COALESCE(synthetic_copiers_current, 0), ROUND(followers * 0.12)::INTEGER) * 1500, 2)
+      ELSE ROUND(GREATEST(201, COALESCE(synthetic_copiers_current, 0)) * 1500, 2)
     END
-WHERE COALESCE(synthetic_copiers_current, 0) = 0
-  AND COALESCE(synthetic_copiers_all_time, 0) = 0;
+WHERE COALESCE(synthetic_copiers_current, 0) < 201
+   OR COALESCE(synthetic_copiers_all_time, 0) < 251;
 
 UPDATE traders
 SET synthetic_copiers_all_time = GREATEST(synthetic_copiers_all_time, synthetic_copiers_current),
