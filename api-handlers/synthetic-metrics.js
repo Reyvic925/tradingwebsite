@@ -22,11 +22,12 @@ export function calculateSyntheticMetrics({ startingEquity, targetReturnProfile 
   }
 
   const liveReturn = ((currentEquity - Number(startingEquity)) / Number(startingEquity)) * 100;
-  const configuredReturn = Number(targetReturnProfile) || 0;
+  const configuredReturn = Math.max(-99.99, Math.min(499.99, Number(targetReturnProfile) || 0));
+  const totalReturn = Math.max(-99.99, Math.min(499.99, configuredReturn + liveReturn));
 
   return {
     current_equity: Number(currentEquity.toFixed(2)),
-    total_return: Number((configuredReturn + liveReturn).toFixed(2)),
+    total_return: Number(totalReturn.toFixed(2)),
     daily_return: returns.length ? Number((returns[returns.length - 1] * 100).toFixed(2)) : 0,
     total_trades: closedTrades.length,
     win_rate_trades: closedTrades.length ? Number(((wins / closedTrades.length) * 100).toFixed(2)) : 0,

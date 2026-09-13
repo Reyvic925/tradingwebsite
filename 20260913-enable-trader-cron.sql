@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.trader_simulation_state (
   seed TEXT NOT NULL,
   config JSONB NOT NULL,
   state JSONB NOT NULL,
+  window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_processed_at TIMESTAMPTZ,
   tick_index BIGINT NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -75,6 +76,9 @@ ALTER TABLE public.user_follows
   ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC(30, 8) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS unrealized_pnl NUMERIC(30, 8) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS fees NUMERIC(30, 8) DEFAULT 0;
+
+ALTER TABLE public.trader_simulation_state
+  ADD COLUMN IF NOT EXISTS window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 ALTER TABLE public.trade_logs
   ADD COLUMN IF NOT EXISTS event_id TEXT,

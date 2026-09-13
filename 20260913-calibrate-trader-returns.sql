@@ -16,6 +16,7 @@ WITH calibrated AS (
 )
 UPDATE public.traders t
 SET total_return = calibrated.target_return,
+    avatar_url = '/images/avatar-' || ((t.id - 1) % 8 + 1) || '.jpg',
     updated_at = NOW()
 FROM calibrated
 WHERE t.id = calibrated.id;
@@ -30,5 +31,9 @@ SET config = jsonb_set(
 FROM public.traders t
 WHERE t.id = s.trader_id
   AND t.is_active = true;
+
+UPDATE public.trader_simulation_state
+SET window_started_at = COALESCE(window_started_at, NOW())
+WHERE window_started_at IS NULL;
 
 NOTIFY pgrst, 'reload schema';

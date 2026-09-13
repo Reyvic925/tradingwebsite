@@ -37,12 +37,13 @@ async function processTradersConcurrently(traders, now) {
   return results;
 }
 
-async function loadRows(table, traderId, order = 'id') {
+async function loadRows(table, traderId, order = 'id', since = null) {
   const rows = [];
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
     let query = supabase.from(table).select('*').eq('trader_id', traderId);
     if (table === 'trade_logs') query = query.not('event_id', 'is', null);
+    if (since) query = query.gte(table === 'trade_logs' ? 'traded_at' : 'snapshot_at', since);
     const { data, error } = await query.order(order, { ascending: true }).range(offset, offset + pageSize - 1);
     if (error) throw error;
     rows.push(...(data || []));
@@ -90,12 +91,27 @@ async function processTrader(trader, now) {
   }
 
   const config = normalizeSyntheticConfig(simulation.config || {});
+  const now = new Date();
+  const windowStartedAt = simulation.window_started_at
+    ? new Date(simulation.window_started_at)
+    : now;
+  const windowExpired = now.getTime() - windowStartedAt.getTime() >= 90 * 24 * 60 * 60 * 1000;
   let state = simulation.state || {
     equity: config.startingEquity,
     peakEquity: config.startingEquity,
     prices: {},
     lossStreak: 0,
   };
+  if (windowExpired) {
+    state = {
+      equity: config.startingEquity,
+      peakEquity: config.startingEquity,
+      prices: {},
+      lossStreak: 0,
+    };
+    simulation.window_started_at = now.toISOString();
+    simulation.last_processed_at = null;
+  }
   const currentTick = tickTime(now);
   const previousTick = simulation.last_processed_at ? tickTime(new Date(simulation.last_processed_at)) : null;
   const missed = previousTick
@@ -148,8 +164,8 @@ async function processTrader(trader, now) {
   }
 
   const [trades, snapshots] = await Promise.all([
-    loadRows('trade_logs', trader.id, 'traded_at'),
-    loadRows('synthetic_equity_snapshots', trader.id, 'snapshot_at'),
+    loadRows('trade_logs', trader.id, 'traded_at', simulation.window_started_at),
+    loadRows('synthetic_equity_snapshots', trader.id, 'snapshot_at', simulation.window_started_at),
   ]);
   const metrics = calculateSyntheticMetrics({
     startingEquity: config.startingEquity,
@@ -168,6 +184,7 @@ async function processTrader(trader, now) {
     state,
     tick_index: Number(simulation.tick_index || 0),
     last_processed_at: simulation.last_processed_at,
+    window_started_at: simulation.window_started_at || now.toISOString(),
     updated_at: now.toISOString(),
   }).eq('trader_id', trader.id);
   if (stateUpdateError) throw stateUpdateError;
