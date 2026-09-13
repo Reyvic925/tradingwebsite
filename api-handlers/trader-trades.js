@@ -15,7 +15,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Trader ID must be an integer' });
     }
 
-    // Show the 25 largest wins and 25 largest losses, rather than an arbitrary
+    // Show the 50 largest wins and 50 largest losses, rather than an arbitrary
     // recent slice that can hide the trader's actual risk and performance.
     const [winsResult, lossesResult] = await Promise.all([
       supabase
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         .not('event_id', 'is', null)
         .gt('pnl', 0)
         .order('pnl', { ascending: false })
-        .limit(25),
+        .limit(50),
       supabase
         .from('trade_logs')
         .select('*')
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         .not('event_id', 'is', null)
         .lt('pnl', 0)
         .order('pnl', { ascending: true })
-        .limit(25),
+        .limit(50),
     ]);
 
     if (winsResult.error) throw winsResult.error;
