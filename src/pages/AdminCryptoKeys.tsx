@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy } from 'lucide-react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
@@ -20,6 +20,22 @@ export default function AdminCryptoKeys() {
   const [revealing, setRevealing] = useState(false);
   const [adminSecret, setAdminSecret] = useState('');
   const [error, setError] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const users = useMemo(() => {
+    const grouped = new Map<string, { userId: string; name: string; email: string; count: number }>();
+    rows.forEach((row) => {
+      const userId = String(row.user_id);
+      const current = grouped.get(userId);
+      grouped.set(userId, {
+        userId,
+        name: row.user_name || row.user_email || `User ${userId.slice(0, 8)}`,
+        email: row.user_email || 'Email unavailable',
+        count: (current?.count || 0) + 1,
+      });
+    });
+    return [...grouped.values()];
+  }, [rows]);
+  const visibleRows = selectedUserId ? rows.filter((row) => String(row.user_id) === selectedUserId) : [];
 
   async function fetchList() {
     setLoading(true);
@@ -88,6 +104,23 @@ export default function AdminCryptoKeys() {
 
       {error && <div className="mb-4 rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
 
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {users.map((user) => (
+          <button
+            key={user.userId}
+            type="button"
+            onClick={() => setSelectedUserId(user.userId)}
+            className={`rounded-md border p-4 text-left transition ${selectedUserId === user.userId ? 'border-amber-400/60 bg-amber-400/10' : 'border-white/10 bg-[#0a0f17] hover:border-white/25'}`}
+          >
+            <div className="font-medium text-white">{user.name}</div>
+            <div className="mt-1 text-xs text-stone-400">{user.email}</div>
+            <div className="mt-3 text-[10px] uppercase tracking-[0.16em] text-amber-200">{user.count} addresses · View addresses</div>
+          </button>
+        ))}
+        {!users.length && !loading && <div className="text-sm text-stone-500">No users with crypto addresses.</div>}
+      </div>
+
+      {selectedUserId && (
       <div className="overflow-hidden rounded-md border border-white/10 bg-[#0a0f17]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -103,7 +136,7 @@ export default function AdminCryptoKeys() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {visibleRows.map((r) => (
                 <tr key={r.id} className="border-t border-white/10">
                   <td className="px-4 py-3 text-stone-300">{r.id}</td>
                   <td className="px-4 py-3 font-mono text-xs text-stone-300">{r.user_id}</td>
@@ -118,7 +151,7 @@ export default function AdminCryptoKeys() {
                   </td>
                 </tr>
               ))}
-              {!rows.length && !loading && (
+              {!visibleRows.length && !loading && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-stone-500">No crypto addresses found.</td>
                 </tr>
@@ -127,6 +160,7 @@ export default function AdminCryptoKeys() {
           </table>
         </div>
       </div>
+      )}
 
       {modal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

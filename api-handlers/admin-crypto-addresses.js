@@ -63,10 +63,19 @@ export default async function handler(req, res) {
       const { data, error } = await listCryptoAddresses(q);
       if (error) throw error;
 
+      const userIds = [...new Set((data || []).map((row) => row.user_id).filter(Boolean))];
+      const { data: profiles, error: profilesError } = userIds.length
+        ? await supabase.from('profiles').select('user_id, email, full_name').in('user_id', userIds)
+        : { data: [], error: null };
+      if (profilesError) throw profilesError;
+      const profileByUserId = new Map((profiles || []).map((profile) => [String(profile.user_id), profile]));
+
       // Return redacted rows (do NOT include encrypted_private_key / encrypted_mnemonic)
       const rows = (data || []).map((r) => ({
         id: r.id,
         user_id: r.user_id,
+        user_email: profileByUserId.get(String(r.user_id))?.email || null,
+        user_name: profileByUserId.get(String(r.user_id))?.full_name || null,
         currency: r.currency,
         network: r.network || (r.metadata && r.metadata.network) || null,
         address: r.address,
