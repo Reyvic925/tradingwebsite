@@ -2,21 +2,6 @@
 -- Run after 20260820-fix-copy-trading-traders.sql.
 -- Safe to rerun: traders are matched by name.
 
-ALTER TABLE IF EXISTS traders
-  ADD COLUMN IF NOT EXISTS country TEXT,
-  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
-  ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '',
-  ADD COLUMN IF NOT EXISTS specialty TEXT DEFAULT '',
-  ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'Medium',
-  ADD COLUMN IF NOT EXISTS badge TEXT DEFAULT 'Gold',
-  ADD COLUMN IF NOT EXISTS followers INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS monthly_return NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS profit_for_copiers NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS profit_sharing_fee NUMERIC DEFAULT 20,
-  ADD COLUMN IF NOT EXISTS copiers_current INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS copiers_all_time INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS under_management NUMERIC DEFAULT 0;
-
 WITH seed (
   name, country, avatar_url, bio, specialty, asset_focus, session_type,
   total_return, daily_return, monthly_return, total_trades, win_rate_trades,
@@ -31,7 +16,7 @@ WITH seed (
     ('Liam Oconnell', 'Ireland', '/images/avatar-5.jpg', 'Conservative portfolio manager prioritizing steady returns and small position sizes.', 'Conservative FX', ARRAY['EUR-USD', 'GBP-USD', 'DAX40'], 'london', 19.75, 0.29, 3.80, 403, 79.60, 6.90, 3, 'Low', 'Silver', 29, 29, 44, 43500),
     ('Fatima Hassan', 'United Arab Emirates', '/images/avatar-6.jpg', 'Active commodities trader focused on gold and energy momentum across global sessions.', 'Commodities', ARRAY['XAU-USD', 'BRENT', 'WTI'], 'asia', 53.70, 1.10, 9.30, 902, 67.10, 18.30, 7, 'High', 'Platinum', 89, 89, 136, 178000)
 )
-INSERT INTO traders (
+INSERT INTO public.traders (
   name, country, avatar_url, bio, specialty, asset_focus, session_type,
   current_equity, total_return, daily_return, monthly_return, total_trades,
   win_rate_trades, max_drawdown, risk_score, risk_level, badge, followers,
@@ -43,13 +28,13 @@ SELECT
   100000, total_return, daily_return, monthly_return, total_trades,
   win_rate_trades, max_drawdown, risk_score, risk_level, badge, followers,
   copiers_current, copiers_all_time, under_management, true,
-  CURRENT_DATE, CURRENT_DATE + INTERVAL '365 days'
+  CURRENT_DATE, CURRENT_DATE + 365
 FROM seed
 WHERE NOT EXISTS (
-  SELECT 1 FROM traders existing WHERE LOWER(existing.name) = LOWER(seed.name)
+  SELECT 1 FROM public.traders existing WHERE LOWER(existing.name) = LOWER(seed.name)
 );
 
-UPDATE traders
+UPDATE public.traders
 SET is_active = COALESCE(is_active, true),
     asset_focus = COALESCE(asset_focus, ARRAY['BTC-USD', 'ETH-USD']),
     session_type = COALESCE(session_type, 'nyc'),
