@@ -1,6 +1,33 @@
 -- Enable the synthetic trader cron on an existing database.
 -- Run after schema.sql and 20260913-create-trade-logs.sql.
 
+CREATE TABLE IF NOT EXISTS public.user_follows (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  trader_id INTEGER REFERENCES public.traders(id) ON DELETE CASCADE,
+  allocated_amount NUMERIC DEFAULT 0,
+  current_value NUMERIC DEFAULT 0,
+  pnl NUMERIC DEFAULT 0,
+  pnl_percent NUMERIC DEFAULT 0,
+  stop_loss_percent NUMERIC DEFAULT 20,
+  take_profit_percent NUMERIC DEFAULT 200,
+  leverage_multiplier NUMERIC DEFAULT 1,
+  is_copying BOOLEAN DEFAULT true,
+  followed_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, trader_id)
+);
+
+ALTER TABLE public.user_follows
+  ADD COLUMN IF NOT EXISTS allocated_amount NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS current_value NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pnl NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pnl_percent NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS leverage_multiplier NUMERIC DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS is_copying BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS followed_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE TABLE IF NOT EXISTS public.trader_simulation_state (
   trader_id INTEGER PRIMARY KEY REFERENCES public.traders(id) ON DELETE CASCADE,
   seed TEXT NOT NULL,
@@ -48,6 +75,17 @@ ALTER TABLE public.user_follows
   ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC(30, 8) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS unrealized_pnl NUMERIC(30, 8) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS fees NUMERIC(30, 8) DEFAULT 0;
+
+ALTER TABLE public.trade_logs
+  ADD COLUMN IF NOT EXISTS event_id TEXT,
+  ADD COLUMN IF NOT EXISTS price_move_percent NUMERIC,
+  ADD COLUMN IF NOT EXISTS trade_return_percent NUMERIC,
+  ADD COLUMN IF NOT EXISTS account_return_percent NUMERIC,
+  ADD COLUMN IF NOT EXISTS entry_time TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS exit_time TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS margin NUMERIC(30, 8),
+  ADD COLUMN IF NOT EXISTS leverage NUMERIC(12, 4),
+  ADD COLUMN IF NOT EXISTS notional NUMERIC(30, 8);
 
 CREATE INDEX IF NOT EXISTS idx_sim_state_updated
   ON public.trader_simulation_state (updated_at);

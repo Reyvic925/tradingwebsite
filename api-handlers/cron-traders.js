@@ -38,7 +38,37 @@ async function processTrader(trader, now) {
     .eq('trader_id', trader.id)
     .maybeSingle();
   if (stateError) throw stateError;
-  if (!simulation) return { traderId: trader.id, skipped: true, reason: 'missing_simulation_state' };
+  if (!simulation) {
+    const startingEquity = Number(trader.current_equity) || 100000;
+    const config = normalizeSyntheticConfig({
+      strategyType: 'momentum',
+      assetClass: 'multi_asset',
+      assets: trader.asset_focus,
+      session: trader.session_type,
+      startingEquity,
+      targetReturnProfile: trader.total_return,
+      targetWinRate: Number(trader.win_rate_trades) / 100,
+      riskProfile: trader.risk_score,
+    });
+    const initialState = {
+      equity: startingEquity,
+      peakEquity: startingEquity,
+      prices: {},
+      lossStreak: 0,
+    };
+    const { data: createdSimulation, error: createStateError } = await supabase
+      .from('trader_simulation_state')
+      .insert({
+        trader_id: trader.id,
+        seed: `trader-${trader.id}`,
+        config,
+        state: initialState,
+      })
+      .select('*')
+      .single();
+    if (createStateError) throw createStateError;
+    simulation = createdSimulation;
+  }
 
   const config = normalizeSyntheticConfig(simulation.config || {});
   let state = simulation.state || {
@@ -175,7 +205,10 @@ export default async function handler(req, res) {
   if (!authorized(req)) return res.status(401).json({ error: 'Invalid or missing cron secret' });
   if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
   try {
-    const { data: traders, error } = await supabase.from('traders').select('id, name, is_active, profit_sharing_fee').eq('is_active', true);
+    const { data: traders, error } = await supabase
+      .from('traders')
+      .select('id, name, is_active, profit_sharing_fee, asset_focus, session_type, current_equity, total_return, win_rate_trades, risk_score')
+      .eq('is_active', true);
     if (error) throw error;
     const results = [];
     for (const trader of traders || []) results.push(await processTrader(trader, new Date()));
