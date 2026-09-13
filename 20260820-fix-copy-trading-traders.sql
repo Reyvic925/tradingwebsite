@@ -1,8 +1,14 @@
 -- Repair migration for the live database's older traders table.
 -- Run once in the Supabase SQL editor before creating traders.
 -- Safe to re-run: every column uses IF NOT EXISTS.
+--
+-- Run this while deployments, cron jobs, and local API processes are stopped.
+-- PostgreSQL needs an ACCESS EXCLUSIVE lock for ALTER TABLE. The timeout below
+-- makes a blocker fail clearly instead of leaving the SQL editor waiting.
+SET lock_timeout = '5s';
+SET statement_timeout = '60s';
 
-ALTER TABLE IF EXISTS traders
+ALTER TABLE IF EXISTS public.traders
   ADD COLUMN IF NOT EXISTS asset_focus TEXT[] DEFAULT '{"BTC-USD", "ETH-USD"}',
   ADD COLUMN IF NOT EXISTS current_equity NUMERIC DEFAULT 10000.00,
   ADD COLUMN IF NOT EXISTS total_return NUMERIC DEFAULT 0.00,
@@ -20,16 +26,16 @@ ALTER TABLE IF EXISTS traders
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
-CREATE INDEX IF NOT EXISTS idx_traders_active ON traders(is_active);
-CREATE INDEX IF NOT EXISTS idx_traders_session ON traders(session_type);
-CREATE INDEX IF NOT EXISTS idx_traders_return ON traders(total_return DESC);
+CREATE INDEX IF NOT EXISTS idx_traders_active ON public.traders(is_active);
+CREATE INDEX IF NOT EXISTS idx_traders_session ON public.traders(session_type);
+CREATE INDEX IF NOT EXISTS idx_traders_return ON public.traders(total_return DESC);
 
 -- Copy-trading follows used by /api/copy-trades and /api/copy-summary.
 -- user_id stays text to match the existing application schema and auth IDs.
-CREATE TABLE IF NOT EXISTS user_follows (
+CREATE TABLE IF NOT EXISTS public.user_follows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL,
-  trader_id INTEGER REFERENCES traders(id) ON DELETE CASCADE,
+  trader_id INTEGER REFERENCES public.traders(id) ON DELETE CASCADE,
   allocated_amount NUMERIC DEFAULT 0.00,
   current_value NUMERIC DEFAULT 0.00,
   pnl NUMERIC DEFAULT 0.00,
@@ -43,7 +49,7 @@ CREATE TABLE IF NOT EXISTS user_follows (
   UNIQUE(user_id, trader_id)
 );
 
-ALTER TABLE IF EXISTS user_follows
+ALTER TABLE IF EXISTS public.user_follows
   ADD COLUMN IF NOT EXISTS user_id TEXT,
   ADD COLUMN IF NOT EXISTS trader_id INTEGER,
   ADD COLUMN IF NOT EXISTS allocated_amount NUMERIC DEFAULT 0.00,
@@ -71,18 +77,18 @@ BEGIN
     AND column_name = 'trader_id';
 
   IF trader_id_type = 'uuid' THEN
-    SELECT COUNT(*) INTO follow_count FROM user_follows;
+    SELECT COUNT(*) INTO follow_count FROM public.user_follows;
     IF follow_count > 0 THEN
       RAISE EXCEPTION 'user_follows.trader_id is UUID but contains % existing rows; migrate those trader IDs before rerunning this repair', follow_count;
     END IF;
-    ALTER TABLE user_follows DROP COLUMN trader_id;
-    ALTER TABLE user_follows ADD COLUMN trader_id INTEGER REFERENCES traders(id) ON DELETE CASCADE;
+    ALTER TABLE public.user_follows DROP COLUMN trader_id;
+    ALTER TABLE public.user_follows ADD COLUMN trader_id INTEGER REFERENCES public.traders(id) ON DELETE CASCADE;
   END IF;
 END $$;
 
-ALTER TABLE IF EXISTS notifications
+ALTER TABLE IF EXISTS public.notifications
   ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'info',
   ADD COLUMN IF NOT EXISTS trader_id INTEGER;
 
-CREATE INDEX IF NOT EXISTS idx_follows_user ON user_follows(user_id);
-CREATE INDEX IF NOT EXISTS idx_follows_trader ON user_follows(trader_id);
+CREATE INDEX IF NOT EXISTS idx_follows_user ON public.user_follows(user_id);
+CREATE INDEX IF NOT EXISTS idx_follows_trader ON public.user_follows(trader_id);
