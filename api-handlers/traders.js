@@ -242,11 +242,41 @@ export default async function handler(req, res) {
 
       const updateData = { ...req.body };
       delete updateData.id; // Prevent ID modification
+      delete updateData.under_management;
+      delete updateData.profit_for_copiers;
+      const requestedCurrentCopiers = Number(updateData.copiers_current);
+      const requestedAllTimeCopiers = Number(updateData.copiers_all_time);
       delete updateData.followers;
       delete updateData.copiers_current;
       delete updateData.copiers_all_time;
-      delete updateData.under_management;
-      delete updateData.profit_for_copiers;
+
+      if (Number.isFinite(requestedCurrentCopiers) || Number.isFinite(requestedAllTimeCopiers)) {
+        const { data: follows, error: followsError } = await supabase
+          .from('user_follows')
+          .select('user_id, is_copying')
+          .eq('trader_id', id);
+        if (followsError) throw followsError;
+        const activeCount = (follows || []).filter((follow) => follow.is_copying === true).length;
+        const allTimeCount = new Set((follows || []).map((follow) => follow.user_id)).size;
+        const currentTarget = Number.isFinite(requestedCurrentCopiers)
+          ? Math.max(0, Math.trunc(requestedCurrentCopiers))
+          : null;
+        const allTimeTarget = Number.isFinite(requestedAllTimeCopiers)
+          ? Math.max(currentTarget ?? 0, Math.trunc(requestedAllTimeCopiers))
+          : null;
+        if (currentTarget !== null) {
+          updateData.synthetic_copiers_current = Math.max(0, currentTarget - activeCount);
+        }
+        if (allTimeTarget !== null) {
+          updateData.synthetic_copiers_all_time = Math.max(
+            updateData.synthetic_copiers_current ?? 0,
+            allTimeTarget - allTimeCount
+          );
+        }
+        if (currentTarget !== null) {
+          updateData.synthetic_under_management = Number((updateData.synthetic_copiers_current * 1500).toFixed(2));
+        }
+      }
       if (updateData.session_start === '') delete updateData.session_start;
       if (updateData.session_end === '') updateData.session_end = null;
 

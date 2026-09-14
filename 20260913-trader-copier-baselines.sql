@@ -9,23 +9,9 @@ ALTER TABLE traders
 -- Initialize public baselines from the existing roster popularity.
 -- Existing real follow records are not included in these synthetic values.
 UPDATE traders
-SET synthetic_copiers_current = CASE
-      WHEN COALESCE(followers, 0) > 0
-        THEN GREATEST(201, COALESCE(synthetic_copiers_current, 0), ROUND(followers * 0.12)::INTEGER)
-      ELSE GREATEST(201, COALESCE(synthetic_copiers_current, 0))
-    END,
-    synthetic_copiers_all_time = CASE
-      WHEN COALESCE(followers, 0) > 0
-        THEN GREATEST(251, COALESCE(synthetic_copiers_current, 0) + 50, COALESCE(synthetic_copiers_all_time, 0), ROUND(followers * 0.16)::INTEGER)
-      ELSE GREATEST(251, COALESCE(synthetic_copiers_current, 0) + 50, COALESCE(synthetic_copiers_all_time, 0))
-    END,
-    synthetic_under_management = CASE
-      WHEN COALESCE(followers, 0) > 0
-        THEN ROUND(GREATEST(201, COALESCE(synthetic_copiers_current, 0), ROUND(followers * 0.12)::INTEGER) * 1500, 2)
-      ELSE ROUND(GREATEST(201, COALESCE(synthetic_copiers_current, 0)) * 1500, 2)
-    END
-WHERE COALESCE(synthetic_copiers_current, 0) < 201
-   OR COALESCE(synthetic_copiers_all_time, 0) < 251;
+SET synthetic_copiers_current = 201 + MOD(id * 37, 300),
+    synthetic_copiers_all_time = 251 + MOD(id * 53, 350),
+    synthetic_under_management = ROUND((201 + MOD(id * 37, 300)) * 1500, 2);
 
 UPDATE traders
 SET synthetic_copiers_all_time = GREATEST(synthetic_copiers_all_time, synthetic_copiers_current),

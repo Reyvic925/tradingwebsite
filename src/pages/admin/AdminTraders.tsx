@@ -10,7 +10,7 @@ function createEmptyFormData() {
     name: '', bio: '', country: '', avatar_url: '', specialty: '', badge: 'Gold',
     asset_focus: ['BTC-USD', 'ETH-USD'], session_type: 'nyc', risk_level: 'Medium',
     current_equity: 10000, total_return: 0, total_trades: 0, win_rate_trades: 50,
-    max_drawdown: 0, risk_score: 5
+    max_drawdown: 0, risk_score: 5, copiers_current: 250, copiers_all_time: 320
   };
 }
 
@@ -138,7 +138,9 @@ export default function AdminTraders() {
       total_trades: trader.total_trades || 0,
       win_rate_trades: trader.win_rate_trades,
       max_drawdown: trader.max_drawdown || 0,
-      risk_score: trader.risk_score || 5
+      risk_score: trader.risk_score || 5,
+      copiers_current: trader.copiers_current || 0,
+      copiers_all_time: trader.copiers_all_time || 0
     });
     setAvatarData('');
     setEditingId(trader.id);
@@ -317,6 +319,8 @@ export default function AdminTraders() {
               <div><label className="block text-sm text-gray-300 mb-1">Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Total Trades</label><input type="number" min="0" step="1" value={formData.total_trades} onChange={(e) => setFormData({ ...formData, total_trades: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Max Drawdown (%)</label><input type="number" min="0" step="0.01" value={formData.max_drawdown} onChange={(e) => setFormData({ ...formData, max_drawdown: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Current Copiers</label><input type="number" min="0" step="1" value={formData.copiers_current} onChange={(e) => setFormData({ ...formData, copiers_current: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">All-time Copiers</label><input type="number" min="0" step="1" value={formData.copiers_all_time} onChange={(e) => setFormData({ ...formData, copiers_all_time: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Risk Score (1-10)</label>
                 <input
