@@ -235,7 +235,19 @@ export default function AdminTraders() {
               </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Specialty</label>
-                <input type="text" value={formData.specialty} onChange={(e) => setFormData({ ...formData, specialty: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" placeholder="e.g., Crypto trends" />
+                <select value={formData.specialty} onChange={(e) => setFormData({ ...formData, specialty: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm">
+                  <option value="">Select specialty</option>
+                  {formData.specialty && !['Futures', 'Stocks', 'Crypto', 'Forex', 'Commodities', 'Indices', 'Multi-asset'].includes(formData.specialty) && (
+                    <option value={formData.specialty}>{formData.specialty}</option>
+                  )}
+                  <option value="Futures">Futures</option>
+                  <option value="Stocks">Stocks</option>
+                  <option value="Crypto">Crypto</option>
+                  <option value="Forex">Forex</option>
+                  <option value="Commodities">Commodities</option>
+                  <option value="Indices">Indices</option>
+                  <option value="Multi-asset">Multi-asset</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Trader image *</label>

@@ -7,7 +7,7 @@ import { reconcileTraderCopierMetrics } from './copier-metrics.js';
 const AVATAR_BUCKET = 'trader-avatars';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-async function syncTraderSimulationState(trader) {
+async function syncTraderSimulationState(trader, resetMetricBaseline = false) {
   const { data: existing, error: lookupError } = await supabase
     .from('trader_simulation_state')
     .select('trader_id, state, tick_index, last_processed_at, window_started_at')
@@ -27,11 +27,41 @@ async function syncTraderSimulationState(trader) {
     riskProfile: Number(trader.risk_score) || 5,
   };
 
+  if (resetMetricBaseline) {
+    const { error: tradeDeleteError } = await supabase
+      .from('trade_logs')
+      .delete()
+      .eq('trader_id', trader.id)
+      .not('event_id', 'is', null);
+    if (tradeDeleteError) throw tradeDeleteError;
+
+    const { error: snapshotDeleteError } = await supabase
+      .from('synthetic_equity_snapshots')
+      .delete()
+      .eq('trader_id', trader.id);
+    if (snapshotDeleteError) throw snapshotDeleteError;
+  }
+
   const payload = {
     trader_id: trader.id,
     seed: `trader-${trader.id}`,
-    config,
-    state: existing?.state || {
+    config: {
+      ...config,
+      metricBaseline: resetMetricBaseline
+        ? {
+            totalReturn: Number(trader.total_return) || 0,
+            totalTrades: Math.max(0, Math.trunc(Number(trader.total_trades) || 0)),
+            winRate: Math.min(100, Math.max(0, Number(trader.win_rate_trades) || 0)),
+            maxDrawdown: Math.max(0, Number(trader.max_drawdown) || 0),
+          }
+        : existing?.state?.metricBaseline
+    },
+    state: resetMetricBaseline ? {
+      equity: startingEquity,
+      peakEquity: startingEquity,
+      prices: {},
+      lossStreak: 0,
+    } : existing?.state || {
       equity: startingEquity,
       peakEquity: startingEquity,
       prices: {},
@@ -262,7 +292,7 @@ export default async function handler(req, res) {
       
       if (error) throw error;
       const trader = first(data);
-      await syncTraderSimulationState(trader);
+      await syncTraderSimulationState(trader, true);
       await reconcileTraderCopierMetrics(supabase, id);
       return res.status(200).json(trader);
     }

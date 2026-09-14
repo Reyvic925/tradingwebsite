@@ -71,6 +71,7 @@ export function normalizeSyntheticConfig(config = {}) {
     compounding: config.compounding !== false,
     riskFraction: Math.max(0.001, Number(config.riskFraction) || profile.riskFraction * targetScale),
     maxExposureFraction: Math.max(0.05, Number(config.maxExposureFraction) || profile.maxExposureFraction),
+    metricBaseline: config.metricBaseline,
   };
 }
 
