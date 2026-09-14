@@ -9,10 +9,8 @@ function createEmptyFormData() {
   return {
     name: '', bio: '', country: '', avatar_url: '', specialty: '', badge: 'Gold',
     asset_focus: ['BTC-USD', 'ETH-USD'], session_type: 'nyc', risk_level: 'Medium',
-    current_equity: 10000, total_return: 0, daily_return: 0, monthly_return: 0,
-    total_trades: 0, win_rate_trades: 50, max_drawdown: 0,
-    profit_sharing_fee: 20, drift: 0.001, volatility: 0.005,
-    risk_score: 5, session_start: '', session_end: ''
+    current_equity: 10000, total_return: 0, total_trades: 0, win_rate_trades: 50,
+    max_drawdown: 0, risk_score: 5
   };
 }
 
@@ -57,8 +55,6 @@ export default function AdminTraders() {
       const method = editingId ? 'PUT' : 'POST';
       const payload = {
         ...formData,
-        session_start: formData.session_start || undefined,
-        session_end: formData.session_end || null,
         avatar_data: avatarData || undefined
       };
       
@@ -139,17 +135,10 @@ export default function AdminTraders() {
       risk_level: trader.risk_level || 'Medium',
       current_equity: trader.current_equity || 10000,
       total_return: trader.total_return,
-      daily_return: trader.daily_return || 0,
-      monthly_return: trader.monthly_return || 0,
       total_trades: trader.total_trades || 0,
       win_rate_trades: trader.win_rate_trades,
       max_drawdown: trader.max_drawdown || 0,
-      profit_sharing_fee: trader.profit_sharing_fee ?? 20,
-      drift: trader.drift,
-      volatility: trader.volatility,
-      risk_score: trader.risk_score,
-      session_start: trader.session_start || '',
-      session_end: trader.session_end || ''
+      risk_score: trader.risk_score || 5
     });
     setAvatarData('');
     setEditingId(trader.id);
@@ -314,35 +303,8 @@ export default function AdminTraders() {
                 />
               </div>
               <div><label className="block text-sm text-gray-300 mb-1">Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Daily Return (%)</label><input type="number" step="0.01" value={formData.daily_return} onChange={(e) => setFormData({ ...formData, daily_return: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Monthly Return (%)</label><input type="number" step="0.01" value={formData.monthly_return} onChange={(e) => setFormData({ ...formData, monthly_return: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Total Trades</label><input type="number" min="0" step="1" value={formData.total_trades} onChange={(e) => setFormData({ ...formData, total_trades: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
               <div><label className="block text-sm text-gray-300 mb-1">Max Drawdown (%)</label><input type="number" min="0" step="0.01" value={formData.max_drawdown} onChange={(e) => setFormData({ ...formData, max_drawdown: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Profit Sharing Fee (%)</label><input type="number" min="0" max="100" step="0.01" value={formData.profit_sharing_fee} onChange={(e) => setFormData({ ...formData, profit_sharing_fee: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Volatility (0-1)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={formData.volatility}
-                  onChange={(e) => setFormData({ ...formData, volatility: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Drift (0-1)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={formData.drift}
-                  onChange={(e) => setFormData({ ...formData, drift: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-                />
-              </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Risk Score (1-10)</label>
                 <input
@@ -366,14 +328,6 @@ export default function AdminTraders() {
                   className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
                   placeholder="e.g., BTC-USD, ETH-USD, AAPL"
                 />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Session Start</label>
-                <input type="date" value={formData.session_start} onChange={(e) => setFormData({ ...formData, session_start: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Session End</label>
-                <input type="date" value={formData.session_end} onChange={(e) => setFormData({ ...formData, session_end: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" />
               </div>
             </div>
 
