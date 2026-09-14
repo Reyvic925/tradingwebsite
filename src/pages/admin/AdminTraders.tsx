@@ -55,11 +55,17 @@ export default function AdminTraders() {
     try {
       const endpoint = editingId ? `/api/traders?id=${editingId}` : '/api/traders';
       const method = editingId ? 'PUT' : 'POST';
+      const payload = {
+        ...formData,
+        session_start: formData.session_start || undefined,
+        session_end: formData.session_end || null,
+        avatar_data: avatarData || undefined
+      };
       
       const response = await fetch(endpoint, {
         method,
         headers: await authHeaders(),
-        body: JSON.stringify({ ...formData, avatar_data: avatarData || undefined })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
