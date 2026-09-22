@@ -23,23 +23,28 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-      "audit": "npm run audit:copiers",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:migrate:local": "wrangler d1 migrations apply apex-prime-db --local",
+    "cf:migrate:remote": "wrangler d1 migrations apply apex-prime-db --remote",
+    "audit": "npm run audit:copiers",
     "preview": "vite preview",
     "pack": "node scripts/pack-source.mjs",
-    "test": "node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs && node tests/unit/investment-tick.test.mjs && node tests/unit/trader-validation.test.mjs && node tests/unit/synthetic-simulation.test.mjs && node tests/unit/synthetic-metrics.test.mjs && node tests/unit/roi-simulator.test.mjs && node tests/unit/copy-trading-tick.test.mjs",
+    "test": "node tests/unit/worker-auth.test.mjs && node tests/unit/crypto-keys.test.mjs && node tests/unit/check-charts.test.mjs && node tests/unit/admin-users.test.mjs && node tests/unit/investment-tick.test.mjs && node tests/unit/trader-validation.test.mjs && node tests/unit/synthetic-simulation.test.mjs && node tests/unit/synthetic-metrics.test.mjs && node tests/unit/roi-simulator.test.mjs && node tests/unit/copy-trading-tick.test.mjs",
+    "test:auth": "node tests/unit/worker-auth.test.mjs",
     "backfill:wallets": "node scripts/backfill-wallets.js",
-    "seed:kyc": "node scripts/seed-kyc-table.js"
-    ,"audit:traders": "node scripts/audit-traders-reconcile.mjs"
-    ,"traders:migrate": "node scripts/migrate-traders-to-simulation.mjs"
-    ,"traders:rebuild-metrics": "node scripts/rebuild-trader-metrics.mjs"
-    ,"traders:24h-test": "node scripts/test-trader-simulation-24h.mjs"
-    ,"traders:migration-report": "node scripts/report-trader-migration.mjs"
-    ,"traders:backfill-profiles": "node scripts/backfill-trader-profiles.mjs"
-    ,"traders:reconcile-status": "node scripts/reconcile-trader-status.mjs"
-    ,"traders:backfill-history": "node scripts/backfill-trader-history.mjs"
-    ,"traders:bootstrap-history": "node scripts/bootstrap-trader-history.mjs"
-    ,"audit:copiers": "node scripts/reconcile-trader-copiers.mjs"
-    ,"seed:copiers": "node scripts/reconcile-trader-copiers.mjs --seed"
+    "seed:kyc": "node scripts/seed-kyc-table.js",
+    "audit:traders": "node scripts/audit-traders-reconcile.mjs",
+    "traders:migrate": "node scripts/migrate-traders-to-simulation.mjs",
+    "traders:rebuild-metrics": "node scripts/rebuild-trader-metrics.mjs",
+    "traders:24h-test": "node scripts/test-trader-simulation-24h.mjs",
+    "traders:migration-report": "node scripts/report-trader-migration.mjs",
+    "traders:backfill-profiles": "node scripts/backfill-trader-profiles.mjs",
+    "traders:reconcile-status": "node scripts/reconcile-trader-status.mjs",
+    "traders:backfill-history": "node scripts/backfill-trader-history.mjs",
+    "traders:bootstrap-history": "node scripts/bootstrap-trader-history.mjs",
+    "audit:copiers": "node scripts/reconcile-trader-copiers.mjs",
+    "seed:copiers": "node scripts/reconcile-trader-copiers.mjs --seed"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
@@ -70,6 +75,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "wrangler": "^4.136.2"
   }
 }
