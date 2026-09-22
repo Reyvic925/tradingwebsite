@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
-import supabase from '../lib/supabase';
+import { signOut as signOutAuth } from '../lib/auth';
 import { apiGet, apiSend, bootstrapProfile } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Notice, Wallet as WalletT } from '../types';
@@ -82,7 +82,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const unread = notes.filter((n) => !n.read).length;
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await signOutAuth();
     navigate('/');
   };
 

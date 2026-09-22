@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import supabase, { isSignupConfirmationCallback } from '../lib/supabase';
+import { isWorkerAuthEnabled, signIn, signOut as signOutAuth, signUp } from '../lib/auth';
 import { signInWithGoogle } from '../lib/googleAuth';
 import { apiGet, bootstrapProfile, persistReferral } from '../lib/api';
 import { BRAND } from '../lib/brand';
@@ -27,6 +28,7 @@ export default function Login() {
     ? `${window.location.origin}`
     : 'https://theprimemarkets.com';
   const confirmedSignup = params.get('confirmed') === '1' || isSignupConfirmationCallback;
+  const workerAuth = isWorkerAuthEnabled();
 
   useEffect(() => {
     const ref = params.get('ref');
@@ -41,12 +43,17 @@ export default function Login() {
     setIsSignUp(false);
     setAwaitingConfirmation(false);
     setConfirmationNote('Email confirmed. Sign in with your email and password to continue.');
-    if (user) void supabase.auth.signOut({ scope: 'local' });
+    if (user) void signOutAuth();
   }, [confirmedSignup, user]);
 
   if (!loading && user && !awaitingConfirmation && !confirmedSignup) return <Navigate to="/app" replace />;
 
   const finishAuthentication = async (isNewAccount = false) => {
+    if (workerAuth) {
+      // The profile and application APIs still use Supabase and remain out of this slice.
+      navigate('/app');
+      return;
+    }
     await bootstrapProfile(isNewAccount ? { full_name: fullName, referred_by: referral || null } : undefined);
     const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
     const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
@@ -58,25 +65,21 @@ export default function Login() {
     e.preventDefault();
     setError('');
     if (!email.includes('@')) return setError('Enter a valid email address.');
-    if (password.length < 6) return setError('Password must be at least 6 characters.');
+    if (password.length < (workerAuth ? 8 : 6)) return setError(`Password must be at least ${workerAuth ? 8 : 6} characters.`);
     setBusy(true);
     try {
       if (isSignUp) {
-        const { data, error: err } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName }, emailRedirectTo: confirmationRedirectUrl },
-        });
-        if (err) throw err;
-        if (data.session) {
-          await supabase.auth.signOut({ scope: 'local' });
+        const result = await signUp(email, password);
+        if (result.provider === 'worker') {
+          await finishAuthentication(true);
+        } else {
+          if (result.session) await supabase.auth.signOut({ scope: 'local' });
+          setAwaitingConfirmation(true);
+          setConfirmationNote(`We sent an 8-digit code and a confirmation link to ${email}.`);
         }
-        setAwaitingConfirmation(true);
-        setConfirmationNote(`We sent an 8-digit code and a confirmation link to ${email}.`);
         return;
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-        if (err) throw err;
+        await signIn(email, password);
         await finishAuthentication();
       }
     } catch (err: unknown) {
