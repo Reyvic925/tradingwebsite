@@ -1,4 +1,5 @@
 import { handleAuthRequest } from './auth.js';
+import { handlePublicRequest } from './public-api.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -24,6 +25,10 @@ export default {
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleAuthRequest(request, env);
+    }
+
+    if (url.pathname === '/api/landing' || url.pathname === '/api/markets') {
+      return handlePublicRequest(request, env);
     }
 
     if (url.pathname.startsWith('/api/')) {
