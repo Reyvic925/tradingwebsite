@@ -57,14 +57,53 @@ try {
   if (!Array.isArray(plans) || plans.length !== 4) throw new Error('D1 did not return the four default plans.');
   const anonymousPositions = await fetch(`${base}/api/positions`);
   if (anonymousPositions.status !== 401) throw new Error('Private positions API did not reject an anonymous request.');
-  const unconfiguredDeposit = await fetch(`${base}/api/deposits`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ amount: 1, currency: 'USDT', network: 'ethereum', tx_hash: `smoke-${randomUUID()}` }),
-  });
-  if (unconfiguredDeposit.status !== 503) throw new Error('Deposits were not disabled without receiving-address configuration.');
-  const unavailableCryptoAddresses = await fetch(`${base}/api/user/crypto-addresses`, { headers: { cookie } });
-  if (unavailableCryptoAddresses.status !== 503) throw new Error('Wallet generation did not fail closed without an encryption secret.');
+  const cryptoAddressesResponse = await fetch(`${base}/api/user/crypto-addresses`, { headers: { cookie } });
+  let walletGeneration;
+  let depositSubmission;
+  if (cryptoAddressesResponse.status === 503) {
+    const unavailableDeposit = await fetch(`${base}/api/deposits`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ amount: 1, currency: 'USDT', network: 'ethereum', tx_hash: `smoke-${randomUUID()}` }),
+    });
+    if (unavailableDeposit.status !== 503) throw new Error('Deposit creation did not fail closed while wallet encryption was unavailable.');
+    walletGeneration = 'fail-closed without encryption key';
+    depositSubmission = 'fail-closed without wallet';
+  } else if (cryptoAddressesResponse.status === 200) {
+    const addresses = await cryptoAddressesResponse.json();
+    if (!Array.isArray(addresses) || addresses.length !== 8) {
+      throw new Error(`Expected eight per-user crypto addresses, received ${addresses?.length ?? 'invalid response'}.`);
+    }
+    if (addresses.some((address) => 'encrypted_private_key' in address || 'encrypted_mnemonic' in address)) {
+      throw new Error('User crypto-address API exposed encrypted key material.');
+    }
+    const depositPayload = {
+      amount: 0.001,
+      currency: 'USDT',
+      network: 'ethereum',
+      tx_hash: `smoke-${randomUUID()}`,
+    };
+    const submitted = await fetch(`${base}/api/deposits`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(depositPayload),
+    });
+    if (submitted.status !== 201) throw new Error(`Configured wallet deposit request returned ${submitted.status}.`);
+    const submissionBody = await submitted.json();
+    if (submissionBody?.deposit?.status !== 'pending') throw new Error('New crypto deposit did not remain pending review.');
+    const duplicate = await fetch(`${base}/api/deposits`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(depositPayload),
+    });
+    if (duplicate.status !== 409) throw new Error('Duplicate on-chain transaction hash was not rejected.');
+    const walletAfterRequest = await requestJson('/api/wallet', { headers: { cookie } });
+    if (Number(walletAfterRequest.body.available) !== 0) throw new Error('Pending deposit incorrectly credited the user wallet.');
+    walletGeneration = 'eight private addresses';
+    depositSubmission = 'pending, duplicate rejected, no wallet credit';
+  } else {
+    throw new Error(`Unexpected crypto-address response: ${cryptoAddressesResponse.status}.`);
+  }
   const nonAdminReview = await fetch(`${base}/api/admin/deposits`, { headers: { cookie } });
   if (nonAdminReview.status !== 403) throw new Error('A regular user was allowed to access admin deposit review.');
   const nonAdminKeys = await fetch(`${base}/api/admin/crypto-addresses`, { headers: { cookie } });
@@ -78,8 +117,8 @@ try {
     dashboardReads: 'passed',
     plans: plans.length,
     anonymousProtection: 'passed',
-    depositsFailClosed: 'passed',
-    walletEncryptionFailClosed: 'passed',
+    walletGeneration,
+    depositSubmission,
     adminAuthorization: 'passed',
     adminKeysAuthorization: 'passed',
     startingBalance: Number(wallet.available),

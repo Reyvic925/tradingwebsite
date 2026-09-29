@@ -22,8 +22,8 @@ function parseMetadata(value) {
 async function listAddresses(request, env) {
   const params = new URL(request.url).searchParams;
   const userId = params.get('user_id');
-  const currency = params.get('currency')?.trim().toUpperCase();
-  const network = params.get('network')?.trim().toLowerCase();
+  const currency = params.get('currency')?.trim().toUpperCase() || null;
+  const network = params.get('network')?.trim().toLowerCase() || null;
   const limit = Math.min(500, Math.max(1, Number(params.get('limit')) || 100));
   const offset = Math.max(0, Number(params.get('offset')) || 0);
   const result = await env.DB.prepare(`
