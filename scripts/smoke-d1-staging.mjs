@@ -57,6 +57,14 @@ try {
   if (!Array.isArray(plans) || plans.length !== 4) throw new Error('D1 did not return the four default plans.');
   const anonymousPositions = await fetch(`${base}/api/positions`);
   if (anonymousPositions.status !== 401) throw new Error('Private positions API did not reject an anonymous request.');
+  const unconfiguredDeposit = await fetch(`${base}/api/deposits`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ amount: 1, currency: 'USDT', network: 'ethereum', tx_hash: `smoke-${randomUUID()}` }),
+  });
+  if (unconfiguredDeposit.status !== 503) throw new Error('Deposits were not disabled without receiving-address configuration.');
+  const nonAdminReview = await fetch(`${base}/api/admin/deposits`, { headers: { cookie } });
+  if (nonAdminReview.status !== 403) throw new Error('A regular user was allowed to access admin deposit review.');
 
   console.log(JSON.stringify({
     signup: 'passed',
@@ -66,6 +74,8 @@ try {
     dashboardReads: 'passed',
     plans: plans.length,
     anonymousProtection: 'passed',
+    depositsFailClosed: 'passed',
+    adminAuthorization: 'passed',
     startingBalance: Number(wallet.available),
   }, null, 2));
 } catch (error) {

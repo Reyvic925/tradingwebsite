@@ -18,11 +18,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const provider = getAuthProvider();
 
   useEffect(() => {
-    getAuthSession().then(({ session: sessionData, user: userData }) => {
+    let active = true;
+    const syncSession = () => getAuthSession().then(({ session: sessionData, user: userData }) => {
+      if (!active) return;
       setSession(sessionData);
       setUser(userData);
       setLoading(false);
     }).catch(() => setLoading(false));
+
+    void syncSession();
+
+    if (isWorkerAuthEnabled()) {
+      const onWorkerAuthChange = (event: Event) => {
+        const nextUser = (event as CustomEvent<WorkerAuthUser | null>).detail;
+        setUser(nextUser);
+        setSession(nextUser ? { user: nextUser } : null);
+        setLoading(false);
+      };
+      window.addEventListener('apex-worker-auth-change', onWorkerAuthChange);
+      return () => {
+        active = false;
+        window.removeEventListener('apex-worker-auth-change', onWorkerAuthChange);
+      };
+    }
 
     if (!isWorkerAuthEnabled()) {
       let subscription: { unsubscribe: () => void } | undefined;
@@ -35,8 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         subscription = authState.data.subscription;
       });
 
-      return () => subscription?.unsubscribe();
+      return () => {
+        active = false;
+        subscription?.unsubscribe();
+      };
     }
+
+    return () => { active = false; };
   }, []);
 
   return (

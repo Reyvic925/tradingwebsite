@@ -49,11 +49,6 @@ export default function Login() {
   if (!loading && user && !awaitingConfirmation && !confirmedSignup) return <Navigate to="/app" replace />;
 
   const finishAuthentication = async (isNewAccount = false) => {
-    if (workerAuth) {
-      // The profile and application APIs still use Supabase and remain out of this slice.
-      navigate('/app');
-      return;
-    }
     await bootstrapProfile(isNewAccount ? { full_name: fullName, referred_by: referral || null } : undefined);
     const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
     const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;

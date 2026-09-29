@@ -19,10 +19,14 @@ type Deposit = {
   user_name?: string | null;
   amount: number;
   currency: string;
+  network: string;
+  tx_hash: string;
+  destination_address: string;
   method: string;
   status: 'pending' | 'confirmed' | 'rejected';
   created_at: string;
   confirmed_at?: string | null;
+  credited_usd?: number | null;
   admin_notes?: string | null;
 };
 
@@ -30,7 +34,7 @@ export default function AdminDeposits() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed'>('pending');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('pending');
   const [reviewId, setReviewId] = useState<number | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [creditedAmount, setCreditedAmount] = useState<string>('');
@@ -57,13 +61,18 @@ export default function AdminDeposits() {
   }, [filter]);
 
   async function approve(id: number) {
+    const amount = Number(creditedAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter the verified amount to credit in USD.');
+      return;
+    }
     try {
       const headers = await authHeaders();
       headers['Content-Type'] = 'application/json';
       const res = await fetch('/api/admin/deposits', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ depositId: id, admin_notes: reviewNote, credited_amount: Number(creditedAmount || 0) }),
+        body: JSON.stringify({ action: 'approve', depositId: id, admin_notes: reviewNote, credited_amount: amount }),
       });
       const data = await readJsonOrText(res);
       if (!res.ok) throw new Error(data?.error || 'Approval failed');
@@ -76,10 +85,27 @@ export default function AdminDeposits() {
     }
   }
 
+  async function reject(id: number) {
+    if (!window.confirm('Reject this deposit request? No wallet credit will be issued.')) return;
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/deposits', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', depositId: id, admin_notes: 'Rejected during manual review.' }),
+      });
+      const data = await readJsonOrText(res);
+      if (!res.ok) throw new Error(data?.error || 'Rejection failed');
+      await fetchList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Rejection failed');
+    }
+  }
+
   return (
     <AdminShell title="Deposit approvals">
       <div className="mb-4 flex gap-2">
-        {(['all', 'pending', 'confirmed'] as const).map((s) => (
+        {(['all', 'pending', 'confirmed', 'rejected'] as const).map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
@@ -122,26 +148,39 @@ export default function AdminDeposits() {
                   <td className="px-4 py-3">
                     <div className="font-semibold text-emerald-200">{Number(d.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
                     <div className="text-[10px] uppercase tracking-[0.2em] text-stone-400">{d.currency}</div>
+                    {d.credited_usd != null && <div className="mt-1 text-xs text-emerald-300">Credited ${Number(d.credited_usd).toFixed(2)} USD</div>}
                   </td>
-                  <td className="px-4 py-3 text-stone-300">{d.method}</td>
+                  <td className="max-w-xs px-4 py-3 text-stone-300">
+                    <div>{d.network} · {d.method}</div>
+                    <div className="mt-1 break-all font-mono text-[10px] text-stone-500">{d.tx_hash}</div>
+                    <div className="mt-1 break-all font-mono text-[10px] text-stone-500">To: {d.destination_address}</div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-widest ${
-                      d.status === 'pending' ? 'bg-amber-500/15 text-amber-200' : 'bg-emerald-500/15 text-emerald-200'
+                      d.status === 'pending' ? 'bg-amber-500/15 text-amber-200' : d.status === 'confirmed' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200'
                     }`}>{d.status}</span>
                   </td>
                   <td className="px-4 py-3 text-stone-400">{new Date(d.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {d.status === 'pending' ? (
-                      <button
-                        onClick={() => {
-                          setReviewId(d.id);
-                          setCreditedAmount(String(d.amount));
-                          setReviewNote('');
-                        }}
-                        className="rounded-sm bg-emerald-500/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-emerald-200 hover:bg-emerald-500/20"
-                      >
-                        Approve
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            setReviewId(d.id);
+                            setCreditedAmount('');
+                            setReviewNote('');
+                          }}
+                          className="rounded-sm bg-emerald-500/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-emerald-200 hover:bg-emerald-500/20"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => void reject(d.id)}
+                          className="ml-2 rounded-sm border border-rose-500/30 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-rose-200 hover:bg-rose-500/10"
+                        >
+                          Reject
+                        </button>
+                      </>
                     ) : (
                       <span className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Closed</span>
                     )}
@@ -162,8 +201,8 @@ export default function AdminDeposits() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="w-full max-w-md rounded-md border border-white/10 bg-[#0a0f17] p-5">
             <h3 className="text-lg font-semibold text-white">Approve deposit</h3>
-            <p className="mt-2 text-sm text-stone-400">Enter the amount verified on-chain, then credit the user’s wallet balance.</p>
-            <label className="mt-4 block text-[10px] uppercase tracking-[0.18em] text-stone-500">Amount to credit</label>
+            <p className="mt-2 text-sm text-stone-400">Verify the transaction hash, network, destination, and received amount before approval. Approval credits the user’s USD wallet.</p>
+            <label className="mt-4 block text-[10px] uppercase tracking-[0.18em] text-stone-500">Verified USD amount to credit</label>
             <input
               value={creditedAmount}
               onChange={(e) => setCreditedAmount(e.target.value)}

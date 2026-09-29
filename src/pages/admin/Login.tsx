@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import supabase from '../../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../../lib/api';
+import { signIn, signOut } from '../../lib/auth';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function AdminLogin() {
@@ -46,23 +46,20 @@ export default function AdminLogin() {
     );
   }
 
-  if (user) return <Navigate to="/admin/dashboard" replace />;
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setBusy(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
+      await signIn(email, password);
 
       const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
       const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
       const role = String(profile?.role || '').toLowerCase();
       if (role !== 'admin') {
-        await supabase.auth.signOut();
-        throw new Error('This account is not an admin account. Use an admin user or promote the profile to role = admin.');
+        await signOut();
+        throw new Error('This account is not configured for admin access.');
       }
 
       navigate('/admin/dashboard', { replace: true });

@@ -36,6 +36,12 @@ function workerAuthUrl() {
   return String(import.meta.env.VITE_WORKER_AUTH_URL || '').trim().replace(/\/+$/, '');
 }
 
+function emitWorkerAuthChange(user: WorkerAuthUser | null) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('apex-worker-auth-change', { detail: user }));
+  }
+}
+
 async function workerRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${workerAuthUrl()}${path}`, {
     ...init,
@@ -77,6 +83,7 @@ export async function signIn(email: string, password: string) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+  emitWorkerAuthChange(data.user);
   return { provider: 'worker' as const, session: { user: data.user }, user: data.user };
 }
 
@@ -90,6 +97,7 @@ export async function signUp(email: string, password: string) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+  emitWorkerAuthChange(data.user);
   return { provider: 'worker' as const, session: { user: data.user }, user: data.user };
 }
 
@@ -100,4 +108,5 @@ export async function signOut() {
     return;
   }
   await workerRequest('/api/auth/logout', { method: 'POST' });
+  emitWorkerAuthChange(null);
 }

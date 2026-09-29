@@ -40,8 +40,8 @@ async function ensureProfileAndWallet(db, user, body = {}) {
   const fullName = String(body.full_name || user.email?.split('@')[0] || 'Trader').trim() || 'Trader';
   await db.prepare(`
     INSERT OR IGNORE INTO profiles
-      (user_id, email, full_name, country, phone, kyc_status, avatar_url, referral_code, referred_by, role)
-    VALUES (?, ?, ?, ?, ?, 'unverified', '', ?, ?, 'user')
+      (user_id, email, full_name, country, phone, kyc_status, avatar_url, referral_code, referred_by)
+    VALUES (?, ?, ?, ?, ?, 'unverified', '', ?, ?)
   `).bind(
     user.id,
     user.email,

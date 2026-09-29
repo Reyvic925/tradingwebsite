@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Activity, LayoutDashboard, LogOut, ShieldCheck, Wallet, Users, FileCheck2, ArrowDownLeft, ArrowUpRight, Landmark, LineChart } from 'lucide-react';
-import supabase from '../lib/supabase';
+import { signOut as signOutAuth } from '../lib/auth';
 import { useAuth } from '../contexts/AuthContext';
 
 const nav = [
@@ -20,7 +20,7 @@ export default function AdminShell({ children, title }: { children: React.ReactN
   const navigate = useNavigate();
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await signOutAuth();
     navigate('/admin/login');
   };
 

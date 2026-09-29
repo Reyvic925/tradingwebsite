@@ -8,7 +8,8 @@ import type { Txn, Wallet as WalletT, Profile as ProfileT } from '../types';
 // Fallback - will be replaced by config from API
 const FALLBACK_SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC'];
 
-type DepositAddress = { id: number; currency: string; network?: string; address: string };
+type DepositAddress = { id: number; currency: string; network: string; address: string };
+type DepositRequest = { id: number; currency: string; network: string; amount: number; tx_hash: string; status: string; credited_usd?: number | null };
 
 export default function Wallet() {
   const [wallet, setWallet] = useState<WalletT | null>(null);
@@ -23,17 +24,24 @@ export default function Wallet() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>([]);
+  const [depositRequests, setDepositRequests] = useState<DepositRequest[]>([]);
+  const [depositTxHash, setDepositTxHash] = useState('');
+  const [network, setNetwork] = useState('');
   const [coinQuery, setCoinQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [supportedCryptos, setSupportedCryptos] = useState<string[]>(FALLBACK_SUPPORTED_CRYPTOS);
+  const configuredCurrencies = [...new Set(depositAddresses.map((address) => address.currency))];
+  const currencyAddresses = depositAddresses.filter((address) => address.currency === currency);
+  const selectedDepositAddress = currencyAddresses.find((address) => address.network === network) || currencyAddresses[0];
 
   const load = async () => {
     try {
-      const [w, p, t, addresses, config] = await Promise.all([
+      const [w, p, t, addresses, deposits, config] = await Promise.all([
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiGet<{ profile: ProfileT }>('/api/profile').then(r => r.profile).catch(() => null),
         apiList<Txn>('/api/transactions'),
         apiList<DepositAddress>('/api/user/crypto-addresses').catch(() => []),
+        apiList<DepositRequest>('/api/deposits/history').catch(() => []),
         fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
       if (w) setWallet(w);
@@ -46,6 +54,14 @@ export default function Wallet() {
         return acc;
       }, []);
       setDepositAddresses(uniqueAddresses);
+      setDepositRequests(asList(deposits));
+      if (uniqueAddresses.length) {
+        const initialCurrency = uniqueAddresses.some((item) => item.currency === currency) ? currency : uniqueAddresses[0].currency;
+        setCurrency(initialCurrency);
+        setNetwork((current) => uniqueAddresses.some((item) => item.currency === initialCurrency && item.network === current)
+          ? current
+          : uniqueAddresses.find((item) => item.currency === initialCurrency)?.network || '');
+      }
       if (config?.value && Array.isArray(config.value)) {
         setSupportedCryptos(config.value);
       }
@@ -79,12 +95,17 @@ export default function Wallet() {
 
     try {
       if (type === 'deposit') {
+        if (!selectedDepositAddress) throw new Error('No receiving address is configured for this currency.');
+        if (!depositTxHash.trim()) throw new Error('Enter the transaction hash after sending your crypto.');
         await apiSend('/api/deposits', 'POST', {
           amount: amt,
           currency,
-          method: 'onchain_transfer',
+          network: selectedDepositAddress.network,
+          tx_hash: depositTxHash.trim(),
+          method: 'manual_crypto',
         });
-        setMsg(`Deposit request created for ${formatMoney(amt)} ${currency}. After you send the funds, the blockchain confirmation will be reviewed before the wallet is credited.`);
+        setMsg(`Deposit submitted for manual review. Your wallet is credited only after an administrator verifies the transaction.`);
+        setDepositTxHash('');
         await load();
         return;
       }
@@ -153,13 +174,13 @@ export default function Wallet() {
          {/* Deposit flow: Binance-like coin selector and QR/address card */}
          {type === 'deposit' ? (
            <>
-             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount to deposit</label>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Crypto amount sent ({currency})</label>
              <input
                value={amount}
                onChange={(e) => setAmount(e.target.value)}
                type="number"
                min="0"
-               step="0.01"
+               step="any"
                className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
              />
 
@@ -172,11 +193,14 @@ export default function Wallet() {
              />
 
              <div className="mt-2 grid grid-cols-2 gap-2">
-               {supportedCryptos.filter((c) => c.toLowerCase().includes(coinQuery.toLowerCase())).map((c) => (
+               {configuredCurrencies.filter((c) => c.toLowerCase().includes(coinQuery.toLowerCase())).map((c) => (
                  <button
                    key={c}
                    type="button"
-                   onClick={() => setCurrency(c)}
+                   onClick={() => {
+                     setCurrency(c);
+                     setNetwork(depositAddresses.find((address) => address.currency === c)?.network || '');
+                   }}
                    className={`rounded-sm border p-2 text-sm ${currency === c ? 'border-amber-400 bg-amber-400/10' : 'border-white/10'}`}
                  >
                    <div className="font-medium">{c}</div>
@@ -185,20 +209,35 @@ export default function Wallet() {
                ))}
              </div>
 
+             {currencyAddresses.length > 1 && (
+               <>
+                 <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Network</label>
+                 <select
+                   value={selectedDepositAddress?.network || ''}
+                   onChange={(event) => setNetwork(event.target.value)}
+                   className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none"
+                 >
+                   {currencyAddresses.map((address) => (
+                     <option key={address.id} value={address.network}>{address.network}</option>
+                   ))}
+                 </select>
+               </>
+             )}
+
              <div className="mt-4 rounded-sm border border-white/10 bg-black/20 p-3">
                <div className="mb-3 rounded bg-amber-400/10 px-3 py-2 text-xs text-amber-300">Send only {currency} to this address on the selected network. Deposits via other networks may result in loss of funds.</div>
 
                {/* Address / QR card */}
                <div className="flex flex-col items-center gap-4">
                  {depositAddresses.length === 0 && (
-                   <div className="text-sm text-stone-500">Generating deposit address…</div>
+                   <div className="text-sm text-amber-200">Crypto deposits are not configured yet. No funds can be submitted.</div>
                  )}
 
                  {depositAddresses.length > 0 && (
                    (() => {
-                     const addr = depositAddresses.find((a) => a.currency === currency);
+                     const addr = selectedDepositAddress;
                      const address = addr?.address || '';
-                     const network = addr?.network || 'network';
+                     const selectedNetwork = addr?.network || 'network';
                      return (
                        <div className="w-full max-w-md rounded-md bg-white p-4 text-center">
                          <div className="bg-white p-4 rounded-md inline-block">
@@ -221,7 +260,7 @@ export default function Wallet() {
                            </button>
                          </div>
 
-                         <div className="mt-3 text-xs text-stone-500">Minimum deposit: 0.0001 {currency} · Credited after blockchain confirms (typically 5-30 min) · Address remains the same</div>
+                         <div className="mt-3 text-xs text-stone-500">Network: {selectedNetwork}. Submit the transaction hash after sending; an administrator will verify it before crediting your USD balance.</div>
                        </div>
                      );
                    })()
@@ -232,27 +271,35 @@ export default function Wallet() {
                <div className="mt-4">
                  <div className="text-[10px] uppercase tracking-widest text-stone-500">Recent Deposits</div>
                  <div className="mt-2 space-y-2">
-                   {txns.filter((t) => t.type === 'deposit' && t.currency === currency).slice(0,5).map((t) => {
-                     const isPending = t.status === 'pending';
+                   {depositRequests.filter((deposit) => deposit.currency === currency).slice(0,5).map((deposit) => {
+                     const isPending = deposit.status === 'pending';
                      return (
-                       <div key={t.id} className={`flex items-center justify-between rounded-sm border p-2 ${isPending ? 'border-amber-400/30 bg-amber-400/5' : 'border-white/5'}`}>
+                       <div key={deposit.id} className={`flex items-center justify-between rounded-sm border p-2 ${isPending ? 'border-amber-400/30 bg-amber-400/5' : 'border-white/5'}`}>
                          <div>
                            <div className="text-sm flex items-center gap-2">
-                             {t.method || t.currency}
-                             {isPending && <span className="text-[10px] uppercase tracking-widest text-amber-400">confirming</span>}
+                             #{deposit.id} · {deposit.network}
+                             <span className={`text-[10px] uppercase tracking-widest ${isPending ? 'text-amber-400' : 'text-stone-400'}`}>{deposit.status}</span>
                            </div>
-                           <div className="text-xs text-stone-500">{t.reference}</div>
+                           <div className="max-w-[220px] truncate font-mono text-xs text-stone-500">{deposit.tx_hash}</div>
                          </div>
-                         <div className={`font-mono ${isPending ? 'text-amber-400' : 'text-emerald-400'}`}>+{formatMoney(Number(t.amount))}</div>
+                         <div className={`font-mono ${isPending ? 'text-amber-400' : 'text-emerald-400'}`}>{Number(deposit.amount).toLocaleString(undefined, { maximumFractionDigits: 8 })} {deposit.currency}</div>
                        </div>
                      );
                    })}
-                   {!txns.some((t) => t.type === 'deposit' && t.currency === currency) && (
+                   {!depositRequests.some((deposit) => deposit.currency === currency) && (
                      <div className="text-sm text-stone-500">No recent deposits for {currency}.</div>
                    )}
                  </div>
                </div>
              </div>
+
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Transaction hash</label>
+             <input
+               value={depositTxHash}
+               onChange={(event) => setDepositTxHash(event.target.value)}
+               placeholder="Paste the on-chain transaction hash"
+               className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
+             />
            </>
          ) : (
            <>
@@ -295,14 +342,14 @@ export default function Wallet() {
          {msg && <div className="mt-3 text-sm text-emerald-300">{msg}</div>}
 
          <button
-           disabled={busy}
+           disabled={busy || (type === 'deposit' && (!selectedDepositAddress || !depositTxHash.trim()))}
            className="mt-5 w-full rounded-sm bg-amber-400 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#1a1304] disabled:cursor-not-allowed disabled:opacity-60"
          >
-           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Confirm Deposit'}
+           {busy ? 'Processing…' : type === 'withdrawal' ? 'Request Withdrawal' : 'Submit for Review'}
          </button>
          <p className="mt-3 text-[11px] text-stone-600">
            {type === 'deposit'
-             ? 'Deposit addresses are automatically assigned to the account and kept on file for wallet funding.'
+             ? 'Only send the selected currency on the displayed network. Never submit a transaction hash before the transfer is confirmed on-chain.'
              : 'Withdrawals are processed after manual review (simulated).'}
          </p>
         </form>

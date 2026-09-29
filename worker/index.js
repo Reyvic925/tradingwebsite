@@ -1,5 +1,6 @@
 import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
+import { handleDepositRequest } from './deposit-api.js';
 import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
 
@@ -31,6 +32,13 @@ export default {
 
     if (url.pathname === '/api/profile' || url.pathname === '/api/wallet') {
       return handleAccountRequest(request, env);
+    }
+
+    if ([
+      '/api/deposits', '/api/deposits/history', '/api/admin/deposits',
+      '/api/user/crypto-addresses',
+    ].includes(url.pathname)) {
+      return handleDepositRequest(request, env);
     }
 
     if (url.pathname === '/api/landing' || url.pathname === '/api/markets' || url.pathname === '/api/plans') {
