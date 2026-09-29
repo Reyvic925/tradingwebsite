@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, type FormEvent } from 'react';
+﻿import { useEffect, useEffectEvent, useState, type FormEvent } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
@@ -40,7 +40,10 @@ export default function Wallet() {
         apiGet<WalletT>('/api/wallet').catch(() => null),
         apiGet<{ profile: ProfileT }>('/api/profile').then(r => r.profile).catch(() => null),
         apiList<Txn>('/api/transactions'),
-        apiList<DepositAddress>('/api/user/crypto-addresses').catch(() => []),
+        apiGet<DepositAddress[]>('/api/user/crypto-addresses').catch((cause) => {
+          setError(cause instanceof Error ? cause.message : 'Deposit wallet unavailable.');
+          return [];
+        }),
         apiList<DepositRequest>('/api/deposits/history').catch(() => []),
         fetch('/api/app-config?key=supported_cryptos').then(r => r.json()).catch(() => null),
       ]);
@@ -72,8 +75,10 @@ export default function Wallet() {
     }
   };
 
+  const loadEffect = useEffectEvent(load);
   useEffect(() => {
-    load();
+    const timeout = window.setTimeout(() => { void loadEffect(); }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const submit = async (e: FormEvent) => {
@@ -230,7 +235,7 @@ export default function Wallet() {
                {/* Address / QR card */}
                <div className="flex flex-col items-center gap-4">
                  {depositAddresses.length === 0 && (
-                   <div className="text-sm text-amber-200">Crypto deposits are not configured yet. No funds can be submitted.</div>
+                   <div className="text-sm text-amber-200">Your deposit wallets are unavailable. No funds can be submitted; contact support.</div>
                  )}
 
                  {depositAddresses.length > 0 && (

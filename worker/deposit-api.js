@@ -1,4 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
+import { getD1Admin } from './admin-auth.js';
+import { ensureUserCryptoWallets } from './crypto-wallets.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -19,50 +21,27 @@ async function readBody(request) {
   }
 }
 
-function depositAddresses(env) {
-  let entries;
-  try {
-    entries = JSON.parse(env.DEPOSIT_ADDRESSES_JSON || '[]');
-  } catch {
-    throw new Error('DEPOSIT_ADDRESSES_JSON must contain a JSON array.');
-  }
-  if (!Array.isArray(entries)) throw new Error('DEPOSIT_ADDRESSES_JSON must contain a JSON array.');
-  return entries
-    .filter((entry) => entry && entry.currency && entry.network && entry.address)
-    .map((entry, index) => ({
-      id: index + 1,
-      currency: String(entry.currency).trim().toUpperCase(),
-      network: String(entry.network).trim().toLowerCase(),
-      address: String(entry.address).trim(),
-    }));
-}
-
-function configuredAdmin(env, email) {
-  const emails = String(env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return emails.includes(String(email || '').trim().toLowerCase());
-}
-
-async function requireAdmin(request, env, user) {
-  if (!configuredAdmin(env, user.email)) return false;
-  const profile = await env.DB.prepare('SELECT role FROM profiles WHERE user_id = ?')
-    .bind(user.id).first();
-  return profile?.role === 'admin';
-}
-
 async function listAddresses(request, env, user) {
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
   if (!user) return json({ error: 'Unauthorized' }, 401);
-  const addresses = depositAddresses(env);
-  return json(addresses);
+  try {
+    const addresses = await ensureUserCryptoWallets(env.DB, user.id, env);
+    return json(addresses.map(({ id, currency, network, address }) => ({ id, currency, network, address })));
+  } catch (error) {
+    console.error('[worker/deposit-api] User wallet generation failed', error?.message || error);
+    return json({ error: 'Your deposit wallet is temporarily unavailable. Contact support.' }, 503);
+  }
 }
 
 async function createDeposit(request, env, user) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-  const addresses = depositAddresses(env);
-  if (!addresses.length) return json({ error: 'Crypto deposits are not configured yet.' }, 503);
+  let addresses;
+  try {
+    addresses = await ensureUserCryptoWallets(env.DB, user.id, env);
+  } catch (error) {
+    console.error('[worker/deposit-api] User wallet generation failed', error?.message || error);
+    return json({ error: 'Your deposit wallet is temporarily unavailable. Contact support.' }, 503);
+  }
 
   const body = await readBody(request);
   const amount = Number(body.amount);
@@ -163,9 +142,9 @@ export async function handleDepositRequest(request, env) {
     }
 
     if (pathname === '/api/admin/deposits') {
-      const user = await getAuthenticatedUser(request, env);
-      if (!user || !(await requireAdmin(request, env, user))) return json({ error: 'Forbidden' }, 403);
-      return await listAdminDeposits(request, env, user);
+      const admin = await getD1Admin(request, env);
+      if (!admin) return json({ error: 'Forbidden' }, 403);
+      return await listAdminDeposits(request, env, admin);
     }
 
     const user = await getAuthenticatedUser(request, env);
@@ -175,9 +154,6 @@ export async function handleDepositRequest(request, env) {
     return json({ error: 'Not found' }, 404);
   } catch (error) {
     console.error('[worker/deposit-api]', error);
-    if (/DEPOSIT_ADDRESSES_JSON/.test(String(error?.message || ''))) {
-      return json({ error: error.message }, 503);
-    }
     return json({ error: 'Internal server error' }, 500);
   }
 }

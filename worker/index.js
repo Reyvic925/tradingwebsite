@@ -1,5 +1,6 @@
 import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
+import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
 import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
@@ -28,6 +29,10 @@ export default {
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleAuthRequest(request, env);
+    }
+
+    if (url.pathname === '/api/admin/crypto-addresses' || url.pathname.startsWith('/api/admin/crypto-addresses/')) {
+      return handleAdminCryptoRequest(request, env);
     }
 
     if (url.pathname === '/api/profile' || url.pathname === '/api/wallet') {

@@ -63,8 +63,12 @@ try {
     body: JSON.stringify({ amount: 1, currency: 'USDT', network: 'ethereum', tx_hash: `smoke-${randomUUID()}` }),
   });
   if (unconfiguredDeposit.status !== 503) throw new Error('Deposits were not disabled without receiving-address configuration.');
+  const unavailableCryptoAddresses = await fetch(`${base}/api/user/crypto-addresses`, { headers: { cookie } });
+  if (unavailableCryptoAddresses.status !== 503) throw new Error('Wallet generation did not fail closed without an encryption secret.');
   const nonAdminReview = await fetch(`${base}/api/admin/deposits`, { headers: { cookie } });
   if (nonAdminReview.status !== 403) throw new Error('A regular user was allowed to access admin deposit review.');
+  const nonAdminKeys = await fetch(`${base}/api/admin/crypto-addresses`, { headers: { cookie } });
+  if (nonAdminKeys.status !== 403) throw new Error('A regular user was allowed to access admin wallet keys.');
 
   console.log(JSON.stringify({
     signup: 'passed',
@@ -75,7 +79,9 @@ try {
     plans: plans.length,
     anonymousProtection: 'passed',
     depositsFailClosed: 'passed',
+    walletEncryptionFailClosed: 'passed',
     adminAuthorization: 'passed',
+    adminKeysAuthorization: 'passed',
     startingBalance: Number(wallet.available),
   }, null, 2));
 } catch (error) {

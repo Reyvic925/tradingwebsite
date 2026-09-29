@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from './auth.js';
+import { ensureUserCryptoWallets } from './crypto-wallets.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -36,7 +37,7 @@ async function getWallet(db, userId) {
   `).bind(userId).first();
 }
 
-async function ensureProfileAndWallet(db, user, body = {}) {
+async function ensureProfileAndWallet(db, user, body = {}, env) {
   const fullName = String(body.full_name || user.email?.split('@')[0] || 'Trader').trim() || 'Trader';
   await db.prepare(`
     INSERT OR IGNORE INTO profiles
@@ -57,6 +58,12 @@ async function ensureProfileAndWallet(db, user, body = {}) {
     VALUES (?, 'USD', 0, 0, 0)
   `).bind(user.id).run();
 
+  try {
+    await ensureUserCryptoWallets(db, user.id, env);
+  } catch (error) {
+    console.error('[worker/account-api] Per-user deposit wallet generation unavailable', error?.message || error);
+  }
+
   const [profile, wallet] = await Promise.all([
     getProfile(db, user.id),
     getWallet(db, user.id),
@@ -66,12 +73,12 @@ async function ensureProfileAndWallet(db, user, body = {}) {
 
 async function handleProfile(request, env, user) {
   if (request.method === 'GET') {
-    const result = await ensureProfileAndWallet(env.DB, user);
+    const result = await ensureProfileAndWallet(env.DB, user, {}, env);
     return json(result);
   }
 
   if (request.method === 'POST') {
-    const result = await ensureProfileAndWallet(env.DB, user, await readBody(request));
+    const result = await ensureProfileAndWallet(env.DB, user, await readBody(request), env);
     return json(result);
   }
 

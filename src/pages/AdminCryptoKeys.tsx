@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { Copy } from 'lucide-react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
@@ -13,12 +13,22 @@ async function readJsonOrText(res: Response) {
   }
 }
 
+type CryptoAddressRow = {
+  id: number;
+  user_id: string;
+  user_email?: string | null;
+  user_name?: string | null;
+  currency: string;
+  network: string;
+  address: string;
+  created_at: string;
+};
+
 export default function AdminCryptoKeys() {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<CryptoAddressRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState<{ id: any; privateKey: string | null; mnemonic: string | null } | null>(null);
+  const [modal, setModal] = useState<{ id: number; privateKey: string | null; mnemonic: string | null } | null>(null);
   const [revealing, setRevealing] = useState(false);
-  const [adminSecret, setAdminSecret] = useState('');
   const [error, setError] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const users = useMemo(() => {
@@ -42,11 +52,10 @@ export default function AdminCryptoKeys() {
     setError('');
     try {
       const headers = await authHeaders();
-      if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const res = await fetch('/api/admin/crypto-addresses', { headers });
       const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Failed to load addresses');
-      setRows(j?.data || []);
+      setRows((j?.data || []) as CryptoAddressRow[]);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : 'Failed to load addresses');
@@ -55,14 +64,17 @@ export default function AdminCryptoKeys() {
     }
   }
 
-  useEffect(() => { fetchList(); }, []);
+  const fetchListEffect = useEffectEvent(fetchList);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => { void fetchListEffect(); }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
-  async function reveal(id: any) {
+  async function reveal(id: number) {
     setRevealing(true);
     setError('');
     try {
       const headers = await authHeaders();
-      if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const res = await fetch(`/api/admin/crypto-addresses/${id}/decrypt`, { headers });
       const j = await readJsonOrText(res);
       if (!res.ok) throw new Error(j?.error || 'Reveal failed');
@@ -87,15 +99,6 @@ export default function AdminCryptoKeys() {
     <AdminShell title="Crypto addresses">
       <div className="mb-5 rounded-md border border-white/10 bg-[#0a0f17] p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Admin secret override</div>
-            <input
-              value={adminSecret}
-              onChange={(e) => setAdminSecret(e.target.value)}
-              placeholder="Optional x-admin-secret"
-              className="mt-2 w-full rounded-sm border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber-400/60"
-            />
-          </div>
           <button onClick={() => fetchList()} disabled={loading} className="rounded-sm bg-amber-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#1a1304] disabled:opacity-60">
             {loading ? 'Loading…' : 'Refresh'}
           </button>
