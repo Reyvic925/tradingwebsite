@@ -1,4 +1,6 @@
 import { handleAuthRequest } from './auth.js';
+import { handleAccountRequest } from './account-api.js';
+import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -27,8 +29,19 @@ export default {
       return handleAuthRequest(request, env);
     }
 
-    if (url.pathname === '/api/landing' || url.pathname === '/api/markets') {
+    if (url.pathname === '/api/profile' || url.pathname === '/api/wallet') {
+      return handleAccountRequest(request, env);
+    }
+
+    if (url.pathname === '/api/landing' || url.pathname === '/api/markets' || url.pathname === '/api/plans') {
       return handlePublicRequest(request, env);
+    }
+
+    if ([
+      '/api/transactions', '/api/investments', '/api/positions', '/api/orders',
+      '/api/notifications', '/api/watchlist',
+    ].includes(url.pathname)) {
+      return handlePrivateRequest(request, env);
     }
 
     if (url.pathname.startsWith('/api/')) {

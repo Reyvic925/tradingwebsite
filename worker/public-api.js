@@ -64,6 +64,11 @@ async function landing(db) {
   return json({ features, partners, stats, plans, testimonials });
 }
 
+async function plans(db) {
+  const result = await db.prepare('SELECT * FROM plans ORDER BY id ASC').all();
+  return json(result.results || []);
+}
+
 async function markets(url, db) {
   const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
   const requestedClass = String(url.searchParams.get('class') || url.searchParams.get('asset_class') || 'all').toLowerCase();
@@ -107,6 +112,7 @@ export async function handlePublicRequest(request, env) {
     const url = new URL(request.url);
     const db = selectPublicDatabase(env);
     if (url.pathname === '/api/landing') return await landing(db);
+    if (url.pathname === '/api/plans') return await plans(db);
     if (url.pathname === '/api/markets') return await markets(url, db);
     return json({ error: 'Not found' }, 404);
   } catch (error) {

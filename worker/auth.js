@@ -1,7 +1,7 @@
 const SESSION_COOKIE = 'apex_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const PASSWORD_MIN_LENGTH = 8;
-const PBKDF2_ITERATIONS = 120000;
+const PBKDF2_ITERATIONS = 100000;
 
 function bytesToBase64Url(bytes) {
   let binary = '';
