@@ -69,6 +69,15 @@ async function plans(db) {
   return json(result.results || []);
 }
 
+async function investmentTiers(db) {
+  const result = await db.prepare(`
+    SELECT * FROM investment_tiers
+    WHERE simulation_enabled = 1
+    ORDER BY tier_level ASC
+  `).all();
+  return json(result.results || []);
+}
+
 async function markets(url, db) {
   const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
   const requestedClass = String(url.searchParams.get('class') || url.searchParams.get('asset_class') || 'all').toLowerCase();
@@ -113,6 +122,7 @@ export async function handlePublicRequest(request, env) {
     const db = selectPublicDatabase(env);
     if (url.pathname === '/api/landing') return await landing(db);
     if (url.pathname === '/api/plans') return await plans(db);
+    if (url.pathname === '/api/investment-tiers') return await investmentTiers(db);
     if (url.pathname === '/api/markets') return await markets(url, db);
     return json({ error: 'Not found' }, 404);
   } catch (error) {

@@ -46,7 +46,9 @@ export default {
       return handleDepositRequest(request, env);
     }
 
-    if (url.pathname === '/api/landing' || url.pathname === '/api/markets' || url.pathname === '/api/plans') {
+    if ([
+      '/api/landing', '/api/markets', '/api/plans', '/api/investment-tiers',
+    ].includes(url.pathname)) {
       return handlePublicRequest(request, env);
     }
 
