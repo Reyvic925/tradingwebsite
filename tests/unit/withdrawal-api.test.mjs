@@ -163,6 +163,25 @@ assert.equal(duplicateReview.status, 409);
 assert.equal(db.wallet.available, 80);
 assert.equal(db.ledger.length, 2);
 
+const secondCreated = await handleWithdrawalRequest(request('/api/user/withdraw/crypto', 'user-token', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ amount: 10, currency: 'USDC', address: '0x-test-destination' }),
+}), env);
+assert.equal(secondCreated.status, 201);
+const secondBody = await secondCreated.json();
+assert.equal(db.wallet.available, 70);
+
+const approved = await handleWithdrawalRequest(request('/api/admin/withdrawals', 'admin-token', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ id: secondBody.tx.id, action: 'approve', admin_notes: 'Checks passed' }),
+}), env);
+assert.equal(approved.status, 200);
+assert.equal((await approved.json()).withdrawal.status, 'approved');
+assert.equal(db.wallet.available, 70);
+assert.equal(db.ledger.length, 3);
+
 const noKycDb = new FakeD1();
 noKycDb.sessions.set((await sessionCookie('user-token-2', 'user-1')).id, { userId: 'user-1' });
 noKycDb.profiles.get('user-1').kyc_status = 'pending';
