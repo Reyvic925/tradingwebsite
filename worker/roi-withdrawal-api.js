@@ -78,11 +78,23 @@ async function createWithdrawal(request, env, user) {
     return json({ error: 'A valid investment_id is required for ROI withdrawals.' }, 400);
   }
   const investment = await env.DB.prepare(`
-    SELECT id FROM investments WHERE id = ? AND user_id = ?
+    SELECT id, status FROM investments WHERE id = ? AND user_id = ?
   `).bind(investmentId, user.id).first();
   if (!investment) return json({ error: 'Investment not found.' }, 404);
+  if (investment.status !== 'completed') return json({ error: 'ROI can only be withdrawn after the investment matures.' }, 409);
+
+  const pending = await env.DB.prepare(`
+    SELECT id FROM withdrawals
+    WHERE user_id = ? AND investment_id = ? AND type = 'roi' AND status = 'pending'
+    LIMIT 1
+  `).bind(user.id, investmentId).first();
+  if (pending) return json({ error: 'A withdrawal request is already pending for this investment.' }, 409);
 
   const results = await env.DB.batch([
+    env.DB.prepare(`
+      INSERT OR IGNORE INTO wallets (user_id, currency, available, reserved, locked_balance)
+      VALUES (?, 'USD', 0, 0, 0)
+    `).bind(user.id),
     env.DB.prepare(`
       UPDATE profiles SET locked_balance = locked_balance - ?
       WHERE user_id = ? AND locked_balance >= ?
@@ -106,7 +118,7 @@ async function createWithdrawal(request, env, user) {
       FROM withdrawals WHERE operation_id = ?
     `).bind(`ROI withdrawal of $${amount} initiated. Awaiting admin approval.`, operationId),
   ]);
-  const withdrawal = results[1]?.results?.[0];
+  const withdrawal = results[2]?.results?.[0];
   if (!withdrawal) return json({ error: 'Insufficient locked balance.' }, 400);
   return json(withdrawal, 201);
 }
@@ -237,6 +249,9 @@ export async function handleRoiWithdrawalRequest(request, env) {
     if (request.method === 'GET') return await listUserWithdrawals(env, user);
     return await createWithdrawal(request, env, user);
   } catch (error) {
+    if (/UNIQUE constraint failed: withdrawals\.investment_id/i.test(String(error?.message || ''))) {
+      return json({ error: 'A withdrawal request is already pending for this investment.' }, 409);
+    }
     console.error('[worker/roi-withdrawal-api]', error);
     return json({ error: 'Internal server error' }, 500);
   }

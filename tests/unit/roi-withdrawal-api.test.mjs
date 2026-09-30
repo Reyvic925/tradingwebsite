@@ -37,7 +37,10 @@ class FakeD1 {
     let changes = 0;
     for (const statement of statements) {
       const { sql, values } = statement;
-      if (sql.startsWith('UPDATE profiles SET locked_balance = locked_balance -')) {
+      if (sql.startsWith('INSERT OR IGNORE INTO wallets')) {
+        changes = 0;
+        results.push({ meta: { changes } });
+      } else if (sql.startsWith('UPDATE profiles SET locked_balance = locked_balance -')) {
         const [amount, userId, minimum] = values;
         const profile = this.profiles.get(userId);
         changes = profile && profile.locked_balance >= minimum ? 1 : 0;
@@ -146,9 +149,14 @@ class FakeStatement {
       const profile = this.db.profiles.get(this.values[0]);
       return profile ? { kyc_status: profile.kyc_status } : null;
     }
-    if (this.sql.startsWith('SELECT id FROM investments WHERE id =')) {
+    if (this.sql.startsWith('SELECT id, status FROM investments WHERE id =')) {
       const investment = this.db.investments.get(this.values[0]);
-      return investment?.user_id === this.values[1] ? { id: investment.id } : null;
+      return investment?.user_id === this.values[1] ? { id: investment.id, status: investment.status } : null;
+    }
+    if (this.sql.startsWith('SELECT id FROM withdrawals WHERE user_id =')) {
+      const withdrawal = this.db.withdrawals.find((row) => row.user_id === this.values[0]
+        && row.investment_id === this.values[1] && row.type === 'roi' && row.status === 'pending');
+      return withdrawal ? { id: withdrawal.id } : null;
     }
     throw new Error(`Unhandled first SQL: ${this.sql}`);
   }
@@ -198,6 +206,12 @@ const firstWithdrawal = await created.json();
 assert.equal(db.profiles.get('user-1').locked_balance, 20);
 assert.equal(db.investments.get(55).roi_withdrawal_pending, 1);
 
+const duplicateRequest = await handleRoiWithdrawalRequest(post('/api/withdrawal-request', 'user-token', {
+  type: 'roi', investment_id: 55, amount: 10,
+}), env);
+assert.equal(duplicateRequest.status, 409);
+assert.equal(db.profiles.get('user-1').locked_balance, 20);
+
 const approved = await handleRoiWithdrawalRequest(post('/api/admin/roi-approvals', 'admin-token', {
   id: firstWithdrawal.id, action: 'approve', admin_notes: 'Reviewed',
 }), env);
@@ -207,6 +221,14 @@ assert.equal(db.wallet.available, 50);
 assert.equal(db.profiles.get('user-1').locked_balance, 20);
 assert.equal(db.investments.get(55).roi_withdrawal_pending, 0);
 assert.equal(db.ledger.filter((entry) => entry.source_type === 'roi_withdrawal').length, 1);
+
+db.investments.get(55).status = 'active';
+const immatureRequest = await handleRoiWithdrawalRequest(post('/api/withdrawal-request', 'user-token', {
+  type: 'roi', investment_id: 55, amount: 10,
+}), env);
+assert.equal(immatureRequest.status, 409);
+assert.equal(db.profiles.get('user-1').locked_balance, 20);
+db.investments.get(55).status = 'completed';
 
 const rejectedRequest = await handleRoiWithdrawalRequest(post('/api/withdrawal-request', 'user-token', {
   type: 'roi', investment_id: 55, amount: 10,
