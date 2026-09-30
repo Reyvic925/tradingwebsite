@@ -1,6 +1,48 @@
 import { parse, pathToFileURL } from 'url';
 import path from 'path';
 
+const WORKER_PREVIEW_PATHS = new Set([
+  '/api/profile', '/api/wallet', '/api/deposits', '/api/deposits/history', '/api/admin/deposits',
+  '/api/user/crypto-addresses', '/api/kyc-upload', '/api/user/kyc', '/api/admin/kyc',
+  '/api/user/withdraw/crypto', '/api/admin/withdrawals', '/api/transactions', '/api/investments',
+  '/api/positions', '/api/orders', '/api/notifications', '/api/watchlist',
+  '/api/landing', '/api/markets', '/api/plans', '/api/investment-tiers',
+]);
+
+async function proxyPreviewToWorker(req, res, urlPath) {
+  const workerOrigin = String(process.env.WORKER_API_URL || '').trim().replace(/\/+$/, '');
+  if (process.env.VERCEL_ENV !== 'preview' || !workerOrigin
+    || (!WORKER_PREVIEW_PATHS.has(urlPath) && !urlPath.startsWith('/api/auth/'))) return false;
+
+  const target = new URL(req.url || urlPath, workerOrigin);
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers || {})) {
+    if (value && !['connection', 'content-length', 'host'].includes(name.toLowerCase())) {
+      headers.set(name, Array.isArray(value) ? value.join(', ') : String(value));
+    }
+  }
+
+  const method = String(req.method || 'GET').toUpperCase();
+  let body;
+  if (!['GET', 'HEAD'].includes(method) && req.body !== undefined) {
+    body = typeof req.body === 'string' || Buffer.isBuffer(req.body)
+      ? req.body
+      : JSON.stringify(req.body);
+  }
+
+  const upstream = await fetch(target, { method, headers, body, redirect: 'manual' });
+  res.statusCode = upstream.status;
+  for (const [name, value] of upstream.headers) {
+    if (!['connection', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
+      res.setHeader(name, value);
+    }
+  }
+  const cookies = upstream.headers.getSetCookie?.();
+  if (cookies?.length) res.setHeader('set-cookie', cookies);
+  res.end(Buffer.from(await upstream.arrayBuffer()));
+  return true;
+}
+
 function ensureQuery(req) {
   if (req.query) return req.query;
   const url = new URL(req.url || '/', 'http://localhost');
@@ -47,6 +89,8 @@ export default async function handler(req, res) {
 
   const urlPath = parse(req.url || '').pathname || '/';
   const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['api','cron','roi'] or ['ticker']
+
+  if (await proxyPreviewToWorker(req, res, urlPath)) return;
 
   if (parts[0] === 'api') parts.shift();
 

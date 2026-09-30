@@ -10,10 +10,14 @@ PUBLIC_API_DATABASE = "production"
 directory = "./dist"
 binding = "ASSETS"
 
+[[r2_buckets]]
+binding = "KYC_FILES"
+bucket_name = "apex-prime-production-kyc"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "apex-prime-db"
-database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+database_id = "b89ee3f0-d30a-42a3-bb73-06c7ccaf633c"
 migrations_dir = "d1-migrations"
 
 [[d1_databases]]
@@ -21,6 +25,10 @@ binding = "STAGING_DB"
 database_name = "apex-prime-staging"
 database_id = "8940eeeb-9cd9-40b6-9478-ff0ae4d91e3a"
 migrations_dir = "d1-migrations"
+
+[[env.staging.r2_buckets]]
+binding = "KYC_FILES"
+bucket_name = "apex-prime-staging-kyc"
 
 [env.staging]
 name = "apex-prime-staging-worker"

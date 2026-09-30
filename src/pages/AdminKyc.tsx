@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
 
@@ -35,7 +35,6 @@ type Submission = {
 export default function AdminKyc() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(false);
-  const [adminSecret, setAdminSecret] = useState('');
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [reviewId, setReviewId] = useState<number | null>(null);
@@ -47,7 +46,6 @@ export default function AdminKyc() {
     setError('');
     try {
       const headers = await authHeaders();
-      if (adminSecret) headers['x-admin-secret'] = adminSecret;
       const statusParam = statusFilter !== 'pending' ? `?status=${statusFilter}` : '';
       const res = await fetch(`/api/admin/kyc${statusParam}`, { headers });
       const j = await readJsonOrText(res);
@@ -61,14 +59,15 @@ export default function AdminKyc() {
     }
   }
 
+  const fetchListEffect = useEffectEvent(fetchList);
   useEffect(() => {
-    fetchList();
+    const timeout = window.setTimeout(() => { void fetchListEffect(); }, 0);
+    return () => window.clearTimeout(timeout);
   }, [statusFilter]);
 
   async function review(id: number, action: 'approve' | 'reject') {
     try {
       const headers = await authHeaders();
-      if (adminSecret) headers['x-admin-secret'] = adminSecret;
       headers['Content-Type'] = 'application/json';
       const res = await fetch('/api/admin/kyc', {
         method: 'POST',
@@ -87,7 +86,6 @@ export default function AdminKyc() {
 
   async function fetchDocumentBlob(fileId: number): Promise<string> {
     const headers = await authHeaders();
-    if (adminSecret) headers['x-admin-secret'] = adminSecret;
     const res = await fetch(`/api/kyc-upload?id=${fileId}`, { headers });
     if (!res.ok) throw new Error('Failed to load document');
     const blob = await res.blob();
@@ -105,6 +103,7 @@ export default function AdminKyc() {
 
   return (
     <AdminShell title="KYC review">
+      <div className="mb-4 text-sm text-stone-400">Identity documents are stored privately and available only to their owner and verified administrators.</div>
       {/* Status filter tabs */}
       <div className="mb-4 flex gap-2">
         {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
@@ -185,20 +184,12 @@ export default function AdminKyc() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setReviewId(s.id); setReviewNote(''); }}
-                        className="rounded-sm bg-emerald-500/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-emerald-200 hover:bg-emerald-500/25"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => { setReviewId(s.id); setReviewNote(''); }}
-                        className="rounded-sm bg-rose-500/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-rose-200 hover:bg-rose-500/25"
-                      >
-                        Reject
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => { setReviewId(s.id); setReviewNote(''); }}
+                      className="rounded-sm bg-amber-500/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-amber-200 hover:bg-amber-500/25"
+                    >
+                      Review
+                    </button>
                   </td>
                 </tr>
               ))}

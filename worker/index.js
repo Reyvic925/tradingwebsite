@@ -2,8 +2,10 @@ import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
 import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
+import { handleKycRequest } from './kyc-api.js';
 import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
+import { handleWithdrawalRequest } from './withdrawal-api.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -44,6 +46,14 @@ export default {
       '/api/user/crypto-addresses',
     ].includes(url.pathname)) {
       return handleDepositRequest(request, env);
+    }
+
+    if (['/api/kyc-upload', '/api/user/kyc', '/api/admin/kyc'].includes(url.pathname)) {
+      return handleKycRequest(request, env);
+    }
+
+    if (['/api/user/withdraw/crypto', '/api/admin/withdrawals'].includes(url.pathname)) {
+      return handleWithdrawalRequest(request, env);
     }
 
     if ([
