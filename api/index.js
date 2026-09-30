@@ -4,7 +4,8 @@ import path from 'path';
 const WORKER_PREVIEW_PATHS = new Set([
   '/api/profile', '/api/wallet', '/api/deposits', '/api/deposits/history', '/api/admin/deposits',
   '/api/user/crypto-addresses', '/api/kyc-upload', '/api/user/kyc', '/api/admin/kyc',
-  '/api/user/withdraw/crypto', '/api/admin/withdrawals', '/api/transactions', '/api/investments',
+  '/api/user/withdraw/crypto', '/api/admin/withdrawals', '/api/withdrawal-request',
+  '/api/admin/roi-approvals', '/api/transactions', '/api/investments',
   '/api/positions', '/api/orders', '/api/notifications', '/api/watchlist',
   '/api/landing', '/api/markets', '/api/plans', '/api/investment-tiers',
 ]);

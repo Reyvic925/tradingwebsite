@@ -5,6 +5,7 @@ import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
 import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
+import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -54,6 +55,10 @@ export default {
 
     if (['/api/user/withdraw/crypto', '/api/admin/withdrawals'].includes(url.pathname)) {
       return handleWithdrawalRequest(request, env);
+    }
+
+    if (['/api/withdrawal-request', '/api/admin/roi-approvals'].includes(url.pathname)) {
+      return handleRoiWithdrawalRequest(request, env);
     }
 
     if ([

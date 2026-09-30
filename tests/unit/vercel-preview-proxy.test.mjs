@@ -11,7 +11,7 @@ process.env.WORKER_API_URL = 'https://apex-prime-staging-worker.dprimemarkets.wo
 globalThis.fetch = async (url, init) => {
   capturedRequest = { url: String(url), init };
   return new Response(new Uint8Array([1, 2, 3]), {
-    status: 201,
+    status: init.method === 'GET' ? 200 : 201,
     headers: {
       'content-type': 'application/octet-stream',
       'content-encoding': 'gzip',
@@ -44,6 +44,23 @@ assert.equal(responseHeaders.get('content-type'), 'application/octet-stream');
 assert.equal(responseHeaders.has('content-encoding'), false);
 assert.equal(responseHeaders.get('set-cookie')[0], 'apex_session=worker-session; Path=/; HttpOnly; SameSite=Lax');
 assert.deepEqual([...response.body], [1, 2, 3]);
+
+const roiResponseHeaders = new Map();
+const roiResponse = {
+  statusCode: 200,
+  setHeader(name, value) { roiResponseHeaders.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; },
+};
+const roiRequest = {
+  url: '/api/admin/roi-approvals?status=pending',
+  method: 'GET',
+  headers: { cookie: 'apex_session=preview-session' },
+};
+
+await handler(roiRequest, roiResponse);
+assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/admin/roi-approvals?status=pending');
+assert.equal(capturedRequest.init.method, 'GET');
+assert.equal(roiResponse.statusCode, 200);
 
 globalThis.fetch = originalFetch;
 if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;

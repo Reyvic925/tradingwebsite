@@ -50,7 +50,7 @@ async function getInvestmentDetail(db, userId, investmentId) {
   `).bind(investmentId, userId).first();
   if (!investment) return json({ error: 'Investment not found.' }, 404);
 
-  const [plan, tier, transactionResult, profile] = await Promise.all([
+  const [plan, tier, transactionResult, profile, pendingWithdrawal] = await Promise.all([
     investment.plan_id
       ? db.prepare('SELECT * FROM plans WHERE id = ?').bind(investment.plan_id).first()
       : Promise.resolve(null),
@@ -63,9 +63,14 @@ async function getInvestmentDetail(db, userId, investmentId) {
       ORDER BY created_at ASC
     `).bind(investment.id, userId).all(),
     db.prepare('SELECT tier, locked_balance FROM profiles WHERE user_id = ?').bind(userId).first(),
+    db.prepare(`
+      SELECT 1 AS pending FROM withdrawals
+      WHERE user_id = ? AND investment_id = ? AND type = 'roi' AND status = 'pending'
+      LIMIT 1
+    `).bind(userId, investment.id).first(),
   ]);
   const transactions = transactionResult.results || [];
-  const withdrawalPending = false;
+  const withdrawalPending = Boolean(pendingWithdrawal);
   return json({
     investment: { ...investment, plan, tier_details: tier },
     transactions,
