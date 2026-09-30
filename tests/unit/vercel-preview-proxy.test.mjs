@@ -14,6 +14,7 @@ globalThis.fetch = async (url, init) => {
     status: 201,
     headers: {
       'content-type': 'application/octet-stream',
+      'content-encoding': 'gzip',
       'set-cookie': 'apex_session=worker-session; Path=/; HttpOnly; SameSite=Lax',
     },
   });
@@ -40,6 +41,7 @@ assert.equal(capturedRequest.init.headers.get('cookie'), 'apex_session=preview-s
 assert.equal(capturedRequest.init.body, JSON.stringify({ kind: 'document_front' }));
 assert.equal(response.statusCode, 201);
 assert.equal(responseHeaders.get('content-type'), 'application/octet-stream');
+assert.equal(responseHeaders.has('content-encoding'), false);
 assert.equal(responseHeaders.get('set-cookie')[0], 'apex_session=worker-session; Path=/; HttpOnly; SameSite=Lax');
 assert.deepEqual([...response.body], [1, 2, 3]);
 

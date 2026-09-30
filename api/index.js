@@ -33,7 +33,7 @@ async function proxyPreviewToWorker(req, res, urlPath) {
   const upstream = await fetch(target, { method, headers, body, redirect: 'manual' });
   res.statusCode = upstream.status;
   for (const [name, value] of upstream.headers) {
-    if (!['connection', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
+    if (!['connection', 'content-encoding', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
       res.setHeader(name, value);
     }
   }
