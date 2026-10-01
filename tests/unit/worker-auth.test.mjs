@@ -144,6 +144,10 @@ const passwordChanged = await handleAuthRequest(request('/api/auth/password', {
 }), env);
 assert.equal(passwordChanged.status, 200);
 assert.deepEqual(await passwordChanged.json(), { ok: true });
+const currentPasswordSession = await handleAuthRequest(request('/api/auth/session', { headers: { cookie: loginCookie } }), env);
+assert.equal((await currentPasswordSession.json()).user.email, 'trader@example.com');
+const revokedOlderSession = await handleAuthRequest(request('/api/auth/session', { headers: { cookie } }), env);
+assert.equal((await revokedOlderSession.json()).user, null);
 const changedPasswordLogin = await handleAuthRequest(request('/api/auth/login', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
