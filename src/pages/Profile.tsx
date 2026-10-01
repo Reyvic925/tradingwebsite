@@ -301,7 +301,7 @@ export default function Profile() {
               <span className="flex items-center gap-3"><BookOpen size={16} className="text-stone-400" /> Terms of service</span><ArrowUpRight size={14} />
             </Link>
             <a href="mailto:support@theprimemarkets.com" className="flex items-center justify-between py-2 text-sm text-stone-300 hover:text-amber-200">
-              <span className="flex items-center gap-3"><Mail size={16} className="text-stone-400" /> Contact support</span><ArrowUpRight size={14} />
+              <span className="flex items-center gap-3"><Mail size={16} className="text-stone-400" /> support@theprimemarkets.com</span><ArrowUpRight size={14} />
             </a>
           </section>
 

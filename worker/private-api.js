@@ -22,11 +22,14 @@ async function readBody(request) {
 async function sendNotificationEmail(env, userId, title, body) {
   const apiKey = String(env.RESEND_API_KEY || '').trim();
   const from = String(env.RESEND_FROM_EMAIL || '').trim();
-  if (!apiKey || !from) return;
+  if (!apiKey || !from) {
+    console.warn('[worker/private-api] email skipped: configure RESEND_API_KEY and RESEND_FROM_EMAIL on the Worker.');
+    return;
+  }
   const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
   if (!user?.email) return;
   try {
-    await fetch('https://api.resend.com/emails', {
+    const result = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -39,6 +42,9 @@ async function sendNotificationEmail(env, userId, title, body) {
         text: body || title,
       }),
     });
+    if (!result.ok) {
+      console.error('[worker/private-api] Resend rejected email:', result.status, (await result.text()).slice(0, 500));
+    }
   } catch (error) {
     console.warn('[worker/private-api] notification email skipped:', error?.message || error);
   }

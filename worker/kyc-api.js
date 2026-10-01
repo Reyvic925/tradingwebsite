@@ -28,15 +28,21 @@ async function readBody(request) {
 async function sendNotificationEmail(env, userId, title, body) {
   const apiKey = String(env.RESEND_API_KEY || '').trim();
   const from = String(env.RESEND_FROM_EMAIL || '').trim();
-  if (!apiKey || !from) return;
+  if (!apiKey || !from) {
+    console.warn('[worker/kyc-api] email skipped: configure RESEND_API_KEY and RESEND_FROM_EMAIL on the Worker.');
+    return;
+  }
   const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
   if (!user?.email) return;
   try {
-    await fetch('https://api.resend.com/emails', {
+    const result = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to: [user.email], subject: title, text: body || title }),
     });
+    if (!result.ok) {
+      console.error('[worker/kyc-api] Resend rejected email:', result.status, (await result.text()).slice(0, 500));
+    }
   } catch (error) {
     console.warn('[worker/kyc-api] notification email skipped:', error?.message || error);
   }
