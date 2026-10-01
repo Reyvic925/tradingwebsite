@@ -62,13 +62,25 @@ export async function signIn(email: string, password: string) {
   return { provider: 'worker' as const, session: { user: data.user }, user: data.user };
 }
 
-export async function signUp(email: string, password: string) {
-  const data = await workerRequest<{ user: WorkerAuthUser }>('/api/auth/signup', {
+export async function signUp(email: string, password: string, profile: Record<string, string | null> = {}) {
+  return workerRequest<{ verification_required: boolean; email_sent: boolean; throttled?: boolean }>('/api/auth/signup', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...profile }),
   });
-  emitWorkerAuthChange(data.user);
-  return { provider: 'worker' as const, session: { user: data.user }, user: data.user };
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return workerRequest<{ ok: boolean }>('/api/auth/verification/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function resendVerificationEmail(email: string) {
+  return workerRequest<{ ok: boolean; throttled?: boolean }>('/api/auth/verification/resend', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function signOut() {

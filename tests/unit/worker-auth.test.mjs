@@ -6,6 +6,8 @@ class FakeD1 {
     this.users = new Map();
     this.sessions = new Map();
     this.emailTokens = new Map();
+    this.verificationLimits = new Map();
+    this.profiles = new Map();
   }
 
   prepare(sql) {
@@ -32,6 +34,21 @@ class FakeStatement {
   }
 
   async first() {
+    if (this.sql.startsWith('SELECT id, email_verified_at FROM auth_users WHERE email =')) {
+      const user = [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]);
+      return user ? { id: user.id, email_verified_at: user.email_verified_at } : null;
+    }
+    if (this.sql.startsWith('SELECT id, email, email_verified_at FROM auth_users WHERE email =')) {
+      const user = [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]);
+      return user ? { id: user.id, email: user.email, email_verified_at: user.email_verified_at } : null;
+    }
+    if (this.sql.startsWith('SELECT attempts, locked_until FROM auth_email_verification_limits')) {
+      return this.db.verificationLimits.get(this.values[0]) || null;
+    }
+    if (this.sql.startsWith('SELECT locked_until FROM auth_email_verification_limits')) {
+      const limit = this.db.verificationLimits.get(this.values[0]);
+      return limit ? { locked_until: limit.locked_until } : null;
+    }
     if (this.sql.startsWith('SELECT token_hash FROM auth_email_tokens')) {
       const [userId, purpose] = this.values;
       const token = [...this.db.emailTokens.values()].find((candidate) => candidate.userId === userId
@@ -46,9 +63,13 @@ class FakeStatement {
       return this.db.users.get(this.values[0]) || null;
     }
     if (this.sql.startsWith('UPDATE auth_email_tokens SET consumed_at =')) {
-      const [tokenHash, purpose] = this.values;
+      const [tokenHash, purposeOrUserId] = this.values;
       const token = this.db.emailTokens.get(tokenHash);
-      if (!token || token.purpose !== purpose || token.consumed || token.expiresAt <= Date.now()) return null;
+      const isCode = this.sql.includes("channel = 'code'");
+      const matches = isCode
+        ? token?.userId === purposeOrUserId && token.channel === 'code'
+        : token?.purpose === purposeOrUserId && token.channel === 'link';
+      if (!matches || token.consumed || token.expiresAt <= Date.now()) return null;
       token.consumed = true;
       return { user_id: token.userId };
     }
@@ -73,6 +94,10 @@ class FakeStatement {
   }
 
   async run() {
+    if (this.sql.startsWith('DELETE FROM auth_email_verification_limits')) {
+      this.db.verificationLimits.delete(this.values[0]);
+      return { success: true };
+    }
     if (this.sql.startsWith('UPDATE auth_users SET password_hash =')) {
       const [passwordHash, id] = this.values;
       const user = this.db.users.get(id);
@@ -94,15 +119,31 @@ class FakeStatement {
       return { success: true };
     }
     if (this.sql.startsWith('INSERT INTO auth_email_tokens')) {
-      const [tokenHash, userId, purpose, expiry] = this.values;
-      const minutes = Number(String(expiry).match(/\+(\d+)/)?.[1] || 0);
+      const [tokenHash, userId, purposeValue, expiry] = this.values;
+      const code = this.sql.includes("'code'");
+      const purpose = purposeValue || 'verify_email';
+      const minutes = Number(String(expiry || '+10 minutes').match(/\+(\d+)/)?.[1] || 0);
       this.db.emailTokens.set(tokenHash, {
         userId,
         purpose,
+        channel: code ? 'code' : 'link',
         expiresAt: Date.now() + minutes * 60 * 1000,
         createdAt: Date.now(),
         consumed: false,
       });
+      return { success: true };
+    }
+    if (this.sql.startsWith('INSERT OR IGNORE INTO profiles')) {
+      const [userId, email, fullName, country, phone, referralCode, referredBy] = this.values;
+      this.db.profiles.set(userId, { user_id: userId, email, full_name: fullName, country, phone, referral_code: referralCode, referred_by: referredBy });
+      return { success: true };
+    }
+    if (this.sql.startsWith('INSERT INTO auth_email_verification_limits')) {
+      const userId = this.values[0];
+      const limit = this.db.verificationLimits.get(userId) || { attempts: 0, locked_until: null };
+      limit.attempts += 1;
+      if (limit.attempts >= 5) limit.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      this.db.verificationLimits.set(userId, limit);
       return { success: true };
     }
     if (this.sql.startsWith('INSERT INTO auth_users')) {
@@ -165,18 +206,26 @@ const signup = await handleAuthRequest(request('/api/auth/signup', {
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email: 'Trader@Example.com', password: 'correct horse battery staple' }),
 }), env);
-assert.equal(signup.status, 201);
-assert.deepEqual((await signup.json()).user.email, 'trader@example.com');
-const cookie = cookieFrom(signup);
-assert.match(signup.headers.get('set-cookie'), /HttpOnly/);
-assert.doesNotMatch(signup.headers.get('set-cookie'), /password|battery|staple/i);
+assert.equal(signup.status, 202);
+assert.equal((await signup.json()).verification_required, true);
+assert.equal(signup.headers.get('set-cookie'), null);
 assert.equal(sentEmails.at(-1).payload.subject, 'Verify your Prime Markets email');
 const verificationLink = new URL(sentEmails.at(-1).payload.text.match(/https:\/\/\S+/)[0]);
 assert.equal(verificationLink.pathname, '/auth/confirm');
 assert.match(sentEmails.at(-1).payload.html, /Confirm Email Address/);
-assert.match(sentEmails.at(-1).payload.html, /expires in 24 hours/);
+assert.match(sentEmails.at(-1).payload.html, /Your verification code/);
+assert.match(sentEmails.at(-1).payload.html, /expires in 10 minutes/);
 assert.match(sentEmails.at(-1).payload.html, /background-color:#f2efe9/);
+const verificationCode = sentEmails.at(-1).payload.html.match(/letter-spacing:8px[^>]*>(\d{8})</)?.[1];
+assert.match(verificationCode || '', /^\d{8}$/);
 assert.equal([...env.DB.users.values()][0].email_verified_at, null);
+const pendingLogin = await handleAuthRequest(request('/api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'trader@example.com', password: 'correct horse battery staple' }),
+}), env);
+assert.equal(pendingLogin.status, 403);
+assert.equal(pendingLogin.headers.get('set-cookie'), null);
 const verifyUrl = new URL('/api/auth/verify-email', 'http://localhost');
 verifyUrl.searchParams.set('token', verificationLink.searchParams.get('token'));
 const verified = await handleAuthRequest(request(`${verifyUrl.pathname}${verifyUrl.search}`), env);
@@ -192,6 +241,36 @@ const duplicate = await handleAuthRequest(request('/api/auth/signup', {
   body: JSON.stringify({ email: 'trader@example.com', password: 'correct horse battery staple' }),
 }), env);
 assert.equal(duplicate.status, 409);
+
+const otpSignup = await handleAuthRequest(request('/api/auth/signup', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'otp@example.com', password: 'correct horse battery staple' }),
+}), env);
+assert.equal(otpSignup.status, 202);
+const otpCode = sentEmails.at(-1).payload.html.match(/letter-spacing:8px[^>]*>(\d{8})</)?.[1];
+assert.match(otpCode || '', /^\d{8}$/);
+const otpUser = [...env.DB.users.values()].find((user) => user.email === 'otp@example.com');
+const otpMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(otpCode), 'PBKDF2', false, ['deriveBits']);
+const otpSalt = new TextEncoder().encode(otpUser.id);
+const otpBits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: otpSalt, iterations: 100000, hash: 'SHA-256' }, otpMaterial, 256);
+const otpEncoded = `100000$${btoa(String.fromCharCode(...otpSalt)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')}$${btoa(String.fromCharCode(...new Uint8Array(otpBits))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')}`;
+const otpHashBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(otpEncoded));
+const otpHash = btoa(String.fromCharCode(...new Uint8Array(otpHashBytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+const otpToken = env.DB.emailTokens.get(otpHash);
+assert.equal(otpToken.channel, 'code');
+const otpVerified = await handleAuthRequest(request('/api/auth/verification/confirm', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'otp@example.com', code: otpCode }),
+}), env);
+assert.equal(otpVerified.status, 200);
+assert.ok(otpUser.email_verified_at);
+const cookie = cookieFrom(await handleAuthRequest(request('/api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'trader@example.com', password: 'correct horse battery staple' }),
+}), env));
 
 const login = await handleAuthRequest(request('/api/auth/login', {
   method: 'POST',

@@ -16,6 +16,8 @@ export function renderPrimeMarketsEmail({
   actionNote = '',
   securityTip = '',
   expiryNote = '',
+  verificationCode = '',
+  codeExpiryNote = '',
 }) {
   const paragraphs = String(body)
     .split(/\n{2,}/)
@@ -30,6 +32,24 @@ export function renderPrimeMarketsEmail({
     : '';
   const expiry = expiryNote
     ? `<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">${escapeHtml(expiryNote)}</p>`
+    : '';
+  const codeExpiry = codeExpiryNote
+    ? `<p style="margin:6px 0 0;text-align:center;font-size:12px;line-height:19px;color:#a0978c">${escapeHtml(codeExpiryNote)}</p>`
+    : '';
+  const verification = verificationCode
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:24px 0 0"><tr><td>
+        <p style="margin:0 0 10px;text-align:center;font-size:13px;line-height:20px;color:#8a8175;text-transform:uppercase;font-weight:600">Your verification code</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8f5f0;border:1px solid #e8dfd4;border-radius:8px"><tr><td align="center" style="padding:20px 16px">
+          <span style="font-family:'Courier New',Courier,monospace;font-size:32px;line-height:40px;font-weight:700;letter-spacing:8px;color:#1a1612">${escapeHtml(verificationCode)}</span>
+        </td></tr></table>
+        <p style="margin:10px 0 0;text-align:center;font-size:13px;line-height:20px;color:#8a8175">Enter this 8-digit code in the app.</p>${codeExpiry}
+      </td></tr></table>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:28px 0"><tr>
+        <td width="45%" style="width:45%;height:1px;background-color:#e8e0d6;font-size:1px;line-height:1px">&nbsp;</td>
+        <td width="10%" align="center" style="width:10%;padding:0 8px;font-size:12px;line-height:18px;color:#8a8175;text-transform:uppercase">OR</td>
+        <td width="45%" style="width:45%;height:1px;background-color:#e8e0d6;font-size:1px;line-height:1px">&nbsp;</td>
+      </tr></table>
+      <p style="margin:0 0 16px;text-align:center;font-size:14px;line-height:22px;color:#6b6358">Prefer to confirm automatically?</p>`
     : '';
 
   return `<!doctype html>
@@ -46,10 +66,11 @@ export function renderPrimeMarketsEmail({
       <tr><td style="padding:40px 36px 32px">
         <h1 style="margin:0 0 10px;font-size:26px;line-height:34px;font-weight:700;color:#1a1612">${escapeHtml(title)}</h1>
         ${paragraphs}
-        ${action ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:12px"><tr><td align="center">${action}</td></tr></table>` : ''}
+        ${verification}
+        ${action ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:${verification ? '0' : '12px'}"><tr><td align="center">${action}</td></tr></table>` : ''}
         ${security}
       </td></tr>
-      <tr><td style="padding:20px 36px;background-color:#faf8f5;border-top:1px solid #eee8df;border-radius:0 0 12px 12px"><p style="margin:0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">This is an automated security email from The Prime Markets.</p>${expiry}<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">If you did not request this, you can safely ignore this email.</p></td></tr>
+      <tr><td style="padding:20px 36px;background-color:#faf8f5;border-top:1px solid #eee8df;border-radius:0 0 12px 12px"><p style="margin:0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">This is an automated email from The Prime Markets.</p>${expiry}<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">If you did not request this, you can safely ignore this email.</p></td></tr>
     </table>
     <p style="margin:18px 0 0;text-align:center;font-size:11px;line-height:18px;color:#9a9288">&copy; The Prime Markets. All rights reserved.</p>
   </td></tr></table>

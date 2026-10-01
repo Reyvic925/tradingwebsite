@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { signIn, signUp } from '../lib/auth';
-import { apiGet, apiSend, bootstrapProfile } from '../lib/api';
+import { resendVerificationEmail, signIn, signUp, verifyEmailCode } from '../lib/auth';
+import { apiGet, apiSend, clearReferral, takeReferral } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
@@ -18,6 +18,10 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationNotice, setVerificationNotice] = useState('');
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
   const mode = params.get('mode') === 'signup' ? 'signup' : params.get('mode') === 'reset' ? 'reset' : 'login';
@@ -49,6 +53,7 @@ export default function Login() {
       if (!email.includes('@')) return setError('Enter a valid email address.');
       if (password.length < 8) return setError('Password must be at least 8 characters.');
     }
+    if (verificationPending && !/^\d{8}$/.test(verificationCode)) return setError('Enter the 8-digit code from your email.');
     if (mode === 'signup') {
       if (!fullName.trim()) return setError('Enter your full name.');
       if (!phone.trim()) return setError('Enter your phone number.');
@@ -63,13 +68,28 @@ export default function Login() {
       } else if (mode === 'reset') {
         await apiSend('/api/auth/password-reset/request', 'POST', { email });
         setResetSent(true);
+      } else if (mode === 'signup' && verificationPending) {
+        await verifyEmailCode(email, verificationCode);
+        setVerificationPending(false);
+        setVerificationNotice('Email confirmed. Signing you in…');
+        await signIn(email, password);
+        await finishAuthentication();
+        return;
       } else if (mode === 'signup') {
-        await signUp(email, password);
-        await bootstrapProfile({
+        const result = await signUp(email, password, {
           full_name: fullName.trim(),
           phone: phone.trim(),
           country: location.trim(),
+          referred_by: takeReferral(),
         });
+        clearReferral();
+        setVerificationPending(true);
+        setVerificationNotice(result.throttled
+          ? 'A verification email was sent recently. Check your inbox, including spam.'
+          : result.email_sent
+          ? 'We sent an 8-digit code and a confirmation link. Confirm your email before signing in.'
+          : 'Your account is pending email confirmation, but we could not send the email. Use resend to try again.');
+        return;
       } else {
         await signIn(email, password);
       }
@@ -86,10 +106,27 @@ export default function Login() {
   };
 
   const headerText = mode === 'signup' ? 'Create your account' : mode === 'reset' ? resetToken ? 'Choose a new password' : 'Reset your password' : 'Welcome back';
-  const helperText = mode === 'reset'
+  const helperText = verificationPending
+    ? 'Check your inbox and enter the 8-digit code, or use the confirmation link in the email.'
+    : mode === 'reset'
     ? resetComplete ? 'Your password has been updated.' : resetSent ? 'If the address is registered, a reset link is on its way.' : resetToken ? 'Choose a new password for your account.' : 'We will send a password reset link if this address has an account.'
     : 'Institutional rails. Retail-ready onboarding in under a minute.';
-  const actionText = mode === 'signup' ? 'Create account' : mode === 'reset' ? resetToken ? 'Reset password' : 'Send reset link' : 'Sign in';
+  const actionText = verificationPending ? 'Verify email' : mode === 'signup' ? 'Create account' : mode === 'reset' ? resetToken ? 'Reset password' : 'Send reset link' : 'Sign in';
+
+  const resendVerification = async () => {
+    setResendingVerification(true);
+    setError('');
+    try {
+      const result = await resendVerificationEmail(email);
+      setVerificationNotice(result.throttled
+        ? 'A verification email was sent recently. Check your inbox, including spam.'
+        : 'If your account is awaiting confirmation, a fresh verification email is on its way.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to resend the verification email.');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#05070b]">
@@ -104,11 +141,12 @@ export default function Login() {
 
           {emailVerified && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">Email verified. Thank you.</div>}
           {emailVerificationFailed && <div role="alert" className="mt-4 border border-rose-400/20 bg-rose-400/5 px-3 py-2 text-sm text-rose-200">That verification link is invalid or expired. Sign in and request another.</div>}
+          {verificationNotice && <div role="status" className="mt-4 border border-amber-300/20 bg-amber-300/5 px-3 py-2 text-sm text-amber-100">{verificationNotice}</div>}
           {resetSent && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">If the address is registered, a password reset link is on its way.</div>}
           {resetComplete && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">Password reset successfully. Sign in with your new password.</div>}
 
           {!resetComplete && !(mode === 'reset' && resetSent) && <form onSubmit={submit} className="mt-6 space-y-3">
-            {!(mode === 'reset' && resetToken) && <input
+            {!verificationPending && !(mode === 'reset' && resetToken) && <input
                 required
                 type="email"
                 autoComplete="email"
@@ -117,7 +155,7 @@ export default function Login() {
                 placeholder="Email Address"
                 className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
               />}
-            {mode === 'signup' && (
+            {mode === 'signup' && !verificationPending && (
               <>
                 <input
                   required
@@ -148,7 +186,20 @@ export default function Login() {
                 />
               </>
             )}
-            {(mode !== 'reset' || Boolean(resetToken)) && (
+            {verificationPending && <input
+              required
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={8}
+              pattern="[0-9]{8}"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder="8-digit verification code"
+              aria-label="8-digit verification code"
+              className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-amber-400/50"
+            />}
+            {!verificationPending && (mode !== 'reset' || Boolean(resetToken)) && (
               <input
                 required
                 type="password"
@@ -159,7 +210,7 @@ export default function Login() {
                 className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
               />
             )}
-            {(mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (
+            {!verificationPending && (mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (
               <input
                 required
                 type="password"
@@ -175,6 +226,15 @@ export default function Login() {
               {busy ? 'Please wait…' : actionText}
             </button>
           </form>}
+
+          {verificationPending && <button
+            type="button"
+            disabled={resendingVerification}
+            onClick={resendVerification}
+            className="mt-3 w-full text-center text-xs font-semibold text-amber-200 underline disabled:opacity-50"
+          >
+            {resendingVerification ? 'Sending…' : 'Resend verification email'}
+          </button>}
 
           <div className="mt-4 text-center text-[11px] text-stone-300">
             {mode === 'reset' ? (
