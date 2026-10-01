@@ -37,9 +37,12 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [verificationMsg, setVerificationMsg] = useState('');
+  const [verificationError, setVerificationError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [verificationBusy, setVerificationBusy] = useState(false);
 
   const load = async () => {
     try {
@@ -107,6 +110,26 @@ export default function Profile() {
     navigate('/login', { replace: true });
   };
 
+  const resendVerification = async () => {
+    setVerificationError('');
+    setVerificationMsg('');
+    setVerificationBusy(true);
+    try {
+      const result = await apiSend<{ already_verified?: boolean; throttled?: boolean }>(
+        '/api/auth/verification/resend', 'POST', {},
+      );
+      setVerificationMsg(result.already_verified
+        ? 'This email is already verified.'
+        : result.throttled
+          ? 'A verification email was sent recently. Check your inbox before requesting another.'
+          : 'Verification email sent. Check your inbox.');
+    } catch (e: unknown) {
+      setVerificationError(e instanceof Error ? e.message : 'Could not send the verification email.');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
   const checklist = [
     { label: 'Profile details', complete: Boolean(profile?.full_name && profile?.country) },
     { label: 'Contact number', complete: Boolean(profile?.phone) },
@@ -156,6 +179,21 @@ export default function Profile() {
                     <span className="truncate">{user?.email || '—'}</span>
                   </span>
                 </label>
+                <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-white/[0.02] px-3 py-2.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`h-1.5 w-1.5 rounded-full ${user?.email_verified_at ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                    <span className={user?.email_verified_at ? 'text-emerald-200' : 'text-amber-200'}>
+                      {user?.email_verified_at ? 'Email verified' : 'Email verification pending'}
+                    </span>
+                  </div>
+                  {!user?.email_verified_at && (
+                    <button type="button" disabled={verificationBusy} onClick={resendVerification} className="text-xs text-amber-200 underline disabled:opacity-50">
+                      {verificationBusy ? 'Sending…' : 'Resend verification email'}
+                    </button>
+                  )}
+                </div>
+                {verificationError && <div role="alert" className="sm:col-span-2 text-sm text-rose-300">{verificationError}</div>}
+                {verificationMsg && <div role="status" className="sm:col-span-2 text-sm text-emerald-300">{verificationMsg}</div>}
                 <label className="text-xs text-stone-400 sm:col-span-2">
                   Legal name
                   <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1.5 w-full border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-stone-100 outline-none focus:border-amber-300/60" />

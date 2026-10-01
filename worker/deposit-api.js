@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from './auth.js';
 import { getD1Admin } from './admin-auth.js';
 import { ensureUserCryptoWallets } from './crypto-wallets.js';
+import { notifyUser } from './notifications.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -60,6 +61,7 @@ async function createDeposit(request, env, user) {
       VALUES (?, ?, ?, ?, ?, ?, 'manual_crypto')
       RETURNING *
     `).bind(user.id, amount, currency, network, address.address, txHash).first();
+    await notifyUser(env, user.id, 'Deposit submitted', `${amount} ${currency} deposit submitted on ${network}. It will be credited after approval.`, 'worker/deposit-api');
     return json({ deposit: result }, 201);
   } catch (error) {
     if (/unique/i.test(String(error?.message || ''))) {
@@ -116,6 +118,7 @@ async function listAdminDeposits(request, env, admin) {
       RETURNING *
     `).bind(adminNotes, admin.id, depositId).first();
     if (!rejected) return json({ error: 'Deposit not found or already reviewed.' }, 409);
+    await notifyUser(env, rejected.user_id, 'Deposit rejected', `Your ${rejected.amount} ${rejected.currency} deposit was rejected.${adminNotes ? ` Note: ${adminNotes}` : ''}`, 'worker/deposit-api');
     return json({ deposit: rejected });
   }
 
@@ -130,6 +133,7 @@ async function listAdminDeposits(request, env, admin) {
     RETURNING *
   `).bind(creditedUsd, adminNotes, admin.id, depositId).first();
   if (!confirmed) return json({ error: 'Deposit not found or already reviewed.' }, 409);
+  await notifyUser(env, confirmed.user_id, 'Deposit confirmed', `Your deposit was approved and $${creditedUsd.toFixed(2)} USD was credited to your account.`, 'worker/deposit-api');
   return json({ deposit: confirmed });
 }
 

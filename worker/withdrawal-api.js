@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
 import { getD1Admin } from './admin-auth.js';
+import { notifyUser } from './notifications.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -57,6 +58,7 @@ async function createWithdrawal(request, env, user) {
 
   const transaction = results[1]?.results?.[0];
   if (!transaction) return json({ error: 'Insufficient available balance.' }, 400);
+  await notifyUser(env, user.id, 'Crypto withdrawal requested', `Your withdrawal of ${amount} ${currency} was submitted for review.`, 'worker/withdrawal-api');
   return json({ ok: true, tx: transaction }, 201);
 }
 
@@ -136,6 +138,12 @@ async function reviewWithdrawal(request, env, admin) {
 
   const withdrawal = results[0]?.results?.[0];
   if (!withdrawal) return json({ error: 'Withdrawal not found or already reviewed.' }, 409);
+  await notifyUser(env, withdrawal.user_id,
+    action === 'approve' ? 'Crypto withdrawal approved' : 'Crypto withdrawal rejected',
+    action === 'approve'
+      ? `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} was approved.`
+      : `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} was rejected.${notes ? ` Note: ${notes}` : ''}`,
+    'worker/withdrawal-api');
   return json({ withdrawal });
 }
 

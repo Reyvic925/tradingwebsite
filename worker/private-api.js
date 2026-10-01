@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from './auth.js';
+import { sendUserEmail } from './email.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -16,37 +17,6 @@ async function readBody(request) {
     return body && typeof body === 'object' ? body : {};
   } catch {
     return {};
-  }
-}
-
-async function sendNotificationEmail(env, userId, title, body) {
-  const apiKey = String(env.RESEND_API_KEY || '').trim();
-  const from = String(env.RESEND_FROM_EMAIL || '').trim();
-  if (!apiKey || !from) {
-    console.warn('[worker/private-api] email skipped: configure RESEND_API_KEY and RESEND_FROM_EMAIL on the Worker.');
-    return;
-  }
-  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
-  if (!user?.email) return;
-  try {
-    const result = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: [user.email],
-        subject: title,
-        text: body || title,
-      }),
-    });
-    if (!result.ok) {
-      console.error('[worker/private-api] Resend rejected email:', result.status, (await result.text()).slice(0, 500));
-    }
-  } catch (error) {
-    console.warn('[worker/private-api] notification email skipped:', error?.message || error);
   }
 }
 
@@ -196,7 +166,10 @@ async function createInvestment(request, env, userId) {
   }
   const investment = results[1]?.results?.[0];
   if (!investment) throw new Error('Investment debit succeeded but no investment row was created.');
-  await sendNotificationEmail(env, userId, `Investment created in ${name}`, `Invested $${amount} for ${durationDays} days.`);
+  await sendUserEmail(env, userId, {
+    subject: `Investment created in ${name}`,
+    text: `Invested $${amount} for ${durationDays} days.`,
+  }, 'worker/private-api');
   return json({ ...investment, plan: isTier ? null : product, tier_details: isTier ? product : null }, 201);
 }
 
@@ -268,7 +241,8 @@ function orderErrorResponse(error) {
   return null;
 }
 
-async function createOrder(request, db, userId) {
+async function createOrder(request, env, userId) {
+  const db = env.DB;
   const body = await readBody(request);
   const marketId = Number(body.market_id);
   const quantity = Number(body.quantity);
@@ -375,6 +349,10 @@ async function createOrder(request, db, userId) {
       WHERE user_id = ? AND market_id = ? AND status = 'open'
       ORDER BY id ASC LIMIT 1
     `).bind(userId, marketId).first();
+    await sendUserEmail(env, userId, {
+      subject: `Filled ${side.toUpperCase()} ${market.symbol}`,
+      text: `${quantity} ${market.symbol} filled at ${price}. The order used 10% initial margin.`,
+    }, 'worker/private-api');
     return json({ order, position }, 201);
   } catch (error) {
     if (/idx_positions_one_open_per_market|UNIQUE constraint failed: positions/i.test(String(error?.message || ''))) {
@@ -415,7 +393,8 @@ async function updatePosition(request, db, userId) {
   return position ? json(position) : json({ error: 'Open position not found.' }, 404);
 }
 
-async function closePosition(request, db, userId) {
+async function closePosition(request, env, userId) {
+  const db = env.DB;
   const body = await readBody(request);
   const id = Number(body.id);
   if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid position id is required.' }, 400);
@@ -474,6 +453,10 @@ async function closePosition(request, db, userId) {
     if (Number(results[0]?.meta?.changes || 0) !== 1) return json({ error: 'Open position was already closed.' }, 409);
     const closed = await db.prepare('SELECT * FROM positions WHERE id = ? AND user_id = ?')
       .bind(id, userId).first();
+    await sendUserEmail(env, userId, {
+      subject: `Closed ${position.symbol} position`,
+      text: `Your ${position.symbol} position closed at ${closePrice}. Realized P&L: ${pnl.toFixed(2)} USD.`,
+    }, 'worker/private-api');
     return json(closed);
   } catch (error) {
     const response = orderErrorResponse(error);
@@ -565,9 +548,9 @@ export async function handlePrivateRequest(request, env) {
     if (pathname === '/api/investments') return await handleInvestments(request, env, user.id);
     if (pathname === '/api/positions' && request.method === 'GET') return await listPositions(request, env.DB, user.id);
     if (pathname === '/api/positions' && request.method === 'PUT') return await updatePosition(request, env.DB, user.id);
-    if (pathname === '/api/positions' && request.method === 'DELETE') return await closePosition(request, env.DB, user.id);
+    if (pathname === '/api/positions' && request.method === 'DELETE') return await closePosition(request, env, user.id);
     if (pathname === '/api/orders' && request.method === 'GET') return await listOrders(env.DB, user.id);
-    if (pathname === '/api/orders' && request.method === 'POST') return await createOrder(request, env.DB, user.id);
+    if (pathname === '/api/orders' && request.method === 'POST') return await createOrder(request, env, user.id);
     if (pathname === '/api/orders' && request.method === 'DELETE') return await cancelOrder(request, env.DB, user.id);
     if (pathname === '/api/notifications') return await handleNotifications(request, env.DB, user.id);
     if (pathname === '/api/watchlist') return await handleWatchlist(request, env.DB, user.id);

@@ -24,7 +24,7 @@ class FakeStatement {
   }
 
   async first() {
-    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at FROM auth_sessions')) {
+    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at')) {
       return { id: 'referrer-1', email: 'referrer@example.com', created_at: '2026-01-01' };
     }
     if (this.sql.startsWith('SELECT referral_code FROM profiles')) return { referral_code: 'APEXABC123' };

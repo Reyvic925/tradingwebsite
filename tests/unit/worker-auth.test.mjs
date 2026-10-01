@@ -5,10 +5,17 @@ class FakeD1 {
   constructor() {
     this.users = new Map();
     this.sessions = new Map();
+    this.emailTokens = new Map();
   }
 
   prepare(sql) {
     return new FakeStatement(this, sql);
+  }
+
+  async batch(statements) {
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
   }
 }
 
@@ -25,17 +32,38 @@ class FakeStatement {
   }
 
   async first() {
+    if (this.sql.startsWith('SELECT token_hash FROM auth_email_tokens')) {
+      const [userId, purpose] = this.values;
+      const token = [...this.db.emailTokens.values()].find((candidate) => candidate.userId === userId
+        && candidate.purpose === purpose && candidate.createdAt > Date.now() - 60_000);
+      return token ? { token_hash: 'recent' } : null;
+    }
+    if (this.sql.startsWith('SELECT email FROM auth_users WHERE id =')) {
+      const user = this.db.users.get(this.values[0]);
+      return user ? { email: user.email } : null;
+    }
     if (this.sql.startsWith('SELECT password_hash FROM auth_users WHERE id =')) {
       return this.db.users.get(this.values[0]) || null;
+    }
+    if (this.sql.startsWith('UPDATE auth_email_tokens SET consumed_at =')) {
+      const [tokenHash, purpose] = this.values;
+      const token = this.db.emailTokens.get(tokenHash);
+      if (!token || token.purpose !== purpose || token.consumed || token.expiresAt <= Date.now()) return null;
+      token.consumed = true;
+      return { user_id: token.userId };
     }
     if (this.sql.startsWith('SELECT id FROM auth_users WHERE email =')) {
       const user = [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]);
       return user ? { id: user.id } : null;
     }
-    if (this.sql.startsWith('SELECT id, email, password_hash, created_at FROM auth_users WHERE email =')) {
+    if (this.sql.startsWith('SELECT id, email FROM auth_users WHERE email =')) {
+      const user = [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]);
+      return user ? { id: user.id, email: user.email } : null;
+    }
+    if (this.sql.startsWith('SELECT id, email, password_hash, created_at')) {
       return [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]) || null;
     }
-    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at FROM auth_sessions')) {
+    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at')) {
       const session = this.db.sessions.get(this.values[0]);
       if (!session || session.expiresAt <= Date.now()) return null;
       const user = this.db.users.get(session.userId);
@@ -52,10 +80,35 @@ class FakeStatement {
       user.password_hash = passwordHash;
       return { success: true, meta: { changes: 1 } };
     }
+    if (this.sql.startsWith('UPDATE auth_users SET email_verified_at =')) {
+      const user = this.db.users.get(this.values[0]);
+      if (!user) return { success: true, meta: { changes: 0 } };
+      user.email_verified_at = new Date().toISOString();
+      return { success: true, meta: { changes: 1 } };
+    }
+    if (this.sql.startsWith('DELETE FROM auth_email_tokens WHERE user_id =')) {
+      const [userId, purpose] = this.values;
+      for (const [hash, token] of this.db.emailTokens) {
+        if (token.userId === userId && token.purpose === purpose) this.db.emailTokens.delete(hash);
+      }
+      return { success: true };
+    }
+    if (this.sql.startsWith('INSERT INTO auth_email_tokens')) {
+      const [tokenHash, userId, purpose, expiry] = this.values;
+      const minutes = Number(String(expiry).match(/\+(\d+)/)?.[1] || 0);
+      this.db.emailTokens.set(tokenHash, {
+        userId,
+        purpose,
+        expiresAt: Date.now() + minutes * 60 * 1000,
+        createdAt: Date.now(),
+        consumed: false,
+      });
+      return { success: true };
+    }
     if (this.sql.startsWith('INSERT INTO auth_users')) {
       const [id, email, passwordHash] = this.values;
       if ([...this.db.users.values()].some((user) => user.email === email)) throw new Error('UNIQUE constraint failed');
-      this.db.users.set(id, { id, email, password_hash: passwordHash, created_at: new Date().toISOString() });
+      this.db.users.set(id, { id, email, password_hash: passwordHash, email_verified_at: null, created_at: new Date().toISOString() });
       return { success: true };
     }
     if (this.sql.startsWith('INSERT INTO auth_sessions')) {
@@ -78,7 +131,19 @@ class FakeStatement {
   }
 }
 
-const env = { DB: new FakeD1(), REGISTRATION_ENABLED: 'true' };
+const sentEmails = [];
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+  sentEmails.push({ url, payload: JSON.parse(options.body) });
+  return new Response(JSON.stringify({ id: `email-${sentEmails.length}` }), { status: 200 });
+};
+const env = {
+  DB: new FakeD1(),
+  REGISTRATION_ENABLED: 'true',
+  RESEND_API_KEY: 'test-resend-key',
+  RESEND_FROM_EMAIL: 'The Prime Markets <alerts@example.com>',
+  APP_URL: 'https://www.theprimemarkets.com',
+};
 const request = (path, options = {}) => new Request(`http://localhost${path}`, options);
 const cookieFrom = (response) => response.headers.get('set-cookie').split(';')[0];
 
@@ -105,6 +170,14 @@ assert.deepEqual((await signup.json()).user.email, 'trader@example.com');
 const cookie = cookieFrom(signup);
 assert.match(signup.headers.get('set-cookie'), /HttpOnly/);
 assert.doesNotMatch(signup.headers.get('set-cookie'), /password|battery|staple/i);
+assert.equal(sentEmails.at(-1).payload.subject, 'Verify your Prime Markets email');
+const verificationLink = new URL(sentEmails.at(-1).payload.text.match(/https:\/\/\S+/)[0]);
+const verified = await handleAuthRequest(request(`${verificationLink.pathname}${verificationLink.search}`), env);
+assert.equal(verified.status, 302);
+assert.equal(new URL(verified.headers.get('location')).searchParams.get('email_verified'), '1');
+assert.ok([...env.DB.users.values()][0].email_verified_at);
+const reusedVerification = await handleAuthRequest(request(`${verificationLink.pathname}${verificationLink.search}`), env);
+assert.equal(new URL(reusedVerification.headers.get('location')).searchParams.get('email_verified'), '0');
 
 const duplicate = await handleAuthRequest(request('/api/auth/signup', {
   method: 'POST',
@@ -154,6 +227,7 @@ const changedPasswordLogin = await handleAuthRequest(request('/api/auth/login', 
   body: JSON.stringify({ email: 'trader@example.com', password: 'another secure password' }),
 }), env);
 assert.equal(changedPasswordLogin.status, 200);
+assert.equal(sentEmails.at(-1).payload.subject, 'Your Prime Markets password was changed');
 
 const wrongCurrentPassword = await handleAuthRequest(request('/api/auth/password', {
   method: 'POST',
@@ -161,6 +235,44 @@ const wrongCurrentPassword = await handleAuthRequest(request('/api/auth/password
   body: JSON.stringify({ current_password: 'incorrect password', new_password: 'third secure password' }),
 }), env);
 assert.equal(wrongCurrentPassword.status, 403);
+
+const resetRequested = await handleAuthRequest(request('/api/auth/password-reset/request', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'TRADER@example.com' }),
+}), env);
+assert.equal(resetRequested.status, 200);
+assert.deepEqual(await resetRequested.json(), { ok: true });
+assert.equal(sentEmails.at(-1).payload.subject, 'Reset your Prime Markets password');
+const emailCountAfterResetRequest = sentEmails.length;
+const repeatedResetRequest = await handleAuthRequest(request('/api/auth/password-reset/request', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'trader@example.com' }),
+}), env);
+assert.equal(repeatedResetRequest.status, 200);
+assert.equal(sentEmails.length, emailCountAfterResetRequest);
+const resetLink = new URL(sentEmails.at(-1).payload.text.match(/https:\/\/\S+/)[0]);
+const passwordReset = await handleAuthRequest(request('/api/auth/password-reset/confirm', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ token: resetLink.searchParams.get('token'), new_password: 'reset secure password' }),
+}), env);
+assert.equal(passwordReset.status, 200);
+const resetLogin = await handleAuthRequest(request('/api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'trader@example.com', password: 'reset secure password' }),
+}), env);
+assert.equal(resetLogin.status, 200);
+const resetSession = cookieFrom(resetLogin);
+assert.equal((await (await handleAuthRequest(request('/api/auth/session', { headers: { cookie: resetSession } }), env)).json()).user.email, 'trader@example.com');
+const reusedReset = await handleAuthRequest(request('/api/auth/password-reset/confirm', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ token: resetLink.searchParams.get('token'), new_password: 'another reset password' }),
+}), env);
+assert.equal(reusedReset.status, 400);
 
 const logout = await handleAuthRequest(request('/api/auth/logout', { method: 'POST', headers: { cookie: loginCookie } }), env);
 assert.equal(logout.status, 200);
@@ -177,3 +289,4 @@ const expired = await handleAuthRequest(request('/api/auth/session', { headers: 
 assert.equal((await expired.json()).user, null);
 
 console.log('WORKER_AUTH_TESTS_PASSED');
+globalThis.fetch = originalFetch;

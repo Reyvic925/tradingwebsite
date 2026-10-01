@@ -95,7 +95,7 @@ class FakeStatement {
   }
 
   async first() {
-    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at FROM auth_sessions')) {
+    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at')) {
       const session = this.db.sessions.get(this.values[0]);
       return session ? this.db.users.get(session.userId) || null : null;
     }

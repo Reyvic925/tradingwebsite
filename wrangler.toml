@@ -8,6 +8,7 @@ PUBLIC_API_DATABASE = "production"
 ADMIN_EMAILS = "admin@theprimemarkets.com"
 REGISTRATION_ENABLED = "true"
 DEPOSITS_ENABLED = "true"
+APP_URL = "https://www.theprimemarkets.com"
 
 [assets]
 directory = "./dist"

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { signIn, signUp } from '../lib/auth';
-import { apiGet, bootstrapProfile } from '../lib/api';
+import { apiGet, apiSend, bootstrapProfile } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
@@ -16,9 +16,14 @@ export default function Login() {
   const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
-  const mode = params.get('mode') === 'signup' ? 'signup' : 'login';
+  const mode = params.get('mode') === 'signup' ? 'signup' : params.get('mode') === 'reset' ? 'reset' : 'login';
+  const resetToken = params.get('token') || '';
+  const emailVerified = params.get('email_verified') === '1';
+  const emailVerificationFailed = params.get('email_verified') === '0';
 
   if (!loading && user) return <Navigate to="/app" replace />;
 
@@ -32,8 +37,18 @@ export default function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!email.includes('@')) return setError('Enter a valid email address.');
-    if (password.length < 8) return setError('Password must be at least 8 characters.');
+    if (mode === 'reset') {
+      if (resetComplete) return;
+      if (resetToken) {
+        if (password.length < 8) return setError('Password must be at least 8 characters.');
+        if (password !== confirmPassword) return setError('Passwords do not match.');
+      } else if (!email.includes('@')) {
+        return setError('Enter a valid email address.');
+      }
+    } else {
+      if (!email.includes('@')) return setError('Enter a valid email address.');
+      if (password.length < 8) return setError('Password must be at least 8 characters.');
+    }
     if (mode === 'signup') {
       if (!fullName.trim()) return setError('Enter your full name.');
       if (!phone.trim()) return setError('Enter your phone number.');
@@ -42,7 +57,13 @@ export default function Login() {
     }
     setBusy(true);
     try {
-      if (mode === 'signup') {
+      if (mode === 'reset' && resetToken) {
+        await apiSend('/api/auth/password-reset/confirm', 'POST', { token: resetToken, new_password: password });
+        setResetComplete(true);
+      } else if (mode === 'reset') {
+        await apiSend('/api/auth/password-reset/request', 'POST', { email });
+        setResetSent(true);
+      } else if (mode === 'signup') {
         await signUp(email, password);
         await bootstrapProfile({
           full_name: fullName.trim(),
@@ -64,11 +85,11 @@ export default function Login() {
     }
   };
 
-  const headerText = mode === 'signup' ? 'Create your account' : 'Welcome back';
-  const helperText = mode === 'signup'
-    ? 'Institutional rails. Retail-ready onboarding in under a minute.'
+  const headerText = mode === 'signup' ? 'Create your account' : mode === 'reset' ? resetToken ? 'Choose a new password' : 'Reset your password' : 'Welcome back';
+  const helperText = mode === 'reset'
+    ? resetComplete ? 'Your password has been updated.' : resetSent ? 'If the address is registered, a reset link is on its way.' : resetToken ? 'Choose a new password for your account.' : 'We will send a password reset link if this address has an account.'
     : 'Institutional rails. Retail-ready onboarding in under a minute.';
-  const actionText = mode === 'signup' ? 'Create account' : 'Sign in';
+  const actionText = mode === 'signup' ? 'Create account' : mode === 'reset' ? resetToken ? 'Reset password' : 'Send reset link' : 'Sign in';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#05070b]">
@@ -81,15 +102,21 @@ export default function Login() {
           <h1 className="mt-2 font-display text-4xl">{headerText}</h1>
           <p className="mt-2 text-sm text-stone-400">{helperText}</p>
 
-          <form onSubmit={submit} className="mt-6 space-y-3">
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email Address"
-              className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
-            />
+          {emailVerified && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">Email verified. Thank you.</div>}
+          {emailVerificationFailed && <div role="alert" className="mt-4 border border-rose-400/20 bg-rose-400/5 px-3 py-2 text-sm text-rose-200">That verification link is invalid or expired. Sign in and request another.</div>}
+          {resetSent && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">If the address is registered, a password reset link is on its way.</div>}
+          {resetComplete && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">Password reset successfully. Sign in with your new password.</div>}
+
+          {!resetComplete && !(mode === 'reset' && resetSent) && <form onSubmit={submit} className="mt-6 space-y-3">
+            {!(mode === 'reset' && resetToken) && <input
+                required
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email Address"
+                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+              />}
             {mode === 'signup' && (
               <>
                 <input
@@ -121,16 +148,18 @@ export default function Login() {
                 />
               </>
             )}
-            <input
-              required
-              type="password"
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === 'signup' ? 'Secure Password' : 'Password'}
-              className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
-            />
-            {mode === 'signup' && (
+            {(mode !== 'reset' || Boolean(resetToken)) && (
+              <input
+                required
+                type="password"
+                autoComplete={mode === 'signup' || mode === 'reset' ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'signup' ? 'Secure Password' : mode === 'reset' ? 'New Password' : 'Password'}
+                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+              />
+            )}
+            {(mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (
               <input
                 required
                 type="password"
@@ -141,14 +170,18 @@ export default function Login() {
                 className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
               />
             )}
-            {error && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
+            {error && <div role="alert" className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
             <button disabled={busy} className="w-full rounded-sm bg-amber-400 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304] disabled:opacity-60">
               {busy ? 'Please wait…' : actionText}
             </button>
-          </form>
+          </form>}
 
           <div className="mt-4 text-center text-[11px] text-stone-300">
-            {mode === 'signup' ? (
+            {mode === 'reset' ? (
+              <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login')}>
+                Back to sign in
+              </button>
+            ) : mode === 'signup' ? (
               <>
                 Already have an account?{' '}
                 <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login')}>
@@ -156,16 +189,20 @@ export default function Login() {
                 </button>
               </>
             ) : (
-              <>
-                Need an account?{' '}
-                <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login?mode=signup')}>
-                  Create one
+              <div className="flex flex-col items-center gap-2">
+                <span>Need an account?{' '}
+                  <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login?mode=signup')}>
+                    Create one
+                  </button>
+                </span>
+                <button type="button" className="font-semibold text-stone-400 underline hover:text-amber-200" onClick={() => navigate('/login?mode=reset')}>
+                  Forgot password?
                 </button>
-              </>
+              </div>
             )}
           </div>
 
-          <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>
+          {mode === 'login' && <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>}
         </div>
       </div>
     </div>

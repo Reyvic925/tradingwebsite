@@ -22,6 +22,7 @@ class FakeD1 {
     this.wallet = { user_id: 'user-1', currency: 'USD', available: 80 };
     this.transactions = [];
     this.ledger = [];
+    this.notifications = [];
     this.audit = [];
     this.nextId = 1;
   }
@@ -100,7 +101,7 @@ class FakeStatement {
   }
 
   async first() {
-    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at FROM auth_sessions')) {
+    if (this.sql.startsWith('SELECT u.id, u.email, u.created_at')) {
       const session = this.db.sessions.get(this.values[0]);
       return session ? this.db.users.get(session.userId) || null : null;
     }
@@ -112,6 +113,14 @@ class FakeStatement {
       return this.db.profiles.get(this.values[0]) || null;
     }
     throw new Error(`Unhandled first SQL: ${this.sql}`);
+  }
+
+  async run() {
+    if (this.sql.startsWith('INSERT INTO notifications')) {
+      this.db.notifications.push(this.values);
+      return { success: true, meta: { changes: 1 } };
+    }
+    throw new Error(`Unhandled run SQL: ${this.sql}`);
   }
 
   async all() {

@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
 import { getD1Admin } from './admin-auth.js';
+import { sendUserEmail } from './email.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -17,29 +18,6 @@ async function readBody(request) {
     return body && typeof body === 'object' ? body : {};
   } catch {
     return null;
-  }
-}
-
-async function sendNotificationEmail(env, userId, title, body) {
-  const apiKey = String(env.RESEND_API_KEY || '').trim();
-  const from = String(env.RESEND_FROM_EMAIL || '').trim();
-  if (!apiKey || !from) {
-    console.warn('[worker/roi-withdrawal-api] email skipped: configure RESEND_API_KEY and RESEND_FROM_EMAIL on the Worker.');
-    return;
-  }
-  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
-  if (!user?.email) return;
-  try {
-    const result = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [user.email], subject: title, text: body || title }),
-    });
-    if (!result.ok) {
-      console.error('[worker/roi-withdrawal-api] Resend rejected email:', result.status, (await result.text()).slice(0, 500));
-    }
-  } catch (error) {
-    console.warn('[worker/roi-withdrawal-api] notification email skipped:', error?.message || error);
   }
 }
 
@@ -93,7 +71,10 @@ async function createWithdrawal(request, env, user) {
     ]);
     const withdrawal = results[1]?.results?.[0];
     if (!withdrawal) return json({ error: 'Insufficient available balance.' }, 400);
-    await sendNotificationEmail(env, user.id, 'Withdrawal initiated', `Withdrawal of ${amount} ${currency} initiated. Awaiting approval.`);
+    await sendUserEmail(env, user.id, {
+      subject: 'Withdrawal initiated',
+      text: `Withdrawal of ${amount} ${currency} initiated. Awaiting approval.`,
+    }, 'worker/roi-withdrawal-api');
     return json(withdrawal, 201);
   }
 
@@ -144,7 +125,10 @@ async function createWithdrawal(request, env, user) {
   ]);
   const withdrawal = results[2]?.results?.[0];
   if (!withdrawal) return json({ error: 'Insufficient locked balance.' }, 400);
-  await sendNotificationEmail(env, user.id, 'ROI withdrawal initiated', `ROI withdrawal of $${amount} initiated. Awaiting admin approval.`);
+  await sendUserEmail(env, user.id, {
+    subject: 'ROI withdrawal initiated',
+    text: `ROI withdrawal of $${amount} initiated. Awaiting admin approval.`,
+  }, 'worker/roi-withdrawal-api');
   return json(withdrawal, 201);
 }
 
@@ -256,7 +240,12 @@ async function reviewRoiWithdrawal(request, env, admin) {
   const withdrawal = results[0]?.results?.[0];
   if (!withdrawal) return json({ error: 'ROI withdrawal not found or already reviewed.' }, 409);
   if (withdrawal.user_id) {
-    await sendNotificationEmail(env, withdrawal.user_id, action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected', action === 'approve' ? 'Your ROI withdrawal was approved and credited to your available balance.' : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.');
+    await sendUserEmail(env, withdrawal.user_id, {
+      subject: action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected',
+      text: action === 'approve'
+        ? 'Your ROI withdrawal was approved and credited to your available balance.'
+        : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.',
+    }, 'worker/roi-withdrawal-api');
   }
   return json(withdrawal);
 }

@@ -2,6 +2,7 @@ export type WorkerAuthUser = {
   id: string;
   email: string;
   created_at: string;
+  email_verified_at?: string | null;
   user_metadata?: Record<string, unknown>;
 };
 

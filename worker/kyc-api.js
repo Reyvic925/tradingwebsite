@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
 import { getD1Admin } from './admin-auth.js';
+import { sendUserEmail } from './email.js';
 
 const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -22,29 +23,6 @@ async function readBody(request) {
     return body && typeof body === 'object' ? body : {};
   } catch {
     return null;
-  }
-}
-
-async function sendNotificationEmail(env, userId, title, body) {
-  const apiKey = String(env.RESEND_API_KEY || '').trim();
-  const from = String(env.RESEND_FROM_EMAIL || '').trim();
-  if (!apiKey || !from) {
-    console.warn('[worker/kyc-api] email skipped: configure RESEND_API_KEY and RESEND_FROM_EMAIL on the Worker.');
-    return;
-  }
-  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
-  if (!user?.email) return;
-  try {
-    const result = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [user.email], subject: title, text: body || title }),
-    });
-    if (!result.ok) {
-      console.error('[worker/kyc-api] Resend rejected email:', result.status, (await result.text()).slice(0, 500));
-    }
-  } catch (error) {
-    console.warn('[worker/kyc-api] notification email skipped:', error?.message || error);
   }
 }
 
@@ -258,7 +236,10 @@ async function submitKyc(request, env, user) {
     ]);
     const submission = results[0]?.results?.[0];
     if (!submission) throw new Error('KYC submission returned no row.');
-    await sendNotificationEmail(env, user.id, 'KYC application submitted', 'Your identity documents were received and are under review.');
+    await sendUserEmail(env, user.id, {
+      subject: 'KYC application submitted',
+      text: 'Your identity documents were received and are under review.',
+    }, 'worker/kyc-api');
     return json({ submission: { ...submission, personal_data: validation.personal, documents: validation.documents } }, 201);
   } catch (error) {
     if (/unique/i.test(String(error?.message || ''))) return json({ error: 'You already have a KYC application under review.' }, 409);
@@ -345,7 +326,12 @@ async function reviewKyc(request, env, admin) {
   if (!submission) return json({ error: 'KYC submission not found or already reviewed.' }, 409);
   const targetUserId = submission.user_id || (await env.DB.prepare('SELECT user_id FROM kyc_submissions WHERE id = ?').bind(id).first())?.user_id;
   if (targetUserId) {
-    await sendNotificationEmail(env, targetUserId, action === 'approve' ? 'Identity verified' : 'KYC application rejected', action === 'approve' ? 'Your identity verification is complete. Withdrawals are now enabled.' : `Your KYC application was rejected.${note ? ` Reason: ${note}` : ''} You can submit a new application.`);
+    await sendUserEmail(env, targetUserId, {
+      subject: action === 'approve' ? 'Identity verified' : 'KYC application rejected',
+      text: action === 'approve'
+        ? 'Your identity verification is complete. Withdrawals are now enabled.'
+        : `Your KYC application was rejected.${note ? ` Reason: ${note}` : ''} You can submit a new application.`,
+    }, 'worker/kyc-api');
   }
   return json({ submission: {
     ...submission,
