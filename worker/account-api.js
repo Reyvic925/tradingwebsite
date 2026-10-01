@@ -39,6 +39,14 @@ async function getWallet(db, userId) {
 
 async function ensureProfileAndWallet(db, user, body = {}, env) {
   const fullName = String(body.full_name || user.email?.split('@')[0] || 'Trader').trim() || 'Trader';
+  const submittedReferral = String(body.referred_by || '').trim().toUpperCase();
+  const referrer = submittedReferral
+    ? await db.prepare(`
+      SELECT user_id FROM profiles
+      WHERE upper(referral_code) = ? AND user_id <> ?
+      LIMIT 1
+    `).bind(submittedReferral, user.id).first()
+    : null;
   await db.prepare(`
     INSERT OR IGNORE INTO profiles
       (user_id, email, full_name, country, phone, kyc_status, avatar_url, referral_code, referred_by)
@@ -50,7 +58,7 @@ async function ensureProfileAndWallet(db, user, body = {}, env) {
     String(body.country || ''),
     String(body.phone || ''),
     referralCode(user.id),
-    body.referred_by ? String(body.referred_by) : null,
+    referrer?.user_id ? submittedReferral : null,
   ).run();
 
   await db.prepare(`

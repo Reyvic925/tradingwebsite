@@ -25,6 +25,23 @@ async function readBody(request) {
   }
 }
 
+async function sendNotificationEmail(env, userId, title, body) {
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  const from = String(env.RESEND_FROM_EMAIL || '').trim();
+  if (!apiKey || !from) return;
+  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
+  if (!user?.email) return;
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [user.email], subject: title, text: body || title }),
+    });
+  } catch (error) {
+    console.warn('[worker/kyc-api] notification email skipped:', error?.message || error);
+  }
+}
+
 function sanitizeFilename(value) {
   return String(value || 'document').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'document';
 }

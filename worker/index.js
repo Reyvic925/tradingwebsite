@@ -5,6 +5,7 @@ import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
 import { handlePrivateRequest } from './private-api.js';
 import { handlePublicRequest } from './public-api.js';
+import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 
@@ -51,6 +52,10 @@ export default {
 
     if (url.pathname === '/api/profile' || url.pathname === '/api/wallet') {
       return handleAccountRequest(request, env);
+    }
+
+    if (url.pathname === '/api/referrals') {
+      return handleReferralRequest(request, env);
     }
 
     if ([

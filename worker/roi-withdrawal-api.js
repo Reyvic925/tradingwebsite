@@ -249,9 +249,8 @@ async function reviewRoiWithdrawal(request, env, admin) {
   const results = await env.DB.batch(statements);
   const withdrawal = results[0]?.results?.[0];
   if (!withdrawal) return json({ error: 'ROI withdrawal not found or already reviewed.' }, 409);
-  const target = await env.DB.prepare('SELECT user_id FROM withdrawals WHERE id = ?').bind(id).first();
-  if (target?.user_id) {
-    await sendNotificationEmail(env, target.user_id, action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected', action === 'approve' ? 'Your ROI withdrawal was approved and credited to your available balance.' : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.');
+  if (withdrawal.user_id) {
+    await sendNotificationEmail(env, withdrawal.user_id, action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected', action === 'approve' ? 'Your ROI withdrawal was approved and credited to your available balance.' : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.');
   }
   return json(withdrawal);
 }
