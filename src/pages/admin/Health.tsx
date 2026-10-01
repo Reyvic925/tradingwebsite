@@ -3,7 +3,7 @@ import AdminShell from '../../components/AdminShell';
 export default function AdminHealth() {
   const checks = [
     { label: 'Authentication', status: 'Ready', tone: 'text-emerald-400' },
-    { label: 'Supabase profile role gate', status: 'Ready', tone: 'text-emerald-400' },
+    { label: 'D1 profile role gate', status: 'Ready', tone: 'text-emerald-400' },
     { label: 'Admin API guard', status: 'Ready', tone: 'text-emerald-400' },
     { label: 'Public wallet UX', status: 'Ready', tone: 'text-emerald-400' },
   ];
@@ -23,9 +23,9 @@ export default function AdminHealth() {
       <div className="mt-8 rounded-md border border-white/10 bg-[#0a0f17] p-5">
         <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Operational notes</div>
         <ul className="mt-4 space-y-3 text-sm text-stone-300">
-          <li>• Set a real user profile with role = admin in Supabase to grant dashboard access.</li>
+          <li>• Grant admin access through the D1 profile role and configured ADMIN_EMAILS allowlist.</li>
           <li>• Keep ADMIN_SECRET and CRON_SECRET configured for server-side automation and protected admin endpoints.</li>
-          <li>• Confirm emails before sign-in or disable Supabase email confirmation if the project is in dev mode.</li>
+          <li>• D1 password authentication creates a session immediately; configure email verification before opening public registration.</li>
         </ul>
       </div>
     </AdminShell>

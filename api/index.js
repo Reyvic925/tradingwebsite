@@ -1,19 +1,18 @@
 import { parse, pathToFileURL } from 'url';
 import path from 'path';
 
-const WORKER_PREVIEW_PATHS = new Set([
-  '/api/profile', '/api/wallet', '/api/deposits', '/api/deposits/history', '/api/admin/deposits',
-  '/api/user/crypto-addresses', '/api/kyc-upload', '/api/user/kyc', '/api/admin/kyc',
-  '/api/user/withdraw/crypto', '/api/admin/withdrawals', '/api/withdrawal-request',
-  '/api/admin/roi-approvals', '/api/transactions', '/api/investments',
-  '/api/positions', '/api/orders', '/api/notifications', '/api/watchlist',
-  '/api/landing', '/api/markets', '/api/plans', '/api/investment-tiers',
-]);
-
-async function proxyPreviewToWorker(req, res, urlPath) {
+async function proxyToWorker(req, res, urlPath) {
   const workerOrigin = String(process.env.WORKER_API_URL || '').trim().replace(/\/+$/, '');
-  if (process.env.VERCEL_ENV !== 'preview' || !workerOrigin
-    || (!WORKER_PREVIEW_PATHS.has(urlPath) && !urlPath.startsWith('/api/auth/'))) return false;
+  const isVercel = Boolean(process.env.VERCEL)
+    || ['preview', 'production'].includes(String(process.env.VERCEL_ENV || '').toLowerCase());
+  if (!isVercel || !urlPath.startsWith('/api/')) return false;
+
+  if (!workerOrigin) {
+    res.statusCode = 503;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Worker API is not configured for this Vercel deployment.' }));
+    return true;
+  }
 
   const target = new URL(req.url || urlPath, workerOrigin);
   const headers = new Headers();
@@ -31,7 +30,16 @@ async function proxyPreviewToWorker(req, res, urlPath) {
       : JSON.stringify(req.body);
   }
 
-  const upstream = await fetch(target, { method, headers, body, redirect: 'manual' });
+  let upstream;
+  try {
+    upstream = await fetch(target, { method, headers, body, redirect: 'manual' });
+  } catch (error) {
+    console.error('[api] Worker API request failed:', error);
+    res.statusCode = 502;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Worker API is unavailable.' }));
+    return true;
+  }
   res.statusCode = upstream.status;
   for (const [name, value] of upstream.headers) {
     if (!['connection', 'content-encoding', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
@@ -91,7 +99,7 @@ export default async function handler(req, res) {
   const urlPath = parse(req.url || '').pathname || '/';
   const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['api','cron','roi'] or ['ticker']
 
-  if (await proxyPreviewToWorker(req, res, urlPath)) return;
+  if (await proxyToWorker(req, res, urlPath)) return;
 
   if (parts[0] === 'api') parts.shift();
 

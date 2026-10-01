@@ -5,7 +5,7 @@ import Footer from '../components/Footer';
 const CONTENTS = [
   { path: 'src/pages/', note: 'Landing, Login, Dashboard, Trade, Markets, Wallet, Invest, Social, Referrals, History, Profile, Source' },
   { path: 'src/components/', note: 'Logo, Navbar, Footer, AppShell, Particles, LiveTicker, IndexBoard, PriceChart' },
-  { path: 'src/lib/', note: 'Supabase client, API helpers, brand, formatters, Google auth' },
+  { path: 'src/lib/', note: 'D1 Worker auth, API helpers, brand, formatters' },
   { path: 'api/', note: 'Serverless routes + US/global universe seed data' },
   { path: 'public/videos/', note: 'Hero trading-floor film + 8 testimonials' },
   { path: 'public/logos/', note: 'JPMorgan, Bloomberg, Nasdaq, LSE, Mastercard, AWS, Cloudflare, TradingView, Deutsche Bank, BlackRock' },

@@ -3,6 +3,7 @@ import handler from '../../api/index.js';
 
 const originalFetch = globalThis.fetch;
 const originalVercelEnv = process.env.VERCEL_ENV;
+const originalVercel = process.env.VERCEL;
 const originalWorkerApiUrl = process.env.WORKER_API_URL;
 let capturedRequest;
 
@@ -62,9 +63,45 @@ assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarke
 assert.equal(capturedRequest.init.method, 'GET');
 assert.equal(roiResponse.statusCode, 200);
 
+process.env.VERCEL_ENV = 'production';
+const productionResponse = {
+  statusCode: 200,
+  setHeader(name, value) { responseHeaders.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; },
+};
+await handler({ url: '/api/copy-trades', method: 'GET', headers: {} }, productionResponse);
+assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/copy-trades');
+assert.equal(productionResponse.statusCode, 200);
+
+process.env.VERCEL = '1';
+process.env.VERCEL_ENV = 'development';
+process.env.WORKER_API_URL = 'https://apex-prime-dev-worker.example.workers.dev';
+const vercelDevResponse = {
+  statusCode: 200,
+  setHeader(name, value) { responseHeaders.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; },
+};
+await handler({ url: '/api/health', method: 'GET', headers: {} }, vercelDevResponse);
+assert.equal(capturedRequest.url, 'https://apex-prime-dev-worker.example.workers.dev/api/health');
+assert.equal(vercelDevResponse.statusCode, 200);
+
+delete process.env.WORKER_API_URL;
+const unconfiguredResponse = {
+  statusCode: 200,
+  headers: new Map(),
+  setHeader(name, value) { this.headers.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; },
+};
+await handler({ url: '/api/unknown-route', method: 'GET', headers: {} }, unconfiguredResponse);
+assert.equal(unconfiguredResponse.statusCode, 503);
+assert.equal(unconfiguredResponse.headers.get('content-type'), 'application/json; charset=utf-8');
+assert.match(unconfiguredResponse.body, /Worker API is not configured/);
+
 globalThis.fetch = originalFetch;
 if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
 else process.env.VERCEL_ENV = originalVercelEnv;
+if (originalVercel === undefined) delete process.env.VERCEL;
+else process.env.VERCEL = originalVercel;
 if (originalWorkerApiUrl === undefined) delete process.env.WORKER_API_URL;
 else process.env.WORKER_API_URL = originalWorkerApiUrl;
 

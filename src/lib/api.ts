@@ -1,6 +1,3 @@
-import supabase from './supabase';
-import { isWorkerAuthEnabled } from './auth';
-
 const REF_KEY = 'apex_ref';
 
 export function persistReferral(code?: string | null) {
@@ -17,11 +14,7 @@ export function clearReferral() {
 }
 
 export async function authHeaders(): Promise<Record<string, string>> {
-  if (isWorkerAuthEnabled()) return { 'Content-Type': 'application/json' };
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-  return headers;
+  return { 'Content-Type': 'application/json' };
 }
 
 async function readBody(res: Response): Promise<unknown> {
@@ -37,7 +30,7 @@ async function readBody(res: Response): Promise<unknown> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(path, { headers: await authHeaders(), credentials: isWorkerAuthEnabled() ? 'include' : 'same-origin' });
+  const res = await fetch(path, { headers: await authHeaders(), credentials: 'include' });
   const data = (await readBody(res)) as { error?: string };
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data as T;
@@ -86,7 +79,7 @@ export async function apiSend<T>(path: string, method: string, body?: unknown): 
   const res = await fetch(path, {
     method,
     headers: await authHeaders(),
-    credentials: isWorkerAuthEnabled() ? 'include' : 'same-origin',
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = (await readBody(res)) as { error?: string };
