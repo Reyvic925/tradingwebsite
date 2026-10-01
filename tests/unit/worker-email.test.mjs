@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { notifyUser } from '../../worker/notifications.js';
 import { sendEmail, sendUserEmail } from '../../worker/email.js';
+import { renderPrimeMarketsEmail } from '../../shared/email-template.js';
 
 const originalFetch = globalThis.fetch;
 const calls = [];
@@ -32,6 +33,17 @@ assert.match(workerEmail.html, /max-width:580px/);
 assert.match(workerEmail.html, /background-color:#f2efe9/);
 assert.match(workerEmail.html, /Review complete\./);
 assert.match(workerEmail.html, /The Prime Markets/);
+
+const escapedEmail = renderPrimeMarketsEmail({
+  title: '<img src=x>',
+  body: '<script>alert(1)</script>',
+  actionUrl: 'https://example.com/?value=<script>',
+  actionLabel: 'Open <account>',
+});
+assert.match(escapedEmail, /&lt;img src=x&gt;/);
+assert.match(escapedEmail, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+assert.match(escapedEmail, /value=&lt;script&gt;/);
+assert.doesNotMatch(escapedEmail, /<script>|<img src=x>/);
 
 const savedNotifications = [];
 const notificationEnv = {

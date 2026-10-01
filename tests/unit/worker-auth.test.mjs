@@ -251,6 +251,8 @@ const resetRequested = await handleAuthRequest(request('/api/auth/password-reset
 assert.equal(resetRequested.status, 200);
 assert.deepEqual(await resetRequested.json(), { ok: true });
 assert.equal(sentEmails.at(-1).payload.subject, 'Reset your Prime Markets password');
+assert.match(sentEmails.at(-1).payload.html, /Reset Password/);
+assert.match(sentEmails.at(-1).payload.html, /expires in 60 minutes/);
 const emailCountAfterResetRequest = sentEmails.length;
 const repeatedResetRequest = await handleAuthRequest(request('/api/auth/password-reset/request', {
   method: 'POST',
