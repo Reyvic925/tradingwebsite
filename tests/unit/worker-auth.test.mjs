@@ -61,13 +61,22 @@ class FakeStatement {
   }
 }
 
-const env = { DB: new FakeD1() };
+const env = { DB: new FakeD1(), REGISTRATION_ENABLED: 'true' };
 const request = (path, options = {}) => new Request(`http://localhost${path}`, options);
 const cookieFrom = (response) => response.headers.get('set-cookie').split(';')[0];
 
 const hash = await hashPassword('correct horse battery staple');
 assert.equal(await verifyPassword('correct horse battery staple', hash), true);
 assert.equal(await verifyPassword('wrong password', hash), false);
+
+const closedRegistrationEnv = { DB: new FakeD1() };
+const closedSignup = await handleAuthRequest(request('/api/auth/signup', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'closed@example.com', password: 'correct horse battery staple' }),
+}), closedRegistrationEnv);
+assert.equal(closedSignup.status, 503);
+assert.equal(closedRegistrationEnv.DB.users.size, 0);
 
 const signup = await handleAuthRequest(request('/api/auth/signup', {
   method: 'POST',

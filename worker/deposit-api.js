@@ -136,6 +136,11 @@ async function listAdminDeposits(request, env, admin) {
 export async function handleDepositRequest(request, env) {
   try {
     const pathname = new URL(request.url).pathname;
+    if (pathname === '/api/deposits' && request.method === 'POST'
+      && String(env.DEPOSITS_ENABLED || '').trim().toLowerCase() !== 'true') {
+      return json({ error: 'New deposit requests are temporarily paused.' }, 503);
+    }
+
     if (pathname === '/api/user/crypto-addresses') {
       const user = await getAuthenticatedUser(request, env);
       return await listAddresses(request, env, user);

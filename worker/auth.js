@@ -143,6 +143,10 @@ async function createSession(request, env, userId) {
 }
 
 async function signup(request, env) {
+  if (String(env.REGISTRATION_ENABLED || '').trim().toLowerCase() !== 'true') {
+    return response({ error: 'New account registration is temporarily paused.' }, 503);
+  }
+
   const body = await readJson(request);
   const email = normalizeEmail(body?.email);
   const password = body?.password;

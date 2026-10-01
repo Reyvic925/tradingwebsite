@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { signIn, signUp } from '../lib/auth';
-import { apiGet, bootstrapProfile, persistReferral } from '../lib/api';
+import { signIn } from '../lib/auth';
+import { apiGet } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
@@ -10,23 +10,14 @@ export default function Login() {
   const { user, loading } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [isSignUp, setIsSignUp] = useState(params.get('mode') === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [referral, setReferral] = useState(params.get('ref') || '');
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    const ref = params.get('ref');
-    if (ref) persistReferral(ref);
-  }, [params]);
-
   if (!loading && user) return <Navigate to="/app" replace />;
 
-  const finishAuthentication = async (isNewAccount = false) => {
-    await bootstrapProfile(isNewAccount ? { full_name: fullName, referred_by: referral || null } : undefined);
+  const finishAuthentication = async () => {
     const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
     const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
     const role = String(profile?.role || '').toLowerCase();
@@ -40,14 +31,8 @@ export default function Login() {
     if (password.length < 8) return setError('Password must be at least 8 characters.');
     setBusy(true);
     try {
-      if (isSignUp) {
-        await signUp(email, password);
-        await finishAuthentication(true);
-        return;
-      } else {
-        await signIn(email, password);
-        await finishAuthentication();
-      }
+      await signIn(email, password);
+      await finishAuthentication();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       setError(/failed to fetch|network|timed out|timeout/i.test(message)
@@ -66,18 +51,11 @@ export default function Login() {
         <div className="mb-8 flex justify-center"><Logo /></div>
         <div className="glass rounded-md p-7">
           <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Private access</div>
-          <h1 className="mt-2 font-display text-4xl">{isSignUp ? 'Open an account' : 'Welcome back'}</h1>
+          <h1 className="mt-2 font-display text-4xl">Welcome back</h1>
           <p className="mt-2 text-sm text-stone-400">Institutional rails. Retail-ready onboarding in under a minute.</p>
+          <p className="mt-3 text-sm text-amber-200/80">New account registration is temporarily paused.</p>
 
           <form onSubmit={submit} className="mt-6 space-y-3">
-            {isSignUp && (
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Full name"
-                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
-              />
-            )}
             <input
               type="email"
               value={email}
@@ -92,23 +70,12 @@ export default function Login() {
               placeholder="Password"
               className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
             />
-            {isSignUp && (
-              <input
-                value={referral}
-                onChange={(e) => setReferral(e.target.value.toUpperCase())}
-                placeholder="Referral code (optional)"
-                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
-              />
-            )}
             {error && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
             <button disabled={busy} className="w-full rounded-sm bg-amber-400 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304] disabled:opacity-60">
-              {busy ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+              {busy ? 'Please wait…' : 'Sign in'}
             </button>
           </form>
 
-          <button onClick={() => setIsSignUp((v) => !v)} className="mt-5 w-full text-center text-sm text-stone-400">
-            {isSignUp ? 'Already have an account? Sign in' : `New to ${BRAND.name}? Create an account`}
-          </button>
           <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>
         </div>
       </div>

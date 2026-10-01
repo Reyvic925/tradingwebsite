@@ -5,6 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 PUBLIC_API_DATABASE = "production"
+ADMIN_EMAILS = "admin@theprimemarkets.com"
+REGISTRATION_ENABLED = "true"
+DEPOSITS_ENABLED = "true"
 
 [assets]
 directory = "./dist"
