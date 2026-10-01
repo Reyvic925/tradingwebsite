@@ -25,6 +25,9 @@ class FakeStatement {
   }
 
   async first() {
+    if (this.sql.startsWith('SELECT password_hash FROM auth_users WHERE id =')) {
+      return this.db.users.get(this.values[0]) || null;
+    }
     if (this.sql.startsWith('SELECT id FROM auth_users WHERE email =')) {
       const user = [...this.db.users.values()].find((candidate) => candidate.email === this.values[0]);
       return user ? { id: user.id } : null;
@@ -42,6 +45,13 @@ class FakeStatement {
   }
 
   async run() {
+    if (this.sql.startsWith('UPDATE auth_users SET password_hash =')) {
+      const [passwordHash, id] = this.values;
+      const user = this.db.users.get(id);
+      if (!user) return { success: true, meta: { changes: 0 } };
+      user.password_hash = passwordHash;
+      return { success: true, meta: { changes: 1 } };
+    }
     if (this.sql.startsWith('INSERT INTO auth_users')) {
       const [id, email, passwordHash] = this.values;
       if ([...this.db.users.values()].some((user) => user.email === email)) throw new Error('UNIQUE constraint failed');
@@ -54,7 +64,14 @@ class FakeStatement {
       return { success: true };
     }
     if (this.sql.startsWith('DELETE FROM auth_sessions')) {
-      this.db.sessions.delete(this.values[0]);
+      if (this.sql.includes('AND id !=')) {
+        const [userId, keepId] = this.values;
+        for (const [id, session] of this.db.sessions) {
+          if (session.userId === userId && id !== keepId) this.db.sessions.delete(id);
+        }
+      } else {
+        this.db.sessions.delete(this.values[0]);
+      }
       return { success: true };
     }
     throw new Error(`Unhandled SQL: ${this.sql}`);
@@ -119,6 +136,27 @@ const authenticated = await getAuthenticatedUser(request('/api/protected', { hea
 assert.equal(authenticated.email, 'trader@example.com');
 const unauthenticated = await getAuthenticatedUser(request('/api/protected'), env);
 assert.equal(unauthenticated, null);
+
+const passwordChanged = await handleAuthRequest(request('/api/auth/password', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', cookie: loginCookie },
+  body: JSON.stringify({ current_password: 'correct horse battery staple', new_password: 'another secure password' }),
+}), env);
+assert.equal(passwordChanged.status, 200);
+assert.deepEqual(await passwordChanged.json(), { ok: true });
+const changedPasswordLogin = await handleAuthRequest(request('/api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'trader@example.com', password: 'another secure password' }),
+}), env);
+assert.equal(changedPasswordLogin.status, 200);
+
+const wrongCurrentPassword = await handleAuthRequest(request('/api/auth/password', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', cookie: loginCookie },
+  body: JSON.stringify({ current_password: 'incorrect password', new_password: 'third secure password' }),
+}), env);
+assert.equal(wrongCurrentPassword.status, 403);
 
 const logout = await handleAuthRequest(request('/api/auth/logout', { method: 'POST', headers: { cookie: loginCookie } }), env);
 assert.equal(logout.status, 200);

@@ -33,7 +33,7 @@ const nav = [
   { to: '/app/referrals', label: 'Referrals', icon: Share2 },
   { to: '/app/history', label: 'History', icon: History },
   { to: '/app/kyc', label: 'KYC', icon: ShieldCheck },
-  { to: '/app/profile', label: 'Profile', icon: UserRound },
+  { to: '/app/profile', label: 'Settings', icon: UserRound },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

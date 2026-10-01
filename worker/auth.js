@@ -187,6 +187,36 @@ async function login(request, env) {
   return response({ user: publicUser(user) }, 200, sessionCookie(request, token));
 }
 
+async function changePassword(request, env) {
+  const user = await findUserBySession(request, env);
+  if (!user) return response({ error: 'Unauthorized' }, 401);
+
+  const body = await readJson(request);
+  const currentPassword = body?.current_password;
+  const newPassword = body?.new_password;
+  if (!validPassword(currentPassword) || !validPassword(newPassword)) {
+    return response({ error: `Current and new passwords must be ${PASSWORD_MIN_LENGTH}-128 characters.` }, 400);
+  }
+
+  const account = await env.DB.prepare('SELECT password_hash FROM auth_users WHERE id = ?')
+    .bind(user.id).first();
+  if (!account || !(await verifyPassword(currentPassword, account.password_hash))) {
+    return response({ error: 'Current password is incorrect.' }, 403);
+  }
+  if (await verifyPassword(newPassword, account.password_hash)) {
+    return response({ error: 'Choose a new password different from your current password.' }, 400);
+  }
+
+  const token = sessionToken(request);
+  if (!token) return response({ error: 'Unauthorized' }, 401);
+  const currentSessionId = await hashSessionToken(token);
+  await env.DB.prepare('UPDATE auth_users SET password_hash = ? WHERE id = ?')
+    .bind(await hashPassword(newPassword), user.id).run();
+  await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ? AND id != ?')
+    .bind(user.id, currentSessionId).run();
+  return response({ ok: true });
+}
+
 async function logout(request, env) {
   const token = sessionToken(request);
   if (token) await env.DB.prepare('DELETE FROM auth_sessions WHERE id = ?').bind(await hashSessionToken(token)).run();
@@ -203,6 +233,7 @@ export async function handleAuthRequest(request, env) {
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/api/auth/signup') return await signup(request, env);
     if (request.method === 'POST' && url.pathname === '/api/auth/login') return await login(request, env);
+    if (request.method === 'POST' && url.pathname === '/api/auth/password') return await changePassword(request, env);
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') return await logout(request, env);
     if (request.method === 'GET' && url.pathname === '/api/auth/session') return await session(request, env);
     return response({ error: 'Method not allowed' }, 405);
