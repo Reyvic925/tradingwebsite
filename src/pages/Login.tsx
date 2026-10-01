@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { signIn, signUp } from '../lib/auth';
-import { apiGet } from '../lib/api';
+import { apiGet, bootstrapProfile } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
@@ -11,7 +11,11 @@ export default function Login() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
   const mode = params.get('mode') === 'signup' ? 'signup' : 'login';
@@ -30,10 +34,21 @@ export default function Login() {
     setError('');
     if (!email.includes('@')) return setError('Enter a valid email address.');
     if (password.length < 8) return setError('Password must be at least 8 characters.');
+    if (mode === 'signup') {
+      if (!fullName.trim()) return setError('Enter your full name.');
+      if (!phone.trim()) return setError('Enter your phone number.');
+      if (!location.trim()) return setError('Enter your location.');
+      if (password !== confirmPassword) return setError('Passwords do not match.');
+    }
     setBusy(true);
     try {
       if (mode === 'signup') {
         await signUp(email, password);
+        await bootstrapProfile({
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          country: location.trim(),
+        });
       } else {
         await signIn(email, password);
       }
@@ -68,19 +83,64 @@ export default function Login() {
 
           <form onSubmit={submit} className="mt-6 space-y-3">
             <input
+              required
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
+              placeholder="Email Address"
               className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
             />
+            {mode === 'signup' && (
+              <>
+                <input
+                  required
+                  type="text"
+                  autoComplete="name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Full Name"
+                  className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+                />
+                <input
+                  required
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Comms (Phone)"
+                  className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+                />
+                <input
+                  required
+                  type="text"
+                  autoComplete="country-name"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Location"
+                  className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+                />
+              </>
+            )}
             <input
+              required
               type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              placeholder={mode === 'signup' ? 'Secure Password' : 'Password'}
               className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
             />
+            {mode === 'signup' && (
+              <input
+                required
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm Password"
+                className="w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-amber-400/50"
+              />
+            )}
             {error && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
             <button disabled={busy} className="w-full rounded-sm bg-amber-400 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304] disabled:opacity-60">
               {busy ? 'Please wait…' : actionText}
