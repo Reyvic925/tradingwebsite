@@ -1,57 +1,9 @@
-# The Prime Markets email templates
+# The Prime Markets Email Design
 
-Configure these in Supabase Dashboard: **Authentication → Email Templates**. Keep the Resend SMTP sender set to `The Prime Markets <no-reply@yourdomain.com>`.
+The active website auth provider is the Cloudflare Worker, which sends signup verification, password reset, and account-security emails through Resend. Transactional and deposit-notification emails use the same HTML renderer in `shared/email-template.js`; update that renderer to change the branded layout across these senders.
 
-## Confirm signup — token and confirmation link
+The renderer follows the supplied confirmation-email design: warm neutral canvas, navy brand header, gold action button, centered 580px table layout, security callout, and a restrained footer. Dynamic text and links are HTML-escaped. Worker signup currently sends a secure link rather than an OTP code, and the link expires in 24 hours; password-reset links expire in 60 minutes.
 
-Use this template for the website's signup flow. It provides the six-digit token for in-app verification and a secure confirmation-link fallback.
+Signup links open `/auth/confirm`, a non-consuming page. Verification only occurs after the user clicks **Confirm Email**, which then visits `/api/auth/verify-email`. Keep this two-step behavior so email security scanners cannot consume a token by prefetching the link.
 
-```html
-<!doctype html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Confirm your email</title></head>
-<body style="margin:0;padding:0;background:#f2efe9;font-family:Arial,Helvetica,sans-serif;color:#1a1612">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f2efe9;padding:40px 16px"><tr><td align="center">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background:#ffffff;border:1px solid #e8e0d6;border-radius:12px">
-      <tr><td style="background:#0b0f1a;padding:28px 36px;border-radius:12px 12px 0 0">
-        <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-          <td><img src="https://YOUR-DOMAIN.com/favicon.svg" width="38" height="38" alt="The Prime Markets" style="display:block;border:0;border-radius:6px" /></td>
-          <td style="padding-left:12px;color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-0.3px">The Prime Markets</td>
-        </tr></table>
-      </td></tr>
-      <tr><td style="padding:40px 36px 32px">
-        <h1 style="margin:0 0 8px;color:#1a1612;font-size:26px;font-weight:700;letter-spacing:-0.4px">Confirm your email</h1>
-        <p style="margin:0 0 24px;color:#6b6358;font-size:15px;line-height:1.6">You’re almost there. Use the secure code below to verify your account.</p>
-        <hr style="border:0;border-top:1px solid #f0ebe4;margin:0 0 24px" />
-        <div style="background:#f8f5f0;border:1px solid #e8dfd4;border-radius:8px;padding:20px 24px;text-align:center;margin:0 0 24px"><span style="font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:10px;color:#1a1612">{{ .Token }}</span></div>
-        <p style="margin:0 0 18px;color:#6b6358;font-size:14px;line-height:1.6;text-align:center">Or confirm instantly using the secure link below.</p>
-        <p style="margin:0 0 24px;text-align:center"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#d4af37;border-radius:6px;color:#0b0f1a;font-size:15px;font-weight:700;padding:14px 36px;text-decoration:none">Confirm email address</a></p>
-        <div style="background:#faf8f5;border-left:3px solid #d4af37;border-radius:6px;padding:16px 20px"><p style="margin:0;color:#6b6358;font-size:13px;line-height:1.6"><strong style="color:#1a1612">Security tip:</strong> Never share this code with anyone. The Prime Markets team will never ask for it.</p></div>
-      </td></tr>
-      <tr><td style="background:#faf8f5;border-top:1px solid #eee8df;border-radius:0 0 12px 12px;color:#8a8175;font-size:12px;line-height:1.6;padding:18px 36px;text-align:center">Automated security email from The Prime Markets. Please do not reply.<br />This link expires in 24 hours.</td></tr>
-    </table>
-  </td></tr></table>
-</body></html>
-```
-
-Replace `YOUR-DOMAIN.com` with the deployed website domain. The original logo is a native SVG and is used by the website and every email layout.
-
-## Required redirect configuration
-
-In **Supabase Dashboard → Authentication → URL Configuration**, add the exact callback URLs used by the app to **Redirect URLs**:
-
-- `https://YOUR-DOMAIN.com/login`
-- `http://localhost:3000/login` (local development)
-
-Set **Site URL** to the deployed site origin, for example `https://YOUR-DOMAIN.com`. If the `/login` URL is missing from the allow-list, Supabase ignores `emailRedirectTo` and sends the confirmation to the Site URL instead. The application also accepts that root-URL fallback and forwards a verified session into the app.
-
-## Other Supabase Auth templates
-
-Use the same wrapper above for **Invite user**, **Magic link**, **Change email address**, and **Reset password**. Their call-to-action button should use `{{ .ConfirmationURL }}` rather than `{{ .Token }}`. For **Reauthentication**, use the OTP card with `{{ .Token }}`.
-
-For all other link-based templates, use this button inside the content area:
-
-```html
-<p><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#d4af37;border-radius:4px;color:#1a1304;font-weight:700;padding:13px 20px;text-decoration:none">Continue securely</a></p>
-```
-
-Do not enable click tracking for Supabase authentication emails: it can rewrite confirmation links and prevent them from working.
+The app does not currently use Supabase-managed auth email templates for signup. If enabling those flows later, configure each template in **Supabase Dashboard → Authentication → Email Templates** and align its token/link variables with the app's confirmation route before switching providers. Avoid using a direct token-consuming verification URL in email links.

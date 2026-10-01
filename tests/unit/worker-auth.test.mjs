@@ -172,11 +172,18 @@ assert.match(signup.headers.get('set-cookie'), /HttpOnly/);
 assert.doesNotMatch(signup.headers.get('set-cookie'), /password|battery|staple/i);
 assert.equal(sentEmails.at(-1).payload.subject, 'Verify your Prime Markets email');
 const verificationLink = new URL(sentEmails.at(-1).payload.text.match(/https:\/\/\S+/)[0]);
-const verified = await handleAuthRequest(request(`${verificationLink.pathname}${verificationLink.search}`), env);
+assert.equal(verificationLink.pathname, '/auth/confirm');
+assert.match(sentEmails.at(-1).payload.html, /Confirm Email Address/);
+assert.match(sentEmails.at(-1).payload.html, /expires in 24 hours/);
+assert.match(sentEmails.at(-1).payload.html, /background-color:#f2efe9/);
+assert.equal([...env.DB.users.values()][0].email_verified_at, null);
+const verifyUrl = new URL('/api/auth/verify-email', 'http://localhost');
+verifyUrl.searchParams.set('token', verificationLink.searchParams.get('token'));
+const verified = await handleAuthRequest(request(`${verifyUrl.pathname}${verifyUrl.search}`), env);
 assert.equal(verified.status, 302);
 assert.equal(new URL(verified.headers.get('location')).searchParams.get('email_verified'), '1');
 assert.ok([...env.DB.users.values()][0].email_verified_at);
-const reusedVerification = await handleAuthRequest(request(`${verificationLink.pathname}${verificationLink.search}`), env);
+const reusedVerification = await handleAuthRequest(request(`${verifyUrl.pathname}${verifyUrl.search}`), env);
 assert.equal(new URL(reusedVerification.headers.get('location')).searchParams.get('email_verified'), '0');
 
 const duplicate = await handleAuthRequest(request('/api/auth/signup', {

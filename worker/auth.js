@@ -1,4 +1,5 @@
 import { sendEmail, sendUserEmail } from './email.js';
+import { renderPrimeMarketsEmail } from '../shared/email-template.js';
 
 const SESSION_COOKIE = 'apex_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
@@ -176,11 +177,21 @@ function emailLink(env, path, token) {
 async function sendVerificationEmail(env, userId, email) {
   const token = await issueEmailToken(env, userId, 'verify_email', 24 * 60);
   if (!token) return { sent: false, throttled: true };
-  const link = emailLink(env, '/api/auth/verify-email', token);
+  const link = emailLink(env, '/auth/confirm', token);
   const sent = await sendEmail(env, {
     to: email,
     subject: 'Verify your Prime Markets email',
     text: `Verify your email address to keep your account contact details current:\n\n${link}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this message.`,
+    html: renderPrimeMarketsEmail({
+      title: 'Confirm your email',
+      preheader: 'Confirm your email address to complete your account setup.',
+      body: "You're almost there. Confirm your email address to complete your account setup.",
+      actionUrl: link,
+      actionLabel: 'Confirm Email Address',
+      actionNote: 'The link opens a confirmation page before your email is verified.',
+      securityTip: 'Never share your verification link with anyone. The Prime Markets team will never ask you to provide it.',
+      expiryNote: 'This confirmation link expires in 24 hours.',
+    }),
   }, 'worker/auth');
   return { sent, throttled: false };
 }
@@ -193,6 +204,14 @@ async function sendPasswordResetEmail(env, userId, email) {
     to: email,
     subject: 'Reset your Prime Markets password',
     text: `Use this link to choose a new password:\n\n${link}\n\nThis link expires in 60 minutes. If you did not request a reset, you can ignore this message.`,
+    html: renderPrimeMarketsEmail({
+      title: 'Reset your password',
+      body: 'Use the secure link below to choose a new password for your account.',
+      actionUrl: link,
+      actionLabel: 'Reset Password',
+      securityTip: 'If you did not request a password reset, do not use this link and ignore this email.',
+      expiryNote: 'This password reset link expires in 60 minutes.',
+    }),
   }, 'worker/auth');
 }
 

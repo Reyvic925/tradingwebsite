@@ -20,12 +20,18 @@ const env = {
 assert.equal(await sendUserEmail(env, 'user-1', { subject: 'KYC update', text: 'Review complete.' }, 'test'), true);
 assert.equal(calls.length, 1);
 assert.equal(calls[0].url, 'https://api.resend.com/emails');
-assert.deepEqual(JSON.parse(calls[0].options.body), {
+const workerEmail = JSON.parse(calls[0].options.body);
+assert.deepEqual({ ...workerEmail, html: undefined }, {
   from: 'The Prime Markets <alerts@example.com>',
   to: ['client@example.com'],
   subject: 'KYC update',
   text: 'Review complete.',
+  html: undefined,
 });
+assert.match(workerEmail.html, /max-width:580px/);
+assert.match(workerEmail.html, /background-color:#f2efe9/);
+assert.match(workerEmail.html, /Review complete\./);
+assert.match(workerEmail.html, /The Prime Markets/);
 
 const savedNotifications = [];
 const notificationEnv = {

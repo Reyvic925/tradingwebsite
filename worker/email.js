@@ -1,3 +1,5 @@
+import { renderPrimeMarketsEmail } from '../shared/email-template.js';
+
 export async function sendEmail(env, { to, subject, text, html = null }, source = 'worker') {
   const apiKey = String(env.RESEND_API_KEY || '').trim();
   const from = String(env.RESEND_FROM_EMAIL || '').trim();
@@ -13,7 +15,13 @@ export async function sendEmail(env, { to, subject, text, html = null }, source 
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, text, ...(html ? { html } : {}) }),
+      body: JSON.stringify({
+        from,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        text,
+        html: html || renderPrimeMarketsEmail({ title: subject, body: text }),
+      }),
     });
     if (!response.ok) {
       console.error(`[${source}] Resend rejected email:`, response.status, (await response.text()).slice(0, 500));
