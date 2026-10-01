@@ -37,6 +37,7 @@
     "migrate:public:export": "node scripts/migrate-public-read-data.mjs --export tmp/apex-prime-public-data.json",
     "backfill:wallets": "node scripts/backfill-wallets.js",
     "seed:kyc": "node scripts/seed-kyc-table.js",
+    "seed:public:data": "node scripts/seed-public-data.mjs",
     "audit:traders": "node scripts/audit-traders-reconcile.mjs",
     "traders:migrate": "node scripts/migrate-traders-to-simulation.mjs",
     "traders:rebuild-metrics": "node scripts/rebuild-trader-metrics.mjs",

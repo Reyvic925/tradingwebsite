@@ -19,6 +19,31 @@ async function readBody(request) {
   }
 }
 
+async function sendNotificationEmail(env, userId, title, body) {
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  const from = String(env.RESEND_FROM_EMAIL || '').trim();
+  if (!apiKey || !from) return;
+  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
+  if (!user?.email) return;
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [user.email],
+        subject: title,
+        text: body || title,
+      }),
+    });
+  } catch (error) {
+    console.warn('[worker/private-api] notification email skipped:', error?.message || error);
+  }
+}
+
 async function listTransactions(db, userId) {
   const result = await db.prepare(`
     SELECT * FROM transactions
@@ -80,7 +105,8 @@ async function getInvestmentDetail(db, userId, investmentId) {
   });
 }
 
-async function createInvestment(request, db, userId) {
+async function createInvestment(request, env, userId) {
+  const db = env.DB;
   const body = await readBody(request);
   const planId = body.plan_id == null || body.plan_id === '' ? null : Number(body.plan_id);
   const tierId = body.tier_id == null || body.tier_id === '' ? null : Number(body.tier_id);
@@ -164,10 +190,12 @@ async function createInvestment(request, db, userId) {
   }
   const investment = results[1]?.results?.[0];
   if (!investment) throw new Error('Investment debit succeeded but no investment row was created.');
+  await sendNotificationEmail(env, userId, `Investment created in ${name}`, `Invested $${amount} for ${durationDays} days.`);
   return json({ ...investment, plan: isTier ? null : product, tier_details: isTier ? product : null }, 201);
 }
 
-async function handleInvestments(request, db, userId) {
+async function handleInvestments(request, env, userId) {
+  const db = env.DB;
   if (request.method === 'GET') {
     const idValue = new URL(request.url).searchParams.get('id');
     if (idValue) {
@@ -177,7 +205,7 @@ async function handleInvestments(request, db, userId) {
     }
     return await listInvestments(db, userId);
   }
-  if (request.method === 'POST') return await createInvestment(request, db, userId);
+  if (request.method === 'POST') return await createInvestment(request, env, userId);
   return json({ error: 'Method not allowed' }, 405);
 }
 
@@ -528,7 +556,7 @@ export async function handlePrivateRequest(request, env) {
     const pathname = new URL(request.url).pathname;
 
     if (pathname === '/api/transactions' && request.method === 'GET') return await listTransactions(env.DB, user.id);
-    if (pathname === '/api/investments') return await handleInvestments(request, env.DB, user.id);
+    if (pathname === '/api/investments') return await handleInvestments(request, env, user.id);
     if (pathname === '/api/positions' && request.method === 'GET') return await listPositions(request, env.DB, user.id);
     if (pathname === '/api/positions' && request.method === 'PUT') return await updatePosition(request, env.DB, user.id);
     if (pathname === '/api/positions' && request.method === 'DELETE') return await closePosition(request, env.DB, user.id);

@@ -235,6 +235,7 @@ async function submitKyc(request, env, user) {
     ]);
     const submission = results[0]?.results?.[0];
     if (!submission) throw new Error('KYC submission returned no row.');
+    await sendNotificationEmail(env, user.id, 'KYC application submitted', 'Your identity documents were received and are under review.');
     return json({ submission: { ...submission, personal_data: validation.personal, documents: validation.documents } }, 201);
   } catch (error) {
     if (/unique/i.test(String(error?.message || ''))) return json({ error: 'You already have a KYC application under review.' }, 409);
@@ -319,6 +320,10 @@ async function reviewKyc(request, env, admin) {
   ]);
   const submission = results[0]?.results?.[0];
   if (!submission) return json({ error: 'KYC submission not found or already reviewed.' }, 409);
+  const targetUserId = submission.user_id || (await env.DB.prepare('SELECT user_id FROM kyc_submissions WHERE id = ?').bind(id).first())?.user_id;
+  if (targetUserId) {
+    await sendNotificationEmail(env, targetUserId, action === 'approve' ? 'Identity verified' : 'KYC application rejected', action === 'approve' ? 'Your identity verification is complete. Withdrawals are now enabled.' : `Your KYC application was rejected.${note ? ` Reason: ${note}` : ''} You can submit a new application.`);
+  }
   return json({ submission: {
     ...submission,
     personal_data: parseJson(submission.personal_data, {}),

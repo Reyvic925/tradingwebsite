@@ -20,6 +20,23 @@ async function readBody(request) {
   }
 }
 
+async function sendNotificationEmail(env, userId, title, body) {
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  const from = String(env.RESEND_FROM_EMAIL || '').trim();
+  if (!apiKey || !from) return;
+  const user = await env.DB.prepare('SELECT email FROM auth_users WHERE id = ?').bind(userId).first();
+  if (!user?.email) return;
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [user.email], subject: title, text: body || title }),
+    });
+  } catch (error) {
+    console.warn('[worker/roi-withdrawal-api] notification email skipped:', error?.message || error);
+  }
+}
+
 async function listUserWithdrawals(env, user) {
   const result = await env.DB.prepare(`
     SELECT * FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT 100
@@ -70,6 +87,7 @@ async function createWithdrawal(request, env, user) {
     ]);
     const withdrawal = results[1]?.results?.[0];
     if (!withdrawal) return json({ error: 'Insufficient available balance.' }, 400);
+    await sendNotificationEmail(env, user.id, 'Withdrawal initiated', `Withdrawal of ${amount} ${currency} initiated. Awaiting approval.`);
     return json(withdrawal, 201);
   }
 
@@ -120,6 +138,7 @@ async function createWithdrawal(request, env, user) {
   ]);
   const withdrawal = results[2]?.results?.[0];
   if (!withdrawal) return json({ error: 'Insufficient locked balance.' }, 400);
+  await sendNotificationEmail(env, user.id, 'ROI withdrawal initiated', `ROI withdrawal of $${amount} initiated. Awaiting admin approval.`);
   return json(withdrawal, 201);
 }
 
@@ -230,6 +249,10 @@ async function reviewRoiWithdrawal(request, env, admin) {
   const results = await env.DB.batch(statements);
   const withdrawal = results[0]?.results?.[0];
   if (!withdrawal) return json({ error: 'ROI withdrawal not found or already reviewed.' }, 409);
+  const target = await env.DB.prepare('SELECT user_id FROM withdrawals WHERE id = ?').bind(id).first();
+  if (target?.user_id) {
+    await sendNotificationEmail(env, target.user_id, action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected', action === 'approve' ? 'Your ROI withdrawal was approved and credited to your available balance.' : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.');
+  }
   return json(withdrawal);
 }
 
