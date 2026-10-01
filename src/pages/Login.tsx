@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { signIn } from '../lib/auth';
+import { signIn, signUp } from '../lib/auth';
 import { apiGet } from '../lib/api';
 import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
@@ -14,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
+  const mode = params.get('mode') === 'signup' ? 'signup' : 'login';
 
   if (!loading && user) return <Navigate to="/app" replace />;
 
@@ -31,17 +32,28 @@ export default function Login() {
     if (password.length < 8) return setError('Password must be at least 8 characters.');
     setBusy(true);
     try {
-      await signIn(email, password);
+      if (mode === 'signup') {
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
+      }
       await finishAuthentication();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
-      setError(/failed to fetch|network|timed out|timeout/i.test(message)
+      const networkIssue = /failed to fetch|network|timed out|timeout/i.test(message);
+      setError(networkIssue
         ? 'Unable to reach the authentication service. Check your internet connection, disable any VPN or ad blocker, and try again.'
-        : message || 'Authentication failed');
+        : message || (mode === 'signup' ? 'Unable to create this account.' : 'Authentication failed'));
     } finally {
       setBusy(false);
     }
   };
+
+  const headerText = mode === 'signup' ? 'Create your account' : 'Welcome back';
+  const helperText = mode === 'signup'
+    ? 'Institutional rails. Retail-ready onboarding in under a minute.'
+    : 'Institutional rails. Retail-ready onboarding in under a minute.';
+  const actionText = mode === 'signup' ? 'Create account' : 'Sign in';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#05070b]">
@@ -51,9 +63,8 @@ export default function Login() {
         <div className="mb-8 flex justify-center"><Logo /></div>
         <div className="glass rounded-md p-7">
           <div className="text-[11px] uppercase tracking-[0.28em] text-amber-300/80">Private access</div>
-          <h1 className="mt-2 font-display text-4xl">Welcome back</h1>
-          <p className="mt-2 text-sm text-stone-400">Institutional rails. Retail-ready onboarding in under a minute.</p>
-          <p className="mt-3 text-sm text-amber-200/80">New account registration is temporarily paused.</p>
+          <h1 className="mt-2 font-display text-4xl">{headerText}</h1>
+          <p className="mt-2 text-sm text-stone-400">{helperText}</p>
 
           <form onSubmit={submit} className="mt-6 space-y-3">
             <input
@@ -72,9 +83,27 @@ export default function Login() {
             />
             {error && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
             <button disabled={busy} className="w-full rounded-sm bg-amber-400 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-[#1a1304] disabled:opacity-60">
-              {busy ? 'Please wait…' : 'Sign in'}
+              {busy ? 'Please wait…' : actionText}
             </button>
           </form>
+
+          <div className="mt-4 text-center text-[11px] text-stone-300">
+            {mode === 'signup' ? (
+              <>
+                Already have an account?{' '}
+                <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login')}>
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Need an account?{' '}
+                <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login?mode=signup')}>
+                  Create one
+                </button>
+              </>
+            )}
+          </div>
 
           <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>
         </div>
