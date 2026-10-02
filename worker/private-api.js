@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
 import { sendUserEmail } from './email.js';
+import { getLiveMarketQuote } from './market-quotes.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -204,12 +205,33 @@ async function listPositions(request, db, userId) {
       ORDER BY p.id DESC
     `).bind(userId, status).all();
 
-  const positions = (result.results || []).map((position) => {
-    const price = Number(position.latest_price ?? position.current_price ?? 0);
+  const rows = result.results || [];
+  let liveBtcQuote = null;
+  if (rows.some((position) => position.status === 'open' && position.symbol === 'BTCUSD')) {
+    try {
+      liveBtcQuote = await getLiveMarketQuote('BTCUSD');
+    } catch (error) {
+      console.error('[worker/private-api] Live BTC quote unavailable for P&L', error?.message || error);
+      return json({ error: 'Live BTC pricing is temporarily unavailable. P&L cannot be refreshed.' }, 503);
+    }
+  }
+
+  const positions = rows.map((position) => {
+    const isOpen = position.status === 'open';
+    const isLiveBtc = isOpen && position.symbol === 'BTCUSD';
+    const price = Number(isLiveBtc ? liveBtcQuote.price : position.latest_price ?? position.current_price ?? 0);
     const direction = ['long', 'buy'].includes(position.side) ? 1 : -1;
-    const pnl = (price - Number(position.entry_price)) * Number(position.quantity) * direction;
+    const pnl = isOpen
+      ? (price - Number(position.entry_price)) * Number(position.quantity) * direction
+      : Number(position.pnl || 0);
     const { latest_price: _latestPrice, ...row } = position;
-    return { ...row, current_price: price, pnl };
+    return {
+      ...row,
+      current_price: price,
+      pnl,
+      price_source: isLiveBtc ? liveBtcQuote.price_source : 'D1 reference',
+      quote_updated_at: isLiveBtc ? liveBtcQuote.quote_updated_at : null,
+    };
   });
   return json(positions);
 }
@@ -261,7 +283,16 @@ async function createOrder(request, env, userId) {
     .bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
 
-  const price = type === 'limit' ? Number(body.price) : Number(market.price);
+  let liveQuote = null;
+  if (type === 'market' && market.symbol === 'BTCUSD') {
+    try {
+      liveQuote = await getLiveMarketQuote('BTCUSD');
+    } catch (error) {
+      console.error('[worker/private-api] Live BTC quote unavailable for order', error?.message || error);
+      return json({ error: 'Live BTC pricing is temporarily unavailable. Try again before placing this order.' }, 503);
+    }
+  }
+  const price = type === 'limit' ? Number(body.price) : Number(liveQuote?.price ?? market.price);
   if (!Number.isFinite(price) || price <= 0) return json({ error: 'A valid order price is required.' }, 400);
   const operationId = crypto.randomUUID();
   if (type === 'limit') {
@@ -353,7 +384,11 @@ async function createOrder(request, env, userId) {
       subject: `Filled ${side.toUpperCase()} ${market.symbol}`,
       text: `${quantity} ${market.symbol} filled at ${price}. The order used 10% initial margin.`,
     }, 'worker/private-api');
-    return json({ order, position }, 201);
+    return json({
+      order,
+      position,
+      ...(liveQuote ? { price_source: liveQuote.price_source, quote_updated_at: liveQuote.quote_updated_at } : {}),
+    }, 201);
   } catch (error) {
     if (/idx_positions_one_open_per_market|UNIQUE constraint failed: positions/i.test(String(error?.message || ''))) {
       return json({ error: 'The open position changed concurrently. Refresh before submitting another order.' }, 409);
@@ -406,7 +441,16 @@ async function closePosition(request, env, userId) {
   `).bind(id, userId).first();
   if (!position) return json({ error: 'Open position not found.' }, 404);
 
-  const closePrice = Number(position.close_price);
+  let liveQuote = null;
+  if (position.symbol === 'BTCUSD') {
+    try {
+      liveQuote = await getLiveMarketQuote('BTCUSD');
+    } catch (error) {
+      console.error('[worker/private-api] Live BTC quote unavailable for close', error?.message || error);
+      return json({ error: 'Live BTC pricing is temporarily unavailable. Try again before closing this position.' }, 503);
+    }
+  }
+  const closePrice = Number(liveQuote?.price ?? position.close_price);
   if (!Number.isFinite(closePrice) || closePrice <= 0) return json({ error: 'Unable to determine a valid close price.' }, 409);
   const direction = ['long', 'buy'].includes(position.side) ? 1 : -1;
   const pnl = (closePrice - Number(position.entry_price)) * Number(position.quantity) * direction;

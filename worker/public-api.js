@@ -1,5 +1,6 @@
 import { UNIVERSE } from '../api-handlers/universe-data.js';
 import { getDefaultPlans } from '../api-handlers/plan-data.js';
+import { getLiveMarketQuote } from './market-quotes.js';
 
 const CLASS_MAP = {
   usa: ['stock', 'etf'],
@@ -198,9 +199,21 @@ async function markets(url, db) {
   const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM markets ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
   const items = dataResult.results && dataResult.results.length ? dataResult.results : defaultMarkets();
+  let marketItems = items.map((item) => ({ ...item, price_source: 'D1 reference' }));
+  if (marketItems.some((item) => item.symbol === 'BTCUSD')) {
+    try {
+      const quote = await getLiveMarketQuote('BTCUSD');
+      marketItems = marketItems.map((item) => item.symbol === 'BTCUSD' ? { ...item, ...quote } : item);
+    } catch (error) {
+      console.error('[worker/public-api] Live BTC quote unavailable', error?.message || error);
+      if (symbol === 'BTCUSD' || requestedClass === 'crypto') {
+        return json({ error: 'Live BTC pricing is temporarily unavailable. Refresh before trading.' }, 503);
+      }
+    }
+  }
   const total = Number(countResult?.total || 0) || items.length;
   return json({
-    items: featured && !dataResult.results?.length ? items.slice(0, limit) : items,
+    items: featured && !dataResult.results?.length ? marketItems.slice(0, limit) : marketItems,
     total,
     limit,
     offset,

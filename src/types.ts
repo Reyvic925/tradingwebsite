@@ -8,6 +8,8 @@ export type Market = {
   volume: number;
   high_24h: number;
   low_24h: number;
+  price_source?: string;
+  quote_updated_at?: string | null;
 };
 
 export type Wallet = {

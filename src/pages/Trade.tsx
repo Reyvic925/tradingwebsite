@@ -190,6 +190,10 @@ export default function Trade() {
     return { bids, asks };
   }, [selected]);
 
+  const quoteSourceLabel = selected?.price_source === 'CoinGecko' && selected.quote_updated_at
+    ? `CoinGecko · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
+    : 'D1 reference mark';
+
   return (
     <AppShell>
       <div className="grid gap-4 xl:grid-cols-[260px_1fr_320px]">
@@ -257,6 +261,7 @@ export default function Trade() {
                 <div className="text-right">
                   <div className="font-mono text-3xl">{formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
                   <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatPct(Number(selected.change_24h))} 24h</div>
+                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${selected.price_source === 'CoinGecko' ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
                 </div>
               </div>
               <div className="h-72 rounded-md border border-white/5 bg-[#080b11] p-2 md:h-96">
