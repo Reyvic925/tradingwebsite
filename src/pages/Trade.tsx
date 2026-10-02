@@ -5,7 +5,7 @@ import AppShell from '../components/AppShell';
 import PriceChart from '../components/PriceChart';
 import { apiGet, apiList, apiMarkets, apiSend, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
-import type { Market, Order, Position, Wallet } from '../types';
+import type { Market, Order, PaperAccount, Position } from '../types';
 
 export default function Trade() {
   const { symbol } = useParams();
@@ -14,13 +14,14 @@ export default function Trade() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [watch, setWatch] = useState<{ id: number; market_id: number; symbol: string }[]>([]);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [filter, setFilter] = useState<'stock' | 'forex' | 'crypto' | 'futures'>('stock');
   const [search, setSearch] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [otype, setOtype] = useState<'market' | 'limit'>('market');
+  const [otype, setOtype] = useState<'market' | 'limit' | 'stop' | 'stop_limit'>('market');
   const [qty, setQty] = useState('1');
   const [limit, setLimit] = useState('');
+  const [stopPrice, setStopPrice] = useState('');
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
   const [busy, setBusy] = useState(false);
@@ -37,11 +38,11 @@ export default function Trade() {
 
   const load = async () => {
     try {
-      const [m, p, o, w, wl, focused] = await Promise.all([
+      const [m, p, o, account, wl, focused] = await Promise.all([
         apiMarkets<Market>({ class: filter, q: search || undefined, limit: 80 }),
-        apiList<Position>('/api/positions'),
-        apiList<Order>('/api/orders'),
-        apiGet<Wallet>('/api/wallet').catch(() => null),
+        apiList<Position>('/api/paper/positions'),
+        apiList<Order>('/api/paper/orders'),
+        apiGet<PaperAccount>('/api/paper/account').catch(() => null),
         apiList<{ id: number; market_id: number; symbol: string }>('/api/watchlist'),
         symbol ? apiMarkets<Market>({ symbol, limit: 1 }) : Promise.resolve({ items: [] as Market[] }),
       ]);
@@ -52,7 +53,7 @@ export default function Trade() {
       setMarkets(merged);
       setPositions(asList(p));
       setOrders(asList(o));
-      if (w) setWallet(w);
+      if (account) setPaperAccount(account);
       setWatch(asList(wl));
       
       // Build market prices map for real-time P&L - only include valid prices
@@ -135,16 +136,19 @@ export default function Trade() {
     setBusy(true);
     setMsg('');
     try {
-      await apiSend('/api/orders', 'POST', {
+      const result = await apiSend<{ order?: Order; price_source?: string }>('/api/paper/orders', 'POST', {
         market_id: selected.id,
         side,
         type: otype,
         quantity: q,
-        price: otype === 'limit' ? Number(limit) : undefined,
+        limit_price: otype === 'limit' || otype === 'stop_limit' ? Number(limit) : undefined,
+        stop_price: otype === 'stop' || otype === 'stop_limit' ? Number(stopPrice) : undefined,
         stop_loss: sl ? Number(sl) : null,
         take_profit: tp ? Number(tp) : null,
       });
-      setMsg(`${side.toUpperCase()} ${selected.symbol} accepted`);
+      setMsg(result.order?.status === 'filled'
+        ? `${side.toUpperCase()} ${selected.symbol} filled at ${formatPrice(Number(result.order.filled_price))}${result.price_source ? ` · ${result.price_source}` : ''}`
+        : `${side.toUpperCase()} ${selected.symbol} order working`);
       setQty('1');
       load();
     } catch (e: unknown) {
@@ -158,7 +162,7 @@ export default function Trade() {
     setErr('');
     setMsg('');
     try {
-      await apiSend('/api/positions', 'DELETE', { id });
+      await apiSend('/api/paper/positions', 'DELETE', { id });
       setMsg('Position closed successfully.');
       await load();
     } catch (e: unknown) {
@@ -167,12 +171,12 @@ export default function Trade() {
   };
 
   const updateRisk = async (id: number | string, stop_loss: string, take_profit: string) => {
-    await apiSend('/api/positions', 'PUT', { id, stop_loss, take_profit });
+    await apiSend('/api/paper/positions', 'PUT', { id, stop_loss, take_profit });
     load();
   };
 
   const cancelOrder = async (id: number | string) => {
-    await apiSend('/api/orders', 'DELETE', { id });
+    await apiSend('/api/paper/orders', 'DELETE', { id });
     load();
   };
 
@@ -190,8 +194,9 @@ export default function Trade() {
     return { bids, asks };
   }, [selected]);
 
-  const quoteSourceLabel = selected?.price_source === 'CoinPaprika' && selected.quote_updated_at
-    ? `CoinGecko · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
+  const isLiveQuote = Boolean(selected?.price_source && selected.price_source !== 'D1 reference');
+  const quoteSourceLabel = isLiveQuote && selected?.quote_updated_at
+    ? `${selected.price_source} · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
     : 'D1 reference mark';
 
   return (
@@ -261,7 +266,7 @@ export default function Trade() {
                 <div className="text-right">
                   <div className="font-mono text-3xl">{formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
                   <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatPct(Number(selected.change_24h))} 24h</div>
-                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${selected.price_source === 'CoinPaprika' ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
+                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${isLiveQuote ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
                 </div>
               </div>
               <div className="h-72 rounded-md border border-white/5 bg-[#080b11] p-2 md:h-96">
@@ -340,16 +345,25 @@ export default function Trade() {
               <button type="button" onClick={() => setSide('buy')} className={`py-2 text-xs uppercase tracking-widest ${side === 'buy' ? 'bg-emerald-500 text-black' : 'text-stone-400'}`}>Buy / Long</button>
               <button type="button" onClick={() => setSide('sell')} className={`py-2 text-xs uppercase tracking-widest ${side === 'sell' ? 'bg-rose-500 text-black' : 'text-stone-400'}`}>Sell / Short</button>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-1 text-[11px]">
-              <button type="button" onClick={() => setOtype('market')} className={`rounded-sm border px-2 py-1 ${otype === 'market' ? 'border-amber-300/40 text-amber-200' : 'border-white/10 text-stone-500'}`}>Market</button>
-              <button type="button" onClick={() => setOtype('limit')} className={`rounded-sm border px-2 py-1 ${otype === 'limit' ? 'border-amber-300/40 text-amber-200' : 'border-white/10 text-stone-500'}`}>Limit</button>
+            <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">
+              {(['market', 'limit', 'stop', 'stop_limit'] as const).map((type) => (
+                <button key={type} type="button" onClick={() => setOtype(type)} className={`rounded-sm border px-1 py-1.5 uppercase ${otype === type ? 'border-amber-300/40 text-amber-200' : 'border-white/10 text-stone-500'}`}>
+                  {type === 'stop_limit' ? 'Stop-Limit' : type}
+                </button>
+              ))}
             </div>
             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Quantity</label>
             <input value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none" />
-            {otype === 'limit' && (
+            {(otype === 'limit' || otype === 'stop_limit') && (
               <>
                 <label className="mt-3 block text-[10px] uppercase tracking-widest text-stone-500">Limit price</label>
                 <input value={limit} onChange={(e) => setLimit(e.target.value)} className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none" />
+              </>
+            )}
+            {(otype === 'stop' || otype === 'stop_limit') && (
+              <>
+                <label className="mt-3 block text-[10px] uppercase tracking-widest text-stone-500">Stop trigger</label>
+                <input value={stopPrice} onChange={(e) => setStopPrice(e.target.value)} className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none" />
               </>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -363,7 +377,7 @@ export default function Trade() {
               </div>
             </div>
             <div className="mt-3 text-[11px] text-stone-500">
-              Buying power {formatMoney(Number(wallet?.available || 0))} · 10× leverage · 10% margin
+              Paper buying power {formatMoney(Number(paperAccount?.available_cash || 0))} · 100% cash collateral
             </div>
             {msg && <div className="mt-2 text-xs text-amber-200">{msg}</div>}
             <button disabled={busy} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>
@@ -393,13 +407,13 @@ export default function Trade() {
           <div className="rounded-md border border-white/5 bg-[#080b11] p-4">
             <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Working orders</div>
             <div className="mt-2 space-y-2">
-              {orders.filter((o) => o.status === 'pending').map((o) => (
+              {orders.filter((o) => o.status === 'pending' || o.status === 'triggered').map((o) => (
                 <div key={o.id} className="flex items-center justify-between text-xs">
-                  <span className="font-mono">{o.side.toUpperCase()} {o.symbol} @ {formatPrice(Number(o.price))}</span>
+                  <span className="font-mono">{o.side.toUpperCase()} {o.type.toUpperCase()} {o.symbol} · {o.status === 'triggered' ? 'Triggered' : 'Working'}</span>
                   <button onClick={() => cancelOrder(o.id)} className="text-rose-300">Cancel</button>
                 </div>
               ))}
-              {!orders.some((o) => o.status === 'pending') && <div className="text-xs text-stone-600">No resting tickets.</div>}
+              {!orders.some((o) => o.status === 'pending' || o.status === 'triggered') && <div className="text-xs text-stone-600">No resting tickets.</div>}
             </div>
           </div>
         </aside>

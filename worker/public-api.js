@@ -207,7 +207,7 @@ async function markets(url, db) {
     } catch (error) {
       console.error('[worker/public-api] Live BTC quote unavailable', error?.message || error);
       if (symbol === 'BTCUSD' || requestedClass === 'crypto') {
-        return json({ error: 'Live BTC pricing is temporarily unavailable. Refresh before trading.' }, 503);
+        return json({ error: `Live BTC pricing is unavailable: ${String(error?.message || 'quote provider failure')}` }, 503);
       }
     }
   }

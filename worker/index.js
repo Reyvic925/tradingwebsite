@@ -4,6 +4,7 @@ import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
 import { handlePrivateRequest } from './private-api.js';
+import { handlePaperTradingRequest } from './paper-trading.js';
 import { handlePublicRequest } from './public-api.js';
 import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
@@ -44,6 +45,10 @@ export default {
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleAuthRequest(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/paper/')) {
+      return handlePaperTradingRequest(request, env);
     }
 
     if (url.pathname === '/api/admin/crypto-addresses' || url.pathname.startsWith('/api/admin/crypto-addresses/')) {

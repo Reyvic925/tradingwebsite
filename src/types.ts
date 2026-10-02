@@ -23,6 +23,18 @@ export type Wallet = {
   open_positions?: number;
 };
 
+export type PaperAccount = {
+  initial_cash: number;
+  cash_balance: number;
+  reserved_cash: number;
+  available_cash: number;
+  realized_pnl: number;
+  unrealized_pnl: number;
+  equity: number;
+  quote_source?: string | null;
+  quote_updated_at?: string | null;
+};
+
 export type Profile = {
   id: number;
   user_id: string;
@@ -51,6 +63,10 @@ export type Position = {
   pnl: number;
   margin: number;
   status: string;
+  unrealized_pnl?: number;
+  realized_pnl?: number | null;
+  price_source?: string | null;
+  quote_updated_at?: string | null;
   opened_at?: string;
   closed_at?: string;
   created_at?: string;
@@ -69,6 +85,10 @@ export type Order = {
   take_profit: number | null;
   status: string;
   filled_price: number | null;
+  limit_price?: number | null;
+  stop_price?: number | null;
+  quote_source?: string | null;
+  quote_updated_at?: string | null;
   created_at?: string;
 };
 

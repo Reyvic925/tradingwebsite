@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList, bootstrapProfile } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
-import type { Investment, Market, Position, Profile, Txn, Wallet } from '../types';
+import type { Investment, Market, PaperAccount, Position, Profile, Txn, Wallet } from '../types';
 
 export default function Dashboard() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -22,14 +23,16 @@ export default function Dashboard() {
         if (prof.profile) setProfile(prof.profile as Profile);
         if (prof.wallet) setWallet(prof.wallet as Wallet);
       }
-      const [w, pos, mkt, tx, inv] = await Promise.all([
+      const [w, paper, pos, mkt, tx, inv] = await Promise.all([
         apiGet<Wallet>('/api/wallet').catch(() => null),
-        apiList<Position>('/api/positions'),
+        apiGet<PaperAccount>('/api/paper/account').catch(() => null),
+        apiList<Position>('/api/paper/positions'),
         apiList<Market>('/api/markets?featured=1&limit=12&tick=1'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
       if (w && !('error' in (w as object))) setWallet(w);
+      if (paper) setPaperAccount(paper);
       setPositions(asList(pos));
       setMarkets(asList(mkt));
       setTxns(asList<Txn>(tx).slice(0, 6));
@@ -48,7 +51,7 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, []);
 
-  const pnl = positions.reduce((s, p) => s + Number(p.pnl || 0), 0);
+  const pnl = Number(paperAccount?.realized_pnl || 0) + Number(paperAccount?.unrealized_pnl || 0);
   const investmentSummary = investments.reduce((summary, investment) => {
     const principal = Number(investment.amount || 0);
     summary.totalPnl += Number(investment.earned || 0);
@@ -88,7 +91,7 @@ export default function Dashboard() {
           { label: 'Account equity', value: formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0)) },
           { label: 'Available balance', value: formatMoney(Number(wallet?.available ?? 0)) },
           { label: 'Investment P&L', value: formatMoney(investmentSummary.totalPnl), tone: investmentSummary.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
-          { label: 'Trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          { label: 'Paper trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
         ].map((c) => (
           <div key={c.label} className="rounded-md border border-white/5 bg-white/[0.02] p-5">
             <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{c.label}</div>
