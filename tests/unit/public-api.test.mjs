@@ -4,10 +4,13 @@ import { handlePublicRequest, selectPublicDatabase } from '../../worker/public-a
 class FakeDatabase {
   constructor(label) {
     this.label = label;
+    this.statements = [];
   }
 
   prepare(sql) {
-    return new FakeStatement(this.label, sql);
+    const statement = new FakeStatement(this.label, sql);
+    this.statements.push(statement);
+    return statement;
   }
 }
 
@@ -58,6 +61,11 @@ assert.deepEqual(await stagingMarkets.json(), {
   limit: 12,
   offset: 0,
 });
+
+await handlePublicRequest(request('/api/markets?class=stocks'), { DB: productionDb });
+assert.deepEqual(productionDb.statements.at(-1).values, ['stock', 120, 0]);
+await handlePublicRequest(request('/api/markets?class=fx'), { DB: productionDb });
+assert.deepEqual(productionDb.statements.at(-1).values, ['forex', 120, 0]);
 
 const missingStaging = await handlePublicRequest(request('/api/markets'), { PUBLIC_API_DATABASE: 'staging', DB: productionDb });
 assert.equal(missingStaging.status, 503);

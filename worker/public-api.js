@@ -4,6 +4,7 @@ import { getDefaultPlans } from '../api-handlers/plan-data.js';
 const CLASS_MAP = {
   usa: ['stock', 'etf'],
   us: ['stock', 'etf'],
+  stocks: ['stock'],
   stock: ['stock', 'etf', 'jp', 'jp-etf', 'ca', 'ca-etf', 'uk', 'uk-etf', 'eu', 'eu-etf', 'de', 'de-etf', 'fr', 'fr-etf', 'in', 'in-etf'],
   equity: ['stock', 'etf', 'jp', 'jp-etf', 'ca', 'ca-etf', 'uk', 'uk-etf', 'eu', 'eu-etf', 'de', 'de-etf', 'fr', 'fr-etf', 'in', 'in-etf'],
   etf: ['etf', 'jp-etf', 'ca-etf', 'uk-etf', 'eu-etf', 'de-etf', 'fr-etf', 'in-etf'],
@@ -23,6 +24,7 @@ const CLASS_MAP = {
   india: ['in', 'in-etf'],
   in: ['in', 'in-etf'],
   forex: ['forex'],
+  fx: ['forex'],
   crypto: ['crypto'],
 };
 
