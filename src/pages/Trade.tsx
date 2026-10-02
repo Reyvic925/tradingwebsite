@@ -190,7 +190,7 @@ export default function Trade() {
     return { bids, asks };
   }, [selected]);
 
-  const quoteSourceLabel = selected?.price_source === 'CoinGecko' && selected.quote_updated_at
+  const quoteSourceLabel = selected?.price_source === 'CoinPaprika' && selected.quote_updated_at
     ? `CoinGecko · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
     : 'D1 reference mark';
 
@@ -261,7 +261,7 @@ export default function Trade() {
                 <div className="text-right">
                   <div className="font-mono text-3xl">{formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
                   <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatPct(Number(selected.change_24h))} 24h</div>
-                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${selected.price_source === 'CoinGecko' ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
+                  <div className={`mt-1 text-[10px] uppercase tracking-widest ${selected.price_source === 'CoinPaprika' ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
                 </div>
               </div>
               <div className="h-72 rounded-md border border-white/5 bg-[#080b11] p-2 md:h-96">
@@ -270,11 +270,11 @@ export default function Trade() {
               <div className="grid grid-cols-3 gap-3 text-xs">
                 <div className="rounded-sm border border-white/5 p-3">
                   <div className="text-stone-500">24h high</div>
-                  <div className="mt-1 font-mono">{formatPrice(Number(selected.high_24h))}</div>
+                  <div className="mt-1 font-mono">{selected.high_24h == null ? '—' : formatPrice(Number(selected.high_24h))}</div>
                 </div>
                 <div className="rounded-sm border border-white/5 p-3">
                   <div className="text-stone-500">24h low</div>
-                  <div className="mt-1 font-mono">{formatPrice(Number(selected.low_24h))}</div>
+                  <div className="mt-1 font-mono">{selected.low_24h == null ? '—' : formatPrice(Number(selected.low_24h))}</div>
                 </div>
                 <div className="rounded-sm border border-white/5 p-3">
                   <div className="text-stone-500">Volume</div>

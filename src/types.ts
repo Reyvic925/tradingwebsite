@@ -6,8 +6,8 @@ export type Market = {
   price: number;
   change_24h: number;
   volume: number;
-  high_24h: number;
-  low_24h: number;
+  high_24h: number | null;
+  low_24h: number | null;
   price_source?: string;
   quote_updated_at?: string | null;
 };
