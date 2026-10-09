@@ -4,7 +4,7 @@ import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
 import { handlePrivateRequest } from './private-api.js';
-import { handlePaperTradingRequest } from './paper-trading.js';
+import { handlePaperTradingRequest, runPaperTradingTick } from './paper-trading.js';
 import { handlePublicRequest } from './public-api.js';
 import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
@@ -19,6 +19,10 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 export default {
+  async scheduled(_controller, env, context) {
+    context.waitUntil(runPaperTradingTick(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 

@@ -31,26 +31,8 @@ async function ensurePaperAccount(db, userId) {
   return db.prepare('SELECT * FROM paper_accounts WHERE user_id = ?').bind(userId).first();
 }
 
-async function getQuote(db, marketId, symbol) {
-  if (symbol === 'BTCUSD') {
-    return getLiveMarketQuote(symbol);
-  }
-  const market = await db.prepare(`
-    SELECT price, change_24h, high_24h, low_24h, volume
-    FROM markets WHERE id = ?
-  `).bind(marketId).first();
-  const price = Number(market?.price);
-  if (!Number.isFinite(price) || price <= 0) throw new Error(`No valid quote for ${symbol}.`);
-  return {
-    symbol,
-    price,
-    change_24h: Number(market.change_24h || 0),
-    high_24h: market.high_24h == null ? null : Number(market.high_24h),
-    low_24h: market.low_24h == null ? null : Number(market.low_24h),
-    volume: Number(market.volume || 0),
-    price_source: 'D1 reference',
-    quote_updated_at: null,
-  };
+async function getQuote(_db, _marketId, symbol) {
+  return getLiveMarketQuote(symbol);
 }
 
 function limitCrossed(order, price) {
@@ -153,6 +135,51 @@ async function processPendingOrders(db, userId) {
   return updates;
 }
 
+function positionExitTriggered(position, price) {
+  if (position.side === 'long') {
+    return (position.stop_loss != null && price <= Number(position.stop_loss))
+      || (position.take_profit != null && price >= Number(position.take_profit));
+  }
+  return (position.stop_loss != null && price >= Number(position.stop_loss))
+    || (position.take_profit != null && price <= Number(position.take_profit));
+}
+
+async function settlePaperPosition(db, userId, position, quote) {
+  const direction = position.side === 'long' ? 1 : -1;
+  const realizedPnl = (Number(quote.price) - Number(position.entry_price)) * Number(position.quantity) * direction;
+  const operationId = crypto.randomUUID();
+  const results = await db.batch([
+    db.prepare(`
+      UPDATE paper_positions
+      SET status = 'closed', current_price = ?, unrealized_pnl = 0, realized_pnl = ?,
+          price_source = ?, quote_updated_at = ?, closed_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ? AND status = 'open'
+    `).bind(quote.price, realizedPnl, quote.price_source, quote.quote_updated_at, position.id, userId),
+    db.prepare(`
+      UPDATE paper_accounts
+      SET cash_balance = cash_balance + ?,
+          reserved_cash = MAX(0, reserved_cash - ?),
+          realized_pnl = realized_pnl + ?, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND changes() = 1
+    `).bind(realizedPnl, position.reserved_cash, realizedPnl, userId),
+    db.prepare(`
+      INSERT INTO paper_orders
+        (user_id, market_id, operation_id, symbol, side, type, quantity, status, filled_price,
+         quote_source, quote_updated_at, filled_at)
+      SELECT ?, ?, ?, ?, ?, 'close', ?, 'filled', ?, ?, ?, CURRENT_TIMESTAMP
+      WHERE changes() = 1
+    `).bind(userId, position.market_id, operationId, position.symbol, direction === 1 ? 'sell' : 'buy', position.quantity,
+      quote.price, quote.price_source, quote.quote_updated_at),
+    db.prepare(`
+      INSERT INTO paper_fills
+        (user_id, order_id, position_id, market_id, symbol, fill_type, side, quantity, price, quote_source, quote_updated_at)
+      SELECT ?, o.id, ?, ?, ?, 'close', o.side, ?, o.filled_price, o.quote_source, o.quote_updated_at
+      FROM paper_orders o WHERE o.operation_id = ? AND changes() = 1
+    `).bind(userId, position.id, position.market_id, position.symbol, position.quantity, operationId),
+  ]);
+  return Number(results[0]?.meta?.changes || 0) === 1;
+}
+
 async function refreshOpenPositions(db, userId) {
   const result = await db.prepare(`
     SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 100
@@ -176,6 +203,12 @@ async function refreshOpenPositions(db, userId) {
   }
 
   if (statements.length) await db.batch(statements);
+  for (const position of result.results || []) {
+    const quote = quotes.get(position.symbol);
+    if (quote && positionExitTriggered(position, Number(quote.price))) {
+      await settlePaperPosition(db, userId, position, quote);
+    }
+  }
   const refreshed = await db.prepare(`
     SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 100
   `).bind(userId).all();
@@ -216,8 +249,12 @@ async function createPaperOrder(request, env, userId) {
 
   const limitPrice = body.limit_price == null || body.limit_price === '' ? null : Number(body.limit_price);
   const stopPrice = body.stop_price == null || body.stop_price === '' ? null : Number(body.stop_price);
+  const stopLoss = body.stop_loss == null || body.stop_loss === '' ? null : Number(body.stop_loss);
+  const takeProfit = body.take_profit == null || body.take_profit === '' ? null : Number(body.take_profit);
   if ((type === 'limit' || type === 'stop_limit') && !(limitPrice > 0)) return json({ error: 'Enter a positive limit price.' }, 400);
   if ((type === 'stop' || type === 'stop_limit') && !(stopPrice > 0)) return json({ error: 'Enter a positive stop price.' }, 400);
+  if (stopLoss !== null && !(stopLoss > 0)) return json({ error: 'Stop loss must be a positive price.' }, 400);
+  if (takeProfit !== null && !(takeProfit > 0)) return json({ error: 'Take profit must be a positive price.' }, 400);
 
   const market = await db.prepare('SELECT id, symbol FROM markets WHERE id = ?').bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
@@ -238,8 +275,8 @@ async function createPaperOrder(request, env, userId) {
     quantity,
     limitPrice,
     stopPrice,
-    body.stop_loss == null || body.stop_loss === '' ? null : Number(body.stop_loss),
-    body.take_profit == null || body.take_profit === '' ? null : Number(body.take_profit),
+    stopLoss,
+    takeProfit,
   ).first();
 
   if (type === 'market') {
@@ -272,41 +309,37 @@ async function closePaperPosition(request, env, userId) {
     console.error(`[worker/paper-trading] Quote unavailable while closing ${position.symbol}`, error?.message || error);
     return json({ error: 'A fresh market quote is unavailable. The position remains open.' }, 503);
   }
-  const direction = position.side === 'long' ? 1 : -1;
-  const realizedPnl = (Number(quote.price) - Number(position.entry_price)) * Number(position.quantity) * direction;
-  const operationId = crypto.randomUUID();
-  const results = await db.batch([
-    db.prepare(`
-      UPDATE paper_positions
-      SET status = 'closed', current_price = ?, unrealized_pnl = 0, realized_pnl = ?,
-          price_source = ?, quote_updated_at = ?, closed_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ? AND status = 'open'
-    `).bind(quote.price, realizedPnl, quote.price_source, quote.quote_updated_at, id, userId),
-    db.prepare(`
-      UPDATE paper_accounts
-      SET cash_balance = cash_balance + ?,
-          reserved_cash = MAX(0, reserved_cash - ?),
-          realized_pnl = realized_pnl + ?, updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ? AND changes() = 1
-    `).bind(realizedPnl, position.reserved_cash, realizedPnl, userId),
-    db.prepare(`
-      INSERT INTO paper_orders
-        (user_id, market_id, operation_id, symbol, side, type, quantity, status, filled_price,
-         quote_source, quote_updated_at, filled_at)
-      SELECT ?, ?, ?, ?, ?, 'close', ?, 'filled', ?, ?, ?, CURRENT_TIMESTAMP
-      WHERE changes() = 1
-    `).bind(userId, position.market_id, operationId, position.symbol, direction === 1 ? 'sell' : 'buy', position.quantity,
-      quote.price, quote.price_source, quote.quote_updated_at),
-    db.prepare(`
-      INSERT INTO paper_fills
-        (user_id, order_id, position_id, market_id, symbol, fill_type, side, quantity, price, quote_source, quote_updated_at)
-      SELECT ?, o.id, ?, ?, ?, 'close', o.side, ?, o.filled_price, o.quote_source, o.quote_updated_at
-      FROM paper_orders o WHERE o.operation_id = ? AND changes() = 1
-    `).bind(userId, id, position.market_id, position.symbol, position.quantity, operationId),
-  ]);
-  if (Number(results[0]?.meta?.changes || 0) !== 1) return json({ error: 'Paper position was already closed.' }, 409);
+  const settled = await settlePaperPosition(db, userId, position, quote);
+  if (!settled) return json({ error: 'Paper position was already closed.' }, 409);
   const closed = await db.prepare('SELECT * FROM paper_positions WHERE id = ? AND user_id = ?').bind(id, userId).first();
   return json(closed);
+}
+
+async function updatePaperPosition(request, db, userId) {
+  const body = await readBody(request);
+  const id = Number(body.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid paper position id is required.' }, 400);
+  const stopLoss = body.stop_loss == null || body.stop_loss === '' ? null : Number(body.stop_loss);
+  const takeProfit = body.take_profit == null || body.take_profit === '' ? null : Number(body.take_profit);
+  if (stopLoss !== null && (!Number.isFinite(stopLoss) || stopLoss <= 0)) return json({ error: 'Stop loss must be a positive price.' }, 400);
+  if (takeProfit !== null && (!Number.isFinite(takeProfit) || takeProfit <= 0)) return json({ error: 'Take profit must be a positive price.' }, 400);
+  const position = await db.prepare(`
+    UPDATE paper_positions SET stop_loss = ?, take_profit = ?
+    WHERE id = ? AND user_id = ? AND status = 'open' RETURNING *
+  `).bind(stopLoss, takeProfit, id, userId).first();
+  return position ? json(position) : json({ error: 'Open paper position not found.' }, 404);
+}
+
+export async function runPaperTradingTick(env) {
+  const accounts = await env.DB.prepare('SELECT user_id FROM paper_accounts').all();
+  for (const account of accounts.results || []) {
+    try {
+      await processPendingOrders(env.DB, account.user_id);
+      await refreshOpenPositions(env.DB, account.user_id);
+    } catch (error) {
+      console.error(`[worker/paper-trading] Scheduled refresh failed for ${account.user_id}`, error?.message || error);
+    }
+  }
 }
 
 export async function handlePaperTradingRequest(request, env) {
@@ -326,6 +359,9 @@ export async function handlePaperTradingRequest(request, env) {
     }
     if (url.pathname === '/api/paper/positions' && request.method === 'DELETE') {
       return await closePaperPosition(request, env, user.id);
+    }
+    if (url.pathname === '/api/paper/positions' && request.method === 'PUT') {
+      return await updatePaperPosition(request, env.DB, user.id);
     }
     if (url.pathname === '/api/paper/orders' && request.method === 'GET') {
       await ensurePaperAccount(env.DB, user.id);

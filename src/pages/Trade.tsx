@@ -40,9 +40,9 @@ export default function Trade() {
     try {
       const [m, p, o, account, wl, focused] = await Promise.all([
         apiMarkets<Market>({ class: filter, q: search || undefined, limit: 80 }),
-        apiList<Position>('/api/paper/positions'),
-        apiList<Order>('/api/paper/orders'),
-        apiGet<PaperAccount>('/api/paper/account').catch(() => null),
+        apiGet<Position[]>('/api/paper/positions'),
+        apiGet<Order[]>('/api/paper/orders'),
+        apiGet<PaperAccount>('/api/paper/account'),
         apiList<{ id: number; market_id: number; symbol: string }>('/api/watchlist'),
         symbol ? apiMarkets<Market>({ symbol, limit: 1 }) : Promise.resolve({ items: [] as Market[] }),
       ]);
@@ -53,7 +53,7 @@ export default function Trade() {
       setMarkets(merged);
       setPositions(asList(p));
       setOrders(asList(o));
-      if (account) setPaperAccount(account);
+      setPaperAccount(account);
       setWatch(asList(wl));
       
       // Build market prices map for real-time P&L - only include valid prices
@@ -409,7 +409,9 @@ export default function Trade() {
             <div className="mt-2 space-y-2">
               {orders.filter((o) => o.status === 'pending' || o.status === 'triggered').map((o) => (
                 <div key={o.id} className="flex items-center justify-between text-xs">
-                  <span className="font-mono">{o.side.toUpperCase()} {o.type.toUpperCase()} {o.symbol} · {o.status === 'triggered' ? 'Triggered' : 'Working'}</span>
+                  <span className="font-mono">
+                    {o.side.toUpperCase()} {o.symbol} · {o.type === 'stop_limit' ? `stop ${formatPrice(Number(o.stop_price))} / limit ${formatPrice(Number(o.limit_price))}` : o.type === 'stop' ? `stop ${formatPrice(Number(o.stop_price))}` : o.type === 'limit' ? `limit ${formatPrice(Number(o.limit_price))}` : o.type.toUpperCase()} · {o.status === 'triggered' ? 'Triggered' : 'Working'}
+                  </span>
                   <button onClick={() => cancelOrder(o.id)} className="text-rose-300">Cancel</button>
                 </div>
               ))}

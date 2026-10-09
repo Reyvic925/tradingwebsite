@@ -200,15 +200,13 @@ async function markets(url, db) {
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
   const items = dataResult.results && dataResult.results.length ? dataResult.results : defaultMarkets();
   let marketItems = items.map((item) => ({ ...item, price_source: 'D1 reference' }));
-  if (marketItems.some((item) => item.symbol === 'BTCUSD')) {
+  if (symbol) {
     try {
-      const quote = await getLiveMarketQuote('BTCUSD');
-      marketItems = marketItems.map((item) => item.symbol === 'BTCUSD' ? { ...item, ...quote } : item);
+      const quote = await getLiveMarketQuote(symbol);
+      marketItems = marketItems.map((item) => item.symbol === symbol ? { ...item, ...quote } : item);
     } catch (error) {
-      console.error('[worker/public-api] Live BTC quote unavailable', error?.message || error);
-      if (symbol === 'BTCUSD' || requestedClass === 'crypto') {
-        return json({ error: `Live BTC pricing is unavailable: ${String(error?.message || 'quote provider failure')}` }, 503);
-      }
+      console.error(`[worker/public-api] Live quote unavailable for ${symbol}`, error?.message || error);
+      return json({ error: `Live ${symbol} pricing is temporarily unavailable. Refresh before trading.` }, 503);
     }
   }
   const total = Number(countResult?.total || 0) || items.length;

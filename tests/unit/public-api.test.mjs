@@ -71,16 +71,17 @@ await handlePublicRequest(request('/api/markets?class=fx'), { DB: productionDb }
 assert.deepEqual(productionDb.statements.at(-1).values, ['forex', 120, 0]);
 
 const originalFetch = globalThis.fetch;
+const quoteTimestamp = new Date().toISOString();
 globalThis.fetch = async () => Response.json({
   quotes: { USD: { price: 84662.5486610824, percent_change_24h: 1.42, volume_24h: 26016114241.4 } },
-  last_updated: '2026-10-02T00:30:20.000Z',
+  last_updated: quoteTimestamp,
 });
 const liveBtcResponse = await handlePublicRequest(request('/api/markets?symbol=BTCUSD&limit=1'), { DB: productionDb });
 const liveBtc = await liveBtcResponse.json();
 assert.equal(liveBtcResponse.status, 200);
 assert.equal(liveBtc.items[0].price, 84662.5486610824);
 assert.equal(liveBtc.items[0].price_source, 'CoinPaprika');
-assert.equal(liveBtc.items[0].quote_updated_at, '2026-10-02T00:30:20.000Z');
+assert.equal(liveBtc.items[0].quote_updated_at, quoteTimestamp);
 globalThis.fetch = originalFetch;
 
 const missingStaging = await handlePublicRequest(request('/api/markets'), { PUBLIC_API_DATABASE: 'staging', DB: productionDb });

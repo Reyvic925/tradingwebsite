@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { handlePaperTradingRequest } from '../../worker/paper-trading.js';
+import { handlePaperTradingRequest, runPaperTradingTick } from '../../worker/paper-trading.js';
 
 class SqliteStatement {
   constructor(db, sql) {
@@ -172,8 +172,31 @@ try {
   const stopLimitPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
   await handlePaperTradingRequest(request('/api/paper/positions', userIds[0], 'DELETE', { id: stopLimitPosition.id }), env);
 
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 8);
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 0);
+  const protectedOrder = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
+    market_id: 1, side: 'buy', type: 'market', quantity: 1, take_profit: 105,
+  }), env);
+  assert.equal((await protectedOrder.json()).position.status, 'open');
+  quotePrice = 105;
+  logicalNow += 6000;
+  const afterTakeProfit = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
+  assert.equal(afterTakeProfit.length, 0);
+  const autoClosed = db.sqlite.prepare("SELECT status, realized_pnl FROM paper_positions WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(userIds[0]);
+  assert.equal(autoClosed.status, 'closed');
+  assert.equal(autoClosed.realized_pnl, 1);
+
+  const scheduledLimit = await handlePaperTradingRequest(request('/api/paper/orders', userIds[1], 'POST', {
+    market_id: 1, side: 'buy', type: 'limit', quantity: 1, limit_price: 95,
+  }), env);
+  assert.equal((await scheduledLimit.json()).status, 'pending');
+  quotePrice = 94;
+  logicalNow += 6000;
+  await runPaperTradingTick(env);
+  const scheduledOrders = await db.prepare('SELECT status FROM paper_orders WHERE user_id = ? AND type = ?')
+    .bind(userIds[1], 'limit').all();
+  assert.equal(scheduledOrders.results[0].status, 'filled');
+
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 10);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 1);
   console.log('PAPER_TRADING_TESTS_PASSED');
 } finally {
   globalThis.fetch = originalFetch;

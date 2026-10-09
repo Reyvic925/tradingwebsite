@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList, bootstrapProfile } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
-import type { Investment, Market, PaperAccount, Position, Profile, Txn, Wallet } from '../types';
+import type { Investment, Market, PaperAccount, Position, Profile, Txn } from '../types';
 
 export default function Dashboard() {
-  const [wallet, setWallet] = useState<Wallet | null>(null);
   const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -21,17 +20,14 @@ export default function Dashboard() {
       if (bootstrap) {
         const prof = await bootstrapProfile();
         if (prof.profile) setProfile(prof.profile as Profile);
-        if (prof.wallet) setWallet(prof.wallet as Wallet);
       }
-      const [w, paper, pos, mkt, tx, inv] = await Promise.all([
-        apiGet<Wallet>('/api/wallet').catch(() => null),
+      const [paper, pos, mkt, tx, inv] = await Promise.all([
         apiGet<PaperAccount>('/api/paper/account').catch(() => null),
         apiList<Position>('/api/paper/positions'),
         apiList<Market>('/api/markets?featured=1&limit=12&tick=1'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
-      if (w && !('error' in (w as object))) setWallet(w);
       if (paper) setPaperAccount(paper);
       setPositions(asList(pos));
       setMarkets(asList(mkt));
@@ -88,8 +84,8 @@ export default function Dashboard() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Account equity', value: formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0)) },
-          { label: 'Available balance', value: formatMoney(Number(wallet?.available ?? 0)) },
+          { label: 'Paper equity', value: formatMoney(Number(paperAccount?.equity ?? paperAccount?.initial_cash ?? 0)) },
+          { label: 'Paper buying power', value: formatMoney(Number(paperAccount?.available_cash ?? 0)) },
           { label: 'Investment P&L', value: formatMoney(investmentSummary.totalPnl), tone: investmentSummary.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
           { label: 'Paper trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
         ].map((c) => (
