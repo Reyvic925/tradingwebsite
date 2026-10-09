@@ -39,11 +39,10 @@ function localApiPlugin(): Plugin {
   return {
     name: 'apex-local-api',
     configResolved() {
-      // Expose server-side env vars (.env: Supabase keys, admin secret) to the
-      // Node process running the API handlers. Existing process env wins.
-      const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
-      for (const [key, value] of Object.entries(env)) {
-        if (process.env[key] === undefined) process.env[key] = value;
+      // Only expose the Worker endpoint required by the API proxy.
+      const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), 'WORKER_API_URL');
+      if (process.env.WORKER_API_URL === undefined && env.WORKER_API_URL) {
+        process.env.WORKER_API_URL = env.WORKER_API_URL;
       }
     },
     configureServer(server: ViteDevServer) {

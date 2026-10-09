@@ -1,16 +1,11 @@
-import { parse, pathToFileURL } from 'url';
-import path from 'path';
-
 async function proxyToWorker(req, res, urlPath) {
   const workerOrigin = String(process.env.WORKER_API_URL || '').trim().replace(/\/+$/, '');
-  const isVercel = Boolean(process.env.VERCEL)
-    || ['preview', 'production'].includes(String(process.env.VERCEL_ENV || '').toLowerCase());
-  if (!isVercel || !urlPath.startsWith('/api/')) return false;
+  if (!urlPath.startsWith('/api/')) return false;
 
   if (!workerOrigin) {
     res.statusCode = 503;
     res.setHeader('content-type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ error: 'Worker API is not configured for this Vercel deployment.' }));
+    res.end(JSON.stringify({ error: 'Worker API is not configured. Set WORKER_API_URL to the Cloudflare Worker URL.' }));
     return true;
   }
 
@@ -52,13 +47,6 @@ async function proxyToWorker(req, res, urlPath) {
   return true;
 }
 
-function ensureQuery(req) {
-  if (req.query) return req.query;
-  const url = new URL(req.url || '/', 'http://localhost');
-  req.query = Object.fromEntries(url.searchParams.entries());
-  return req.query;
-}
-
 async function ensureBody(req) {
   if (req.body !== undefined) return req.body;
   const method = String(req.method || '').toUpperCase();
@@ -93,70 +81,11 @@ async function ensureBody(req) {
 }
 
 export default async function handler(req, res) {
-  ensureQuery(req);
+  const urlPath = new URL(req.url || '/', 'http://localhost').pathname;
+  if (!urlPath.startsWith('/api/')) {
+    res.statusCode = 404;
+    return res.end('Not found');
+  }
   await ensureBody(req);
-
-  const urlPath = parse(req.url || '').pathname || '/';
-  const parts = urlPath.split('/').filter(Boolean); // e.g. ['api','ticker'] or ['api','cron','roi'] or ['ticker']
-
-  if (await proxyToWorker(req, res, urlPath)) return;
-
-  if (parts[0] === 'api') parts.shift();
-
-  const name = parts[0] || 'landing';
-  let nestedName = null;
-
-  if (name === 'cron' && parts[1]) {
-    nestedName = parts[1];
-  }
-
-  const handlerCandidates = [];
-  if (nestedName) {
-    handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}-${nestedName}.js`));
-    handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}-${nestedName}-simulator.js`));
-    if (nestedName === 'roi') {
-      handlerCandidates.push(path.join(process.cwd(), 'api-handlers', 'cron-roi-simulator.js'));
-    }
-  }
-  handlerCandidates.push(path.join(process.cwd(), 'api-handlers', `${name}.js`));
-
-  let resolvedHandlerPath = null;
-  let lastImportError = null;
-
-  for (const candidatePath of handlerCandidates) {
-    try {
-      const moduleUrl = pathToFileURL(candidatePath).href;
-      await import(moduleUrl);
-      resolvedHandlerPath = candidatePath;
-      break;
-    } catch (err) {
-      lastImportError = err;
-    }
-  }
-
-  if (!resolvedHandlerPath) {
-    throw lastImportError || new Error('Handler not found');
-  }
-
-  try {
-    const moduleUrl = pathToFileURL(resolvedHandlerPath).href;
-    const handlerModule = await import(moduleUrl);
-    const fn = handlerModule?.default || handlerModule?.handler || handlerModule;
-    if (typeof fn === 'function') {
-      return fn(req, res);
-    }
-
-    res.statusCode = 500;
-    return res.end(`Handler for ${name} is not a function`);
-  } catch (err) {
-    // Module not found errors differ between Node versions; check message/code
-    const msg = String(err?.message || '');
-    if (err?.code === 'ERR_MODULE_NOT_FOUND' || /Cannot find module/.test(msg) || /not find/.test(msg)) {
-      res.statusCode = 404;
-      return res.end('Not found');
-    }
-    console.error(err);
-    res.statusCode = 500;
-    return res.end('Internal Server Error');
-  }
+  await proxyToWorker(req, res, urlPath);
 }

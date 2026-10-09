@@ -7,7 +7,8 @@ const originalVercel = process.env.VERCEL;
 const originalWorkerApiUrl = process.env.WORKER_API_URL;
 let capturedRequest;
 
-process.env.VERCEL_ENV = 'preview';
+delete process.env.VERCEL_ENV;
+delete process.env.VERCEL;
 process.env.WORKER_API_URL = 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/';
 globalThis.fetch = async (url, init) => {
   capturedRequest = { url: String(url), init };
@@ -46,6 +47,8 @@ assert.equal(responseHeaders.has('content-encoding'), false);
 assert.equal(responseHeaders.get('set-cookie')[0], 'apex_session=worker-session; Path=/; HttpOnly; SameSite=Lax');
 assert.deepEqual([...response.body], [1, 2, 3]);
 
+assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/kyc-upload?id=17');
+
 const roiResponseHeaders = new Map();
 const roiResponse = {
   statusCode: 200,
@@ -63,7 +66,6 @@ assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarke
 assert.equal(capturedRequest.init.method, 'GET');
 assert.equal(roiResponse.statusCode, 200);
 
-process.env.VERCEL_ENV = 'production';
 const productionResponse = {
   statusCode: 200,
   setHeader(name, value) { responseHeaders.set(name.toLowerCase(), value); },
@@ -73,8 +75,6 @@ await handler({ url: '/api/copy-trades', method: 'GET', headers: {} }, productio
 assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/copy-trades');
 assert.equal(productionResponse.statusCode, 200);
 
-process.env.VERCEL = '1';
-process.env.VERCEL_ENV = 'development';
 process.env.WORKER_API_URL = 'https://apex-prime-dev-worker.example.workers.dev';
 const vercelDevResponse = {
   statusCode: 200,
@@ -95,7 +95,7 @@ const unconfiguredResponse = {
 await handler({ url: '/api/unknown-route', method: 'GET', headers: {} }, unconfiguredResponse);
 assert.equal(unconfiguredResponse.statusCode, 503);
 assert.equal(unconfiguredResponse.headers.get('content-type'), 'application/json; charset=utf-8');
-assert.match(unconfiguredResponse.body, /Worker API is not configured/);
+assert.match(unconfiguredResponse.body, /WORKER_API_URL/);
 
 globalThis.fetch = originalFetch;
 if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;

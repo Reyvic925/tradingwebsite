@@ -9,6 +9,7 @@ import { handlePublicRequest } from './public-api.js';
 import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
+import { handleTraderRequest } from './traders-api.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -65,6 +66,12 @@ export default {
 
     if (url.pathname === '/api/referrals') {
       return handleReferralRequest(request, env);
+    }
+
+    if ([
+      '/api/traders', '/api/trader-trades', '/api/trader-history',
+    ].includes(url.pathname)) {
+      return handleTraderRequest(request, env);
     }
 
     if ([

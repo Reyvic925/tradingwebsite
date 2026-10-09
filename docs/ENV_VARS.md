@@ -1,6 +1,6 @@
 Environment Variables
 
-Vercel serves the frontend and proxies API requests to the Cloudflare Worker. It does not connect to Supabase. Keep deployment values in the relevant provider's secure environment settings, not in source control.
+Vercel serves the frontend and proxies API requests to the Cloudflare Worker, where application data is stored in D1. Keep deployment values in the relevant provider's secure environment settings, not in source control.
 
 WORKER_API_URL (required in Vercel Production and Preview)
 - Purpose: Base URL of the corresponding deployed Cloudflare Worker, without a trailing slash.
@@ -32,7 +32,7 @@ MARKET_DATA_API_KEY
 - Usage: Server uses this key to fetch market data for syncing, charting, and ticks.
 
 Notes and Best Practices
-- Supabase credentials are not required by Vercel. Legacy migration/backfill scripts may still require Supabase credentials when run manually; do not add them to Vercel's environment.
+- Configure the Worker API URL and Worker secrets only. Do not add legacy database credentials to deployment environments.
 - For tests: set ENCRYPTION_MASTER_KEY to a deterministic test value (example in tests: 'test-master-key-please-change-in-prod') so encryption tests can run locally.
 - Rotate secrets periodically and store them in a secrets manager (AWS Secrets Manager, Azure Key Vault, Vault, etc.).
 - Do not commit any secrets to the repo or attach them to pull-requests.
