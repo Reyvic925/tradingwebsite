@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import TraderAvatar from '../components/TraderAvatar';
 import {
   useTraders,
   useLeaderboard,
@@ -240,11 +241,7 @@ function LeaderboardSection() {
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Link to={`/app/trader/${trader.id}`} aria-label={`View ${trader.name} profile`} className="shrink-0" onClick={(event) => event.stopPropagation()}>
-                  <img
-                    src={trader.avatar_url}
-                    alt={trader.name}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
+                  <TraderAvatar src={trader.avatar_url} name={trader.name} className="h-10 w-10 rounded-full object-cover" />
                 </Link>
                 <div>
                   <Link to={`/app/trader/${trader.id}`} className="text-sm font-semibold text-white hover:text-emerald-300" onClick={(event) => event.stopPropagation()}>
@@ -364,11 +361,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
       >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <img
-              src={trader.avatar_url}
-              alt={trader.name}
-              className="h-12 w-12 rounded-full object-cover"
-            />
+            <TraderAvatar src={trader.avatar_url} name={trader.name} className="h-12 w-12 rounded-full object-cover" />
             <div>
               <Link to={`/app/trader/${trader.id}`} className="text-sm font-semibold text-white hover:text-emerald-300">
                 {trader.name}
@@ -446,7 +439,7 @@ function CopyDetailModal({ follow, onClose, onEdit, onStop }: { follow: UserFoll
       <div role="dialog" aria-modal="true" aria-label={`${trader?.name || 'Copy position'} details`} className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-xl border border-white/10 bg-[#0b111a] p-5 shadow-2xl sm:p-7">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
           <div className="flex items-center gap-3">
-            <img src={trader?.avatar_url} alt={trader?.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-emerald-400/30" />
+            <TraderAvatar src={trader?.avatar_url} name={trader?.name} className="h-14 w-14 rounded-full object-cover ring-2 ring-emerald-400/30" />
             <div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/70">Active copy</div>
               <h2 className="mt-1 text-2xl font-bold text-white">{trader?.name || 'Copy position'}</h2>
@@ -522,11 +515,7 @@ function MyPositions() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <Link to={`/app/trader/${follow.trader_id}`} aria-label={`View ${follow.trader?.name || 'trader'} profile`} className="shrink-0" onClick={(event) => event.stopPropagation()}>
-                  <img
-                    src={follow.trader?.avatar_url}
-                    alt={follow.trader?.name}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
+                  <TraderAvatar src={follow.trader?.avatar_url} name={follow.trader?.name} className="h-10 w-10 rounded-full object-cover" />
                 </Link>
                 <div>
                   <Link to={`/app/trader/${follow.trader_id}`} className="text-sm font-semibold text-white hover:text-emerald-300" onClick={(event) => event.stopPropagation()}>

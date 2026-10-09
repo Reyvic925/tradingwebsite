@@ -130,7 +130,7 @@ async function createTrader(request, env) {
   try {
     values = normalizeWrite({
       ...body,
-      avatar_url: resolveAvatar(body, '/images/avatar-1.jpg'),
+      avatar_url: resolveAvatar(body),
       is_active: true,
       asset_focus: body.asset_focus || ['BTC-USD', 'ETH-USD'],
     });
@@ -147,6 +147,9 @@ async function createTrader(request, env) {
     return json(parseTrader(result), 201);
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || error))) {
+      if (/avatar_url/i.test(String(error?.message || error))) {
+        return json({ error: 'That photo is already assigned to another trader' }, 409);
+      }
       return json({ error: 'A trader with that name already exists' }, 409);
     }
     throw error;
@@ -176,6 +179,9 @@ async function updateTrader(request, env, id) {
     return json(parseTrader(updated));
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || error))) {
+      if (/avatar_url/i.test(String(error?.message || error))) {
+        return json({ error: 'That photo is already assigned to another trader' }, 409);
+      }
       return json({ error: 'A trader with that name already exists' }, 409);
     }
     throw error;

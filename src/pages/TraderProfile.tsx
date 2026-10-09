@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import TraderAvatar from '../components/TraderAvatar';
 import { useTraderTrades, useTraderHistory, usePnlAnimation, useCopyTrading } from '../lib/copy-trading-hooks';
 import {
   ChevronUp,
@@ -107,11 +108,7 @@ export default function TraderProfile() {
 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <img
-              src={trader.avatar_url}
-              alt={trader.name}
-              className="h-20 w-20 rounded-full object-cover"
-            />
+            <TraderAvatar src={trader.avatar_url} name={trader.name} className="h-20 w-20 rounded-full object-cover" />
             <div>
               <h1 className="text-3xl font-bold text-white">{trader.name}</h1>
               <p className="text-gray-400 text-sm">{trader.bio}</p>

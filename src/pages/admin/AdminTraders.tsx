@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminShell from '../../components/AdminShell';
+import TraderAvatar from '../../components/TraderAvatar';
 import { Plus, Edit2, Save, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
 import { authHeaders } from '../../lib/api';
@@ -252,19 +253,16 @@ export default function AdminTraders() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Trader image *</label>
+                <label className="block text-sm text-gray-300 mb-1">Trader image (optional)</label>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/gif"
-                  required={!editingId && !formData.avatar_url}
                   onChange={(e) => handleAvatarChange(e.target.files?.[0])}
                   className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-500 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
                 />
                 <div className="mt-2 flex items-center gap-3">
-                  {(avatarData || formData.avatar_url) && (
-                    <img src={avatarData || formData.avatar_url} alt="Trader preview" className="h-12 w-12 rounded-full object-cover" />
-                  )}
-                  <span className="text-xs text-gray-500">PNG, JPG, WEBP, or GIF. Max 2 MB.</span>
+                  <TraderAvatar src={avatarData || formData.avatar_url} name={formData.name} className="h-12 w-12 rounded-full object-cover" />
+                  <span className="text-xs text-gray-500">Optional. PNG, JPG, WEBP, or GIF. Max 2 MB.</span>
                 </div>
               </div>
               <div>
@@ -389,11 +387,7 @@ export default function AdminTraders() {
               <tr key={trader.id} className="hover:bg-white/[0.02] transition">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={trader.avatar_url}
-                      alt={trader.name}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
+                    <TraderAvatar src={trader.avatar_url} name={trader.name} className="h-8 w-8 rounded-full object-cover" />
                     <div>
                       <div className="font-semibold text-white">{trader.name}</div>
                       <div className="text-xs text-gray-500">{trader.bio}</div>
