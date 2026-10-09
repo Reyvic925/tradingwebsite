@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import InvestmentModal from '../components/InvestmentModal';
-import InvestmentTierSelector from '../components/InvestmentTierSelector';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Investment, Plan, Wallet } from '../types';
@@ -97,14 +96,6 @@ export default function Invest() {
             </button>
           </div>
         ))}
-      </div>
-
-      {/* Investment Tier Selector */}
-      <div className="mt-12">
-        <InvestmentTierSelector 
-          wallet_available={Number(wallet?.available || 0)} 
-          onInvestmentCreated={() => void load(false)}
-        />
       </div>
 
       <h2 className="mt-12 text-sm uppercase tracking-[0.18em] text-stone-400">Your allocations</h2>
