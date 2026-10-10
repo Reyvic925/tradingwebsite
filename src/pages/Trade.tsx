@@ -39,7 +39,7 @@ export default function Trade() {
   const load = async () => {
     try {
       const [m, p, o, account, wl, focused] = await Promise.all([
-        apiMarkets<Market>({ class: filter, q: search || undefined, limit: 80 }),
+        apiMarkets<Market>({ class: filter, q: search || undefined, limit: 50 }),
         apiGet<Position[]>('/api/paper/positions'),
         apiGet<Order[]>('/api/paper/orders'),
         apiGet<PaperAccount>('/api/paper/account'),

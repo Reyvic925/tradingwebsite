@@ -65,6 +65,7 @@ assert.ok(requestedUrls.some((url) => url.includes('/chart/ETH-USD')));
 
 logicalNow += 6000;
 quoteUpdatedAt = new Date(logicalNow - 6 * 60 * 1000).toISOString();
+logicalNow += 61000;
 await assert.rejects(getLiveMarketQuote('ETHUSD'), /ETHUSD quote is stale/);
 
 globalThis.fetch = originalFetch;

@@ -2,7 +2,7 @@ const COINPAPRIKA_BTC_URL = 'https://api.coinpaprika.com/v1/tickers/btc-bitcoin'
 const YAHOO_CHART_URL = 'https://query2.finance.yahoo.com/v8/finance/chart';
 const CRYPTO_QUOTE_MAX_AGE_MS = 5 * 60 * 1000;
 const MARKET_QUOTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const QUOTE_CACHE_MS = 5000;
+const QUOTE_CACHE_MS = 60 * 1000;
 const CURRENCY_CODES = new Set([
   'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNH', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR',
   'ILS', 'INR', 'JPY', 'KES', 'KRW', 'MXN', 'MYR', 'NGN', 'NOK', 'NZD', 'PHP', 'PLN', 'RUB',
@@ -131,4 +131,21 @@ export async function getLiveMarketQuote(symbol) {
   } finally {
     pendingQuotes.delete(normalizedSymbol);
   }
+}
+
+export async function getLiveMarketQuotes(symbols = []) {
+  const uniqueSymbols = [...new Set(symbols.map((symbol) => String(symbol || '').trim().toUpperCase()).filter(Boolean))];
+  const results = await Promise.allSettled(uniqueSymbols.map((symbol) => getLiveMarketQuote(symbol)));
+  const quotes = Object.create(null);
+
+  results.forEach((result, index) => {
+    const symbol = uniqueSymbols[index];
+    if (result.status === 'fulfilled') {
+      quotes[symbol] = result.value;
+    } else {
+      console.error(`[worker/market-quotes] Live quote unavailable for ${symbol}`, result.reason?.message || result.reason);
+    }
+  });
+
+  return quotes;
 }

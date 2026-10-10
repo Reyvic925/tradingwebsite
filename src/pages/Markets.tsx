@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiMarkets } from '../lib/api';
-import { formatPct, formatPrice } from '../lib/format';
+import { formatPct, formatPrice, timeAgo } from '../lib/format';
 import type { Market } from '../types';
 import IndexBoard from '../components/IndexBoard';
 
@@ -95,7 +95,7 @@ export default function Markets() {
       }
     };
     load();
-    const id = setInterval(() => load(), 8000);
+    const id = setInterval(() => load(), 30000);
     return () => {
       alive = false;
       clearInterval(id);
@@ -167,9 +167,23 @@ export default function Markets() {
                 <td className="px-3 py-3 font-mono sm:px-5">{m.symbol}</td>
                 <td className="px-3 py-3 text-stone-400">{m.name}</td>
                 <td className="px-3 py-3 uppercase text-[11px] text-stone-500">{m.asset_class}</td>
-                <td className="px-3 py-3 font-mono">{formatPrice(Number(m.price))}</td>
+                <td className="px-3 py-3 font-mono">
+                  <span>{formatPrice(Number(m.price))}</span>
+                  <span
+                    className="mt-1 block text-[9px] leading-none text-stone-500"
+                    title={m.price_source || 'Price source unavailable'}
+                  >
+                    {m.price_source === 'D1 reference'
+                      ? 'Reference'
+                      : m.quote_updated_at
+                        ? `As of ${timeAgo(m.quote_updated_at)}`
+                        : 'Price source unavailable'}
+                  </span>
+                </td>
                 <td className={`px-3 py-3 font-mono ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
-                <td className="px-3 py-3 font-mono text-xs text-stone-500">{formatPrice(Number(m.high_24h))} / {formatPrice(Number(m.low_24h))}</td>
+                <td className="px-3 py-3 font-mono text-xs text-stone-500">
+                  {m.high_24h == null ? '—' : formatPrice(Number(m.high_24h))} / {m.low_24h == null ? '—' : formatPrice(Number(m.low_24h))}
+                </td>
                 <td className="px-3 py-3 text-right sm:px-5">
                   <Link to={`/app/trade/${encodeURIComponent(m.symbol)}`} className="text-xs text-amber-300">Trade</Link>
                 </td>

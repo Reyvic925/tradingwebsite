@@ -1,6 +1,6 @@
 import { UNIVERSE } from '../api-handlers/universe-data.js';
 import { getDefaultPlans } from '../api-handlers/plan-data.js';
-import { getLiveMarketQuote } from './market-quotes.js';
+import { getLiveMarketQuote, getLiveMarketQuotes } from './market-quotes.js';
 
 const CLASS_MAP = {
   usa: ['stock', 'etf'],
@@ -175,7 +175,7 @@ async function markets(url, db) {
   const requestedClass = String(url.searchParams.get('class') || url.searchParams.get('asset_class') || 'all').toLowerCase();
   const assetClasses = requestedClass === 'all' ? null : CLASS_MAP[requestedClass];
   const featured = url.searchParams.get('featured') === '1';
-  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || (featured ? 12 : 120)));
+  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || (featured ? 12 : 50)));
   const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
   const symbol = String(url.searchParams.get('symbol') || '').trim().toUpperCase();
 
@@ -208,6 +208,12 @@ async function markets(url, db) {
       console.error(`[worker/public-api] Live quote unavailable for ${symbol}`, error?.message || error);
       return json({ error: `Live ${symbol} pricing is temporarily unavailable. Refresh before trading.` }, 503);
     }
+  } else if (marketItems.length) {
+    const quotes = await getLiveMarketQuotes(marketItems.map((item) => item.symbol));
+    marketItems = marketItems.map((item) => ({
+      ...item,
+      ...(quotes[String(item.symbol || '').toUpperCase()] || {}),
+    }));
   }
   const total = Number(countResult?.total || 0) || items.length;
   return json({
