@@ -1,9 +1,11 @@
+import YahooFinance from 'yahoo-finance2';
+
 const COINPAPRIKA_BTC_URL = 'https://api.coinpaprika.com/v1/tickers/btc-bitcoin';
-const YAHOO_CHART_URL = 'https://query2.finance.yahoo.com/v8/finance/chart';
 const CRYPTO_QUOTE_MAX_AGE_MS = 5 * 60 * 1000;
 const MARKET_QUOTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const QUOTE_CACHE_MS = 5000;
 const MARKET_REFRESH_BATCH_SIZE = 12;
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 const CURRENCY_CODES = new Set([
   'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNH', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR',
   'ILS', 'INR', 'JPY', 'KES', 'KRW', 'MXN', 'MYR', 'NGN', 'NOK', 'NZD', 'PHP', 'PLN', 'RUB',
@@ -68,29 +70,41 @@ async function fetchCoinPaprikaBtc() {
 
 async function fetchYahooQuote(symbol) {
   const yahooSymbol = toYahooSymbol(symbol);
-  const url = `${YAHOO_CHART_URL}/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!response.ok) throw new Error(`Yahoo Finance request failed (${response.status})`);
-  const result = (await response.json())?.chart?.result?.[0];
-  const price = Number(result?.meta?.regularMarketPrice);
+  const result = await yahooFinance.quote(
+    yahooSymbol,
+    {
+      fields: [
+      'regularMarketPrice',
+      'regularMarketChangePercent',
+      'regularMarketDayHigh',
+      'regularMarketDayLow',
+      'regularMarketVolume',
+      'regularMarketTime',
+      'regularMarketPreviousClose',
+      'fullExchangeName',
+      'symbol',
+      ],
+    },
+    {
+      fetchOptions: { signal: AbortSignal.timeout(8000) },
+      validateResult: false,
+    },
+  );
+  const price = Number(result?.regularMarketPrice);
   if (!Number.isFinite(price) || price <= 0) throw new Error(`Yahoo Finance returned no price for ${symbol}.`);
-
-  const intraday = result.indicators?.quote?.[0] || {};
-  const highs = (intraday.high || []).map(Number).filter((value) => Number.isFinite(value) && value > 0);
-  const lows = (intraday.low || []).map(Number).filter((value) => Number.isFinite(value) && value > 0);
-  const previousClose = Number(result.meta.chartPreviousClose || result.meta.previousClose || price);
-  const quoteUpdatedAt = Number.isFinite(Number(result.meta.regularMarketTime))
-    ? new Date(Number(result.meta.regularMarketTime) * 1000).toISOString()
+  const previousClose = Number(result.regularMarketPreviousClose || price);
+  const quoteUpdatedAt = result.regularMarketTime
+    ? new Date(result.regularMarketTime).toISOString()
     : null;
 
   return {
     symbol: String(symbol).toUpperCase(),
     price,
-    change_24h: previousClose > 0 ? ((price / previousClose) - 1) * 100 : 0,
-    high_24h: highs.length ? Math.max(...highs) : null,
-    low_24h: lows.length ? Math.min(...lows) : null,
-    volume: Number(result.meta.regularMarketVolume || (intraday.volume || []).filter(Number.isFinite).at(-1) || 0),
-    price_source: `Yahoo Finance (${result.meta.exchangeName || result.meta.fullExchangeName || yahooSymbol})`,
+    change_24h: Number(result.regularMarketChangePercent || 0),
+    high_24h: Number(result.regularMarketDayHigh || price),
+    low_24h: Number(result.regularMarketDayLow || price),
+    volume: Number(result.regularMarketVolume || 0),
+    price_source: `Yahoo Finance (${result.fullExchangeName || yahooSymbol})`,
     quote_updated_at: quoteUpdatedAt,
   };
 }
