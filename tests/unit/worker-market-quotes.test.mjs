@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getLiveMarketQuote } from '../../worker/market-quotes.js';
+import { getLiveMarketQuote, refreshMarketPrices } from '../../worker/market-quotes.js';
 
 const originalFetch = globalThis.fetch;
 let calls = 0;
@@ -62,6 +62,44 @@ const cryptoQuote = await getLiveMarketQuote('ETHUSD');
 assert.equal(cryptoQuote.price, 3000);
 assert.equal(cryptoQuote.price_source, 'Yahoo Finance (CCC)');
 assert.ok(requestedUrls.some((url) => url.includes('/chart/ETH-USD')));
+
+class FakeMarketDatabase {
+  statements = [];
+  rows = [
+    { id: 1, symbol: 'BTCUSD' },
+    { id: 2, symbol: 'ETHUSD' },
+    { id: 3, symbol: 'ZZZFAKE' },
+  ];
+
+  prepare(sql) {
+    const statement = {
+      sql,
+      values: [],
+      bind: (...values) => {
+        statement.values = values;
+        return statement;
+      },
+      first: async () => ({ total: this.rows.length }),
+      all: async () => ({ results: this.rows }),
+    };
+    this.statements.push(statement);
+    return statement;
+  }
+
+  async batch(statements) {
+    this.updates = statements;
+    return statements.map(() => ({ success: true }));
+  }
+}
+
+logicalNow += 6000;
+quoteUpdatedAt = new Date(logicalNow).toISOString();
+const db = new FakeMarketDatabase();
+const refreshResult = await refreshMarketPrices(db, logicalNow);
+assert.deepEqual(refreshResult, { refreshed: 2, total: 3 });
+assert.equal(db.updates.length, 2, 'only symbols with valid live quotes should be persisted');
+assert.deepEqual(db.updates[0].values, [84858.8, ((84858.8 / 84000) - 1) * 100, 120, 85200, 83000, 1]);
+assert.match(db.updates[0].sql, /UPDATE markets\s+SET price = \?, change_24h = \?, volume = \?, high_24h = \?, low_24h = \?/);
 
 logicalNow += 6000;
 quoteUpdatedAt = new Date(logicalNow - 6 * 60 * 1000).toISOString();

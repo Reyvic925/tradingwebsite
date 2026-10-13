@@ -3,6 +3,7 @@ const YAHOO_CHART_URL = 'https://query2.finance.yahoo.com/v8/finance/chart';
 const CRYPTO_QUOTE_MAX_AGE_MS = 5 * 60 * 1000;
 const MARKET_QUOTE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const QUOTE_CACHE_MS = 5000;
+const MARKET_REFRESH_BATCH_SIZE = 12;
 const CURRENCY_CODES = new Set([
   'AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNH', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR',
   'ILS', 'INR', 'JPY', 'KES', 'KRW', 'MXN', 'MYR', 'NGN', 'NOK', 'NZD', 'PHP', 'PLN', 'RUB',
@@ -148,4 +149,39 @@ export async function getLiveMarketQuotes(symbols = []) {
   });
 
   return quotes;
+}
+
+export async function refreshMarketPrices(db, now = Date.now()) {
+  const count = await db.prepare('SELECT COUNT(*) AS total FROM markets').first();
+  const total = Number(count?.total || 0);
+  if (!Number.isInteger(total) || total <= 0) return { refreshed: 0, total: 0 };
+
+  const batchCount = Math.ceil(total / MARKET_REFRESH_BATCH_SIZE);
+  const offset = (Math.floor(now / 60000) % batchCount) * MARKET_REFRESH_BATCH_SIZE;
+  const result = await db.prepare(
+    'SELECT id, symbol FROM markets ORDER BY id ASC LIMIT ? OFFSET ?',
+  ).bind(MARKET_REFRESH_BATCH_SIZE, offset).all();
+  const rows = result.results || [];
+  if (!rows.length) return { refreshed: 0, total };
+
+  const quotes = await getLiveMarketQuotes(rows.map((row) => row.symbol));
+  const updates = rows.flatMap((row) => {
+    const quote = quotes[String(row.symbol || '').toUpperCase()];
+    if (!quote || !Number.isFinite(Number(quote.price)) || Number(quote.price) <= 0) return [];
+    return [db.prepare(`
+      UPDATE markets
+      SET price = ?, change_24h = ?, volume = ?, high_24h = ?, low_24h = ?
+      WHERE id = ?
+    `).bind(
+      quote.price,
+      quote.change_24h,
+      quote.volume,
+      quote.high_24h,
+      quote.low_24h,
+      row.id,
+    )];
+  });
+
+  if (updates.length) await db.batch(updates);
+  return { refreshed: updates.length, total };
 }

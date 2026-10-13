@@ -10,6 +10,7 @@ import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 import { handleTraderRequest } from './traders-api.js';
+import { refreshMarketPrices } from './market-quotes.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -22,6 +23,9 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 export default {
   async scheduled(_controller, env, context) {
     context.waitUntil(runPaperTradingTick(env));
+    context.waitUntil(refreshMarketPrices(env.DB).catch((error) => {
+      console.error('[worker] Scheduled market quote refresh failed', error);
+    }));
   },
 
   async fetch(request, env) {
