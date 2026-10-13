@@ -84,10 +84,10 @@ export default function Dashboard() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Paper equity', value: formatMoney(Number(paperAccount?.equity ?? paperAccount?.initial_cash ?? 0)) },
-          { label: 'Paper buying power', value: formatMoney(Number(paperAccount?.available_cash ?? 0)) },
+          { label: 'Desk equity', value: formatMoney(Number(paperAccount?.equity ?? paperAccount?.initial_cash ?? 0)) },
+          { label: 'Available to trade', value: formatMoney(Number(paperAccount?.available_cash ?? 0)) },
           { label: 'Investment P&L', value: formatMoney(investmentSummary.totalPnl), tone: investmentSummary.totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
-          { label: 'Paper trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          { label: 'Trading P&L', value: formatMoney(pnl), tone: pnl >= 0 ? 'text-emerald-400' : 'text-rose-400' },
         ].map((c) => (
           <div key={c.label} className="rounded-md border border-white/5 bg-white/[0.02] p-5">
             <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{c.label}</div>

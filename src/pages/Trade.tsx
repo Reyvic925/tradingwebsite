@@ -377,7 +377,7 @@ export default function Trade() {
               </div>
             </div>
             <div className="mt-3 text-[11px] text-stone-500">
-              Paper buying power {formatMoney(Number(paperAccount?.available_cash || 0))} · 100% cash collateral
+              Buying power {formatMoney(Number(paperAccount?.available_cash || 0))} · 100% cash collateral
             </div>
             {msg && <div className="mt-2 text-xs text-amber-200">{msg}</div>}
             <button disabled={busy} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>

@@ -85,7 +85,7 @@ async function fillPaperOrder(db, userId, order, quote) {
     return { rejected: true };
   }
   if (Number(changes[1]?.meta?.changes || 0) !== 1 || Number(changes[2]?.meta?.changes || 0) !== 1) {
-    throw new Error('Paper order did not produce a position fill.');
+    throw new Error('Order did not produce a position fill.');
   }
 
   const [filledOrder, position] = await Promise.all([
@@ -296,11 +296,11 @@ async function closePaperPosition(request, env, userId) {
   const db = env.DB;
   const body = await readBody(request);
   const id = Number(body.id);
-  if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid paper position id is required.' }, 400);
+  if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid position id is required.' }, 400);
   const position = await db.prepare(`
     SELECT * FROM paper_positions WHERE id = ? AND user_id = ? AND status = 'open'
   `).bind(id, userId).first();
-  if (!position) return json({ error: 'Open paper position not found.' }, 404);
+  if (!position) return json({ error: 'Open position not found.' }, 404);
 
   let quote;
   try {
@@ -310,7 +310,7 @@ async function closePaperPosition(request, env, userId) {
     return json({ error: 'A fresh market quote is unavailable. The position remains open.' }, 503);
   }
   const settled = await settlePaperPosition(db, userId, position, quote);
-  if (!settled) return json({ error: 'Paper position was already closed.' }, 409);
+  if (!settled) return json({ error: 'Position was already closed.' }, 409);
   const closed = await db.prepare('SELECT * FROM paper_positions WHERE id = ? AND user_id = ?').bind(id, userId).first();
   return json(closed);
 }
@@ -318,7 +318,7 @@ async function closePaperPosition(request, env, userId) {
 async function updatePaperPosition(request, db, userId) {
   const body = await readBody(request);
   const id = Number(body.id);
-  if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid paper position id is required.' }, 400);
+  if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid position id is required.' }, 400);
   const stopLoss = body.stop_loss == null || body.stop_loss === '' ? null : Number(body.stop_loss);
   const takeProfit = body.take_profit == null || body.take_profit === '' ? null : Number(body.take_profit);
   if (stopLoss !== null && (!Number.isFinite(stopLoss) || stopLoss <= 0)) return json({ error: 'Stop loss must be a positive price.' }, 400);
@@ -327,7 +327,7 @@ async function updatePaperPosition(request, db, userId) {
     UPDATE paper_positions SET stop_loss = ?, take_profit = ?
     WHERE id = ? AND user_id = ? AND status = 'open' RETURNING *
   `).bind(stopLoss, takeProfit, id, userId).first();
-  return position ? json(position) : json({ error: 'Open paper position not found.' }, 404);
+  return position ? json(position) : json({ error: 'Open position not found.' }, 404);
 }
 
 export async function runPaperTradingTick(env) {
@@ -377,16 +377,16 @@ export async function handlePaperTradingRequest(request, env) {
     if (url.pathname === '/api/paper/orders' && request.method === 'DELETE') {
       const body = await readBody(request);
       const id = Number(body.id);
-      if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid paper order id is required.' }, 400);
+      if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'Valid order id is required.' }, 400);
       const order = await env.DB.prepare(`
         UPDATE paper_orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND user_id = ? AND status IN ('pending', 'triggered') RETURNING id
       `).bind(id, user.id).first();
-      return order ? json({ ok: true }) : json({ error: 'Pending paper order not found.' }, 404);
+      return order ? json({ ok: true }) : json({ error: 'Pending order not found.' }, 404);
     }
     return json({ error: 'Not found' }, 404);
   } catch (error) {
     console.error('[worker/paper-trading]', error);
-    return json({ error: 'Paper trading is temporarily unavailable.' }, 500);
+    return json({ error: 'Trading is temporarily unavailable.' }, 500);
   }
 }
