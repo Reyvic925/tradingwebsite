@@ -280,27 +280,6 @@ export default function Landing() {
               </a>
             </div>
 
-            <div className="mt-8 max-w-lg rounded-md border border-amber-300/20 bg-black/30 p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-amber-200">Wallet test</div>
-                  <div className="mt-1 text-sm text-stone-300">Connect any injected EVM wallet, including Trust Wallet and other browser wallets.</div>
-                </div>
-                <button
-                  id="walletConnectBtn"
-                  type="button"
-                  className="inline-flex items-center rounded-sm border border-amber-300/50 bg-amber-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:bg-amber-400/20"
-                >
-                  Connect wallet
-                </button>
-              </div>
-              <div id="walletStatus" className="mt-3 rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-stone-300">
-                No wallet connected yet
-              </div>
-              <div id="walletAddress" className="mt-2 text-[11px] uppercase tracking-[0.2em] text-stone-500">
-                Not connected
-              </div>
-            </div>
           </motion.div>
         </div>
 

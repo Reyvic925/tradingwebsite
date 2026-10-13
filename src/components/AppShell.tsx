@@ -139,6 +139,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             Private client terminal
           </div>
           <div className="ml-auto flex items-center gap-4">
+            <div className="flex items-center gap-3 rounded-sm border border-amber-300/20 bg-[#0b1017]/90 px-3 py-2 text-left">
+              <div className="min-w-0">
+                <div id="walletStatus" className="text-[9px] uppercase tracking-[0.22em] text-stone-500">No wallet connected yet</div>
+                <div id="walletAddress" className="mt-1 text-[10px] uppercase tracking-[0.18em] text-stone-400">Not connected</div>
+              </div>
+              <button
+                id="walletConnectBtn"
+                type="button"
+                className="inline-flex items-center rounded-sm border border-amber-300/50 bg-amber-400/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:bg-amber-400/20"
+              >
+                Connect wallet
+              </button>
+            </div>
             <div className="hidden text-right sm:block">
               <div className="text-[10px] uppercase tracking-widest text-stone-500">Equity</div>
               <div className="font-mono text-sm text-stone-100">{formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0))}</div>

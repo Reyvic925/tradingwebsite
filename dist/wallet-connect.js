@@ -275,12 +275,34 @@ function closeWalletModal() {
 
 function attachWalletHandlers() {
   const connectBtn = document.getElementById('walletConnectBtn');
-  if (connectBtn) {
+  if (connectBtn && !connectBtn.dataset.walletBound) {
+    connectBtn.dataset.walletBound = 'true';
     connectBtn.addEventListener('click', showWalletModal);
   }
 
-  setStatus('No wallet connected yet');
-  setAddress('Not connected');
+  const status = document.getElementById('walletStatus');
+  const address = document.getElementById('walletAddress');
+  if (status) status.textContent = 'No wallet connected yet';
+  if (address) address.textContent = 'Not connected';
 }
 
-document.addEventListener('DOMContentLoaded', attachWalletHandlers);
+function observeWalletUI() {
+  const root = document.body;
+  if (!root) return;
+
+  const observer = new MutationObserver(() => {
+    attachWalletHandlers();
+  });
+
+  observer.observe(root, { childList: true, subtree: true });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  attachWalletHandlers();
+  observeWalletUI();
+});
+
+if (document.readyState !== 'loading') {
+  attachWalletHandlers();
+  observeWalletUI();
+}
