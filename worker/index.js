@@ -10,7 +10,6 @@ import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 import { handleTraderRequest } from './traders-api.js';
-import { refreshMarketPrices } from './market-quotes.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -20,12 +19,11 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   },
 });
 
+const pendingMarketResponses = new Map();
+
 export default {
   async scheduled(_controller, env, context) {
     context.waitUntil(runPaperTradingTick(env));
-    context.waitUntil(refreshMarketPrices(env.DB).catch((error) => {
-      console.error('[worker] Scheduled market quote refresh failed', error);
-    }));
   },
 
   async fetch(request, env) {
@@ -100,6 +98,62 @@ export default {
     if ([
       '/api/landing', '/api/markets', '/api/plans', '/api/investment-tiers',
     ].includes(url.pathname)) {
+      if (url.pathname === '/api/markets' && request.method === 'GET') {
+        const marketCache = globalThis.caches?.default;
+        if (marketCache) {
+          const cacheUrl = new URL(request.url);
+          cacheUrl.searchParams.sort();
+          const cacheKey = new Request(cacheUrl, { method: 'GET' });
+          const responseWithCacheStatus = (response, cacheStatus) => {
+            const clone = response.clone();
+            const headers = new Headers(clone.headers);
+            headers.set('x-market-cache', cacheStatus);
+            return new Response(clone.body, {
+              status: clone.status,
+              statusText: clone.statusText,
+              headers,
+            });
+          };
+          try {
+            const cached = await marketCache.match(cacheKey);
+            if (cached) return responseWithCacheStatus(cached, 'HIT');
+          } catch (error) {
+            console.error('[worker] Market response cache read failed', error);
+          }
+
+          const cacheKeyUrl = cacheKey.url;
+          let pending = pendingMarketResponses.get(cacheKeyUrl);
+          const cacheStatus = pending ? 'COALESCED' : 'MISS';
+          if (!pending) {
+            pending = (async () => {
+              const response = await handlePublicRequest(request, env);
+              if (!response.ok) return response;
+              const headers = new Headers(response.headers);
+              headers.set('cache-control', 'public, max-age=15');
+              const cacheable = new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers,
+              });
+              try {
+                await marketCache.put(cacheKey, cacheable.clone());
+              } catch (error) {
+                console.error('[worker] Market response cache write failed', error);
+              }
+              return cacheable;
+            })();
+            pendingMarketResponses.set(cacheKeyUrl, pending);
+          }
+          try {
+            const response = await pending;
+            return responseWithCacheStatus(response, cacheStatus);
+          } finally {
+            if (pendingMarketResponses.get(cacheKeyUrl) === pending) {
+              pendingMarketResponses.delete(cacheKeyUrl);
+            }
+          }
+        }
+      }
       return handlePublicRequest(request, env);
     }
 

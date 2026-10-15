@@ -77,40 +77,9 @@ export default function Trade() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 20000);
+    const id = setInterval(load, 30000);
     return () => clearInterval(id);
   }, [filter, search, symbol]);
-  
-  // Real-time P&L update every second - use single price source
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (positions.length > 0 && markets.length > 0) {
-        // Fetch prices for each position symbol individually since backend doesn't support multi-symbol filter
-        const uniqueSymbols = [...new Set(positions.map(p => p.symbol))];
-        const pricePromises = uniqueSymbols.map(sym => 
-          apiMarkets<Market>({ symbol: sym, limit: 1 }).then(({ items }) => ({ symbol: sym, price: items[0]?.price }))
-            .catch(() => ({ symbol: sym, price: null }))
-        );
-        
-        Promise.all(pricePromises).then(results => {
-          const prices: Record<string, number> = {};
-          results.forEach(r => {
-            if (r.price !== null && r.price !== undefined) {
-              const numPrice = Number(r.price);
-              // Only update if it's a valid positive number
-              if (!isNaN(numPrice) && numPrice > 0) {
-                prices[r.symbol] = numPrice;
-              }
-            }
-          });
-          // Update both maps with the same price to avoid dual pricing
-          setMarketPrices(prev => ({ ...prev, ...prices }));
-          setLatestPrice(prev => ({ ...prev, ...prices }));
-        }).catch(() => {});
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [positions.length, markets.length]);
 
   const FILTERS = [
     { id: 'stock', label: 'Stocks' },

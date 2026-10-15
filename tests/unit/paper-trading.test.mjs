@@ -119,8 +119,19 @@ try {
   assert.equal(marketBuyBody.position.reserved_cash, 100);
   assert.equal((await (await handlePaperTradingRequest(request('/api/paper/account', userIds[1]), env)).json()).reserved_cash, 0);
 
+  const changesBeforeReadRequests = db.sqlite.prepare('SELECT total_changes() AS total').get().total;
+  await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env);
+  await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env);
+  await handlePaperTradingRequest(request('/api/paper/account', userIds[0]), env);
+  assert.equal(
+    db.sqlite.prepare('SELECT total_changes() AS total').get().total,
+    changesBeforeReadRequests,
+    'account, positions, and orders reads must not write to D1',
+  );
+
   quotePrice = 110;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const positions = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(positions[0].unrealized_pnl, 10);
   assert.equal(positions[0].price_source, 'CoinPaprika');
@@ -139,6 +150,7 @@ try {
   assert.equal((await limit.json()).status, 'pending');
   quotePrice = 104;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const limitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(limitOrders.find((order) => order.type === 'limit').status, 'filled');
   const limitPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
@@ -150,6 +162,7 @@ try {
   assert.equal((await stop.json()).status, 'pending');
   quotePrice = 106;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const stopOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopOrders.find((order) => order.type === 'stop').status, 'filled');
   const stopPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
@@ -163,10 +176,12 @@ try {
   assert.equal((await stopLimit.json()).status, 'pending');
   quotePrice = 106;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const triggeredOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(triggeredOrders.find((order) => order.type === 'stop_limit').status, 'triggered');
   quotePrice = 104;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const stopLimitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopLimitOrders.find((order) => order.type === 'stop_limit').status, 'filled');
   const stopLimitPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
@@ -178,6 +193,7 @@ try {
   assert.equal((await protectedOrder.json()).position.status, 'open');
   quotePrice = 105;
   logicalNow += 6000;
+  await runPaperTradingTick(env);
   const afterTakeProfit = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(afterTakeProfit.length, 0);
   const autoClosed = db.sqlite.prepare("SELECT status, realized_pnl FROM paper_positions WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(userIds[0]);

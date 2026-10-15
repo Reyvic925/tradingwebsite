@@ -78,16 +78,39 @@ assert.deepEqual(productionDb.statements.at(-1).values, ['forex', 50, 0]);
 
 const quoteTimestamp = new Date().toISOString();
 globalThis.fetch = async (url) => {
-  if (url.includes('coinpaprika.com')) {
+  const requestUrl = new URL(url);
+  if (requestUrl.hostname === 'finance.yahoo.com') {
+    return new Response('ok', { headers: { 'set-cookie': 'A=test; Domain=.yahoo.com; Path=/; Secure' } });
+  }
+  if (requestUrl.pathname === '/v1/test/getcrumb') {
+    return new Response('test-crumb');
+  }
+  if (requestUrl.pathname === '/v7/finance/quote') {
+    const symbols = requestUrl.searchParams.get('symbols')?.split(',') || [];
+    return Response.json({
+      quoteResponse: {
+        result: symbols.map((symbol) => ({
+          symbol,
+          quoteType: 'EQUITY',
+          regularMarketPrice: 42,
+          regularMarketChangePercent: 5,
+          regularMarketDayHigh: 43,
+          regularMarketDayLow: 41,
+          regularMarketVolume: 100,
+          regularMarketTime: quoteTimestamp,
+          regularMarketPreviousClose: 40,
+          fullExchangeName: 'TEST',
+        })),
+      },
+    });
+  }
+  if (requestUrl.hostname === 'api.coinpaprika.com') {
     return Response.json({
       quotes: { USD: { price: 84662.5486610824, percent_change_24h: 1.42, volume_24h: 26016114241.4 } },
       last_updated: quoteTimestamp,
     });
   }
-  return Response.json({ chart: { result: [{
-    meta: { regularMarketPrice: 42, chartPreviousClose: 40, exchangeName: 'TEST', regularMarketTime: Date.parse(quoteTimestamp) / 1000 },
-    indicators: { quote: [{ high: [43], low: [39], volume: [100] }] },
-  }] } });
+  throw new Error(`Unexpected quote test URL: ${requestUrl.href}`);
 };
 const liveMarketsResponse = await handlePublicRequest(request('/api/markets?class=stocks&limit=1'), { DB: liveDb });
 const liveMarkets = await liveMarketsResponse.json();

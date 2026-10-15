@@ -43,7 +43,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     load(true);
-    const id = setInterval(() => load(false), 10000);
+    const id = setInterval(() => load(false), 30000);
     return () => clearInterval(id);
   }, []);
 

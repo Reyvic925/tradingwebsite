@@ -24,6 +24,8 @@ async function readBody(request) {
 }
 
 async function ensurePaperAccount(db, userId) {
+  const existing = await db.prepare('SELECT * FROM paper_accounts WHERE user_id = ?').bind(userId).first();
+  if (existing) return existing;
   await db.prepare(`
     INSERT OR IGNORE INTO paper_accounts (user_id, initial_cash, cash_balance)
     VALUES (?, ?, ?)
@@ -184,6 +186,7 @@ async function refreshOpenPositions(db, userId) {
   const result = await db.prepare(`
     SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 100
   `).bind(userId).all();
+  if (!(result.results || []).length) return [];
   const quotes = new Map();
   const statements = [];
 
@@ -216,11 +219,14 @@ async function refreshOpenPositions(db, userId) {
 }
 
 async function accountSnapshot(db, userId) {
-  await ensurePaperAccount(db, userId);
-  await processPendingOrders(db, userId);
-  const positions = await refreshOpenPositions(db, userId);
-  const account = await db.prepare('SELECT * FROM paper_accounts WHERE user_id = ?').bind(userId).first();
-  const unrealizedPnl = positions.reduce((total, position) => total + Number(position.unrealized_pnl || 0), 0);
+  const account = await ensurePaperAccount(db, userId);
+  const positions = await db.prepare(`
+    SELECT unrealized_pnl, price_source, quote_updated_at
+    FROM paper_positions WHERE user_id = ? AND status = 'open'
+    ORDER BY id DESC LIMIT 100
+  `).bind(userId).all();
+  const openPositions = positions.results || [];
+  const unrealizedPnl = openPositions.reduce((total, position) => total + Number(position.unrealized_pnl || 0), 0);
   return {
     initial_cash: Number(account.initial_cash),
     cash_balance: Number(account.cash_balance),
@@ -229,8 +235,8 @@ async function accountSnapshot(db, userId) {
     realized_pnl: Number(account.realized_pnl),
     unrealized_pnl: unrealizedPnl,
     equity: Number(account.cash_balance) + unrealizedPnl,
-    quote_source: positions.length ? positions[0].price_source : null,
-    quote_updated_at: positions.length ? positions[0].quote_updated_at : null,
+    quote_source: openPositions.length ? openPositions[0].price_source : null,
+    quote_updated_at: openPositions.length ? openPositions[0].quote_updated_at : null,
   };
 }
 
@@ -331,7 +337,12 @@ async function updatePaperPosition(request, db, userId) {
 }
 
 export async function runPaperTradingTick(env) {
-  const accounts = await env.DB.prepare('SELECT user_id FROM paper_accounts').all();
+  const accounts = await env.DB.prepare(`
+    SELECT user_id FROM paper_orders
+    WHERE status IN ('pending', 'triggered')
+    UNION
+    SELECT user_id FROM paper_positions WHERE status = 'open'
+  `).all();
   for (const account of accounts.results || []) {
     try {
       await processPendingOrders(env.DB, account.user_id);
@@ -352,10 +363,10 @@ export async function handlePaperTradingRequest(request, env) {
       return json(await accountSnapshot(env.DB, user.id));
     }
     if (url.pathname === '/api/paper/positions' && request.method === 'GET') {
-      await ensurePaperAccount(env.DB, user.id);
-      await processPendingOrders(env.DB, user.id);
-      const positions = await refreshOpenPositions(env.DB, user.id);
-      return json(positions);
+      const result = await env.DB.prepare(`
+        SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 100
+      `).bind(user.id).all();
+      return json(result.results || []);
     }
     if (url.pathname === '/api/paper/positions' && request.method === 'DELETE') {
       return await closePaperPosition(request, env, user.id);
@@ -364,8 +375,6 @@ export async function handlePaperTradingRequest(request, env) {
       return await updatePaperPosition(request, env.DB, user.id);
     }
     if (url.pathname === '/api/paper/orders' && request.method === 'GET') {
-      await ensurePaperAccount(env.DB, user.id);
-      await processPendingOrders(env.DB, user.id);
       const result = await env.DB.prepare(`
         SELECT * FROM paper_orders WHERE user_id = ? ORDER BY id DESC LIMIT 100
       `).bind(user.id).all();
