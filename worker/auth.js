@@ -110,7 +110,7 @@ function cookieOptions(request, maxAge) {
 
 function sessionCookie(request, token) {
   const secure = new URL(request.url).protocol === 'https:';
-  return `${SESSION_COOKIE}=${token}; Max-Age=${SESSION_MAX_AGE}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
 }
 
 function sessionToken(request) {

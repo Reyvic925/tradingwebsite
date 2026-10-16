@@ -278,6 +278,8 @@ const login = await handleAuthRequest(request('/api/auth/login', {
   body: JSON.stringify({ email: 'TRADER@example.com', password: 'correct horse battery staple' }),
 }), env);
 assert.equal(login.status, 200);
+assert.doesNotMatch(login.headers.get('set-cookie'), /Max-Age|Expires=/i, 'Login cookie should expire with the browser session');
+assert.match(login.headers.get('set-cookie'), /HttpOnly/);
 const loginCookie = cookieFrom(login);
 
 const invalidPassword = await handleAuthRequest(request('/api/auth/login', {
@@ -364,6 +366,7 @@ assert.equal(reusedReset.status, 400);
 
 const logout = await handleAuthRequest(request('/api/auth/logout', { method: 'POST', headers: { cookie: loginCookie } }), env);
 assert.equal(logout.status, 200);
+assert.match(logout.headers.get('set-cookie'), /Max-Age=0/);
 const afterLogout = await handleAuthRequest(request('/api/auth/session', { headers: { cookie: loginCookie } }), env);
 assert.equal((await afterLogout.json()).user, null);
 
