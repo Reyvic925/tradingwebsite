@@ -1,3 +1,5 @@
+import { withRequestTimeout } from './request';
+
 export type WorkerAuthUser = {
   id: string;
   email: string;
@@ -28,24 +30,27 @@ function emitWorkerAuthChange(user: WorkerAuthUser | null) {
 }
 
 async function workerRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${workerAuthUrl()}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+  return withRequestTimeout(async (signal) => {
+    const response = await fetch(`${workerAuthUrl()}${path}`, {
+      ...init,
+      credentials: 'include',
+      signal,
+      headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    });
+    let data: unknown = {};
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+    if (!response.ok) {
+      const message = data && typeof data === 'object' && 'error' in data
+        ? String((data as { error?: unknown }).error || '')
+        : '';
+      throw new Error(message || `Authentication request failed (${response.status})`);
+    }
+    return data as T;
   });
-  let data: unknown = {};
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
-  }
-  if (!response.ok) {
-    const message = data && typeof data === 'object' && 'error' in data
-      ? String((data as { error?: unknown }).error || '')
-      : '';
-    throw new Error(message || `Authentication request failed (${response.status})`);
-  }
-  return data as T;
 }
 
 export async function getAuthSession() {
