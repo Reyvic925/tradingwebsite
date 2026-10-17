@@ -31,9 +31,6 @@ class FakeStatement {
       if (this.values.includes('BTCUSD')) {
         return { results: [{ id: 2, symbol: 'BTCUSD', name: 'Bitcoin / USD', asset_class: 'crypto', price: 63250, change_24h: 0, volume: 1, high_24h: 63250, low_24h: 63250 }] };
       }
-      if (this.label === 'live') {
-        return { results: [{ id: 3, symbol: 'LIVE', name: 'Live market', asset_class: 'stock', price: 1, change_24h: 0, volume: 1, high_24h: 1, low_24h: 1 }] };
-      }
       return { results: [{ id: 1, symbol: this.label === 'staging' ? 'STAGE' : 'PROD', name: `${this.label} market`, asset_class: 'stock', price: 1, change_24h: 0, volume: 1, high_24h: 1, low_24h: 1 }] };
     }
     return { results: [{ id: 1, source: this.label }] };
@@ -46,7 +43,6 @@ class FakeStatement {
 
 const productionDb = new FakeDatabase('production');
 const stagingDb = new FakeDatabase('staging');
-const liveDb = new FakeDatabase('live');
 const request = (path) => new Request(`http://localhost${path}`);
 const originalFetch = globalThis.fetch;
 let externalFetchCalls = 0;

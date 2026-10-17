@@ -24,7 +24,7 @@ export default function Dashboard() {
       const [paper, pos, mkt, tx, inv] = await Promise.all([
         apiGet<PaperAccount>('/api/paper/account').catch(() => null),
         apiList<Position>('/api/paper/positions'),
-        apiList<Market>('/api/markets?featured=1&limit=12&tick=1'),
+        apiList<Market>('/api/markets?featured=1&limit=12'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
