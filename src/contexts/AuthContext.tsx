@@ -18,16 +18,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const syncSession = () => getAuthSession().then(({ session: sessionData, user: userData }) => {
-      if (!active) return;
-      setSession(sessionData);
-      setUser(userData);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    let authChangeRevision = 0;
+    const syncSession = async () => {
+      const revision = authChangeRevision;
+      try {
+        const { session: sessionData, user: userData } = await getAuthSession();
+        if (!active || revision !== authChangeRevision) return;
+        setSession(sessionData);
+        setUser(userData);
+        setLoading(false);
+      } catch {
+        if (active && revision === authChangeRevision) setLoading(false);
+      }
+    };
 
     void syncSession();
 
     const onWorkerAuthChange = (event: Event) => {
+      authChangeRevision += 1;
       const nextUser = (event as CustomEvent<WorkerAuthUser | null>).detail;
       setUser(nextUser);
       setSession(nextUser ? { user: nextUser } : null);

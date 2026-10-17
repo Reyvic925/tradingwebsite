@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { resendVerificationEmail, signIn, signUp, verifyEmailCode } from '../lib/auth';
 import { apiGet, apiSend, clearReferral, takeReferral } from '../lib/api';
-import { BRAND } from '../lib/brand';
 import Logo from '../components/Logo';
 
 export default function Login() {
@@ -262,7 +261,6 @@ export default function Login() {
             )}
           </div>
 
-          {mode === 'login' && <p className="mt-4 text-center text-[11px] text-stone-600">Demo: {BRAND.demoEmail} / {BRAND.demoPassword}</p>}
         </div>
       </div>
     </div>
