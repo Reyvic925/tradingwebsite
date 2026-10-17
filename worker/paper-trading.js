@@ -1,5 +1,4 @@
 import { getAuthenticatedUser } from './auth.js';
-import { getLiveMarketQuote } from './market-quotes.js';
 
 const INITIAL_PAPER_CASH = 100000;
 const OPEN_ORDER_STATUSES = ['pending', 'triggered'];
@@ -33,8 +32,20 @@ async function ensurePaperAccount(db, userId) {
   return db.prepare('SELECT * FROM paper_accounts WHERE user_id = ?').bind(userId).first();
 }
 
-async function getQuote(_db, _marketId, symbol) {
-  return getLiveMarketQuote(symbol);
+async function getQuote(db, marketId, symbol) {
+  const market = await db.prepare(`
+    SELECT symbol, price FROM markets WHERE id = ? AND upper(symbol) = upper(?)
+  `).bind(marketId, symbol).first();
+  const price = Number(market?.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`No valid D1 reference price is available for ${symbol}.`);
+  }
+  return {
+    symbol: market.symbol,
+    price,
+    price_source: 'D1 reference',
+    quote_updated_at: null,
+  };
 }
 
 function limitCrossed(order, price) {
