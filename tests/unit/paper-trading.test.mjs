@@ -80,18 +80,13 @@ for (const userId of userIds) {
     .run(hash, userId);
 }
 
-let quotePrice = 100;
-let logicalNow = Date.now();
-const originalDateNow = Date.now;
 const originalFetch = globalThis.fetch;
-Date.now = () => logicalNow;
-globalThis.fetch = async (url) => {
-  assert.match(url, /api\.coinpaprika\.com\/v1\/tickers\/btc-bitcoin/);
-  return Response.json({
-    quotes: { USD: { price: quotePrice, percent_change_24h: 0, volume_24h: 5000 } },
-    last_updated: new Date(logicalNow).toISOString(),
-  });
+let externalFetchCalls = 0;
+globalThis.fetch = async () => {
+  externalFetchCalls += 1;
+  throw new Error('External market price fetching must remain disabled.');
 };
+const setMarketPrice = (price) => db.sqlite.prepare('UPDATE markets SET price = ? WHERE id = 1').run(price);
 
 const env = { DB: db };
 const request = (path, userId, method = 'GET', body) => new Request(`https://app.test${path}`, {
@@ -129,12 +124,11 @@ try {
     'account, positions, and orders reads must not write to D1',
   );
 
-  quotePrice = 110;
-  logicalNow += 6000;
+  setMarketPrice(110);
   await runPaperTradingTick(env);
   const positions = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(positions[0].unrealized_pnl, 10);
-  assert.equal(positions[0].price_source, 'CoinPaprika');
+  assert.equal(positions[0].price_source, 'D1 reference');
   const accountAtMark = await (await handlePaperTradingRequest(request('/api/paper/account', userIds[0]), env)).json();
   assert.equal(accountAtMark.equity, 100010);
 
@@ -148,8 +142,7 @@ try {
     market_id: 1, side: 'buy', type: 'limit', quantity: 1, limit_price: 105,
   }), env);
   assert.equal((await limit.json()).status, 'pending');
-  quotePrice = 104;
-  logicalNow += 6000;
+  setMarketPrice(104);
   await runPaperTradingTick(env);
   const limitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(limitOrders.find((order) => order.type === 'limit').status, 'filled');
@@ -160,27 +153,23 @@ try {
     market_id: 1, side: 'buy', type: 'stop', quantity: 1, stop_price: 105,
   }), env);
   assert.equal((await stop.json()).status, 'pending');
-  quotePrice = 106;
-  logicalNow += 6000;
+  setMarketPrice(106);
   await runPaperTradingTick(env);
   const stopOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopOrders.find((order) => order.type === 'stop').status, 'filled');
   const stopPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
   await handlePaperTradingRequest(request('/api/paper/positions', userIds[0], 'DELETE', { id: stopPosition.id }), env);
 
-  quotePrice = 100;
-  logicalNow += 6000;
+  setMarketPrice(100);
   const stopLimit = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
     market_id: 1, side: 'buy', type: 'stop_limit', quantity: 1, stop_price: 105, limit_price: 104,
   }), env);
   assert.equal((await stopLimit.json()).status, 'pending');
-  quotePrice = 106;
-  logicalNow += 6000;
+  setMarketPrice(106);
   await runPaperTradingTick(env);
   const triggeredOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(triggeredOrders.find((order) => order.type === 'stop_limit').status, 'triggered');
-  quotePrice = 104;
-  logicalNow += 6000;
+  setMarketPrice(104);
   await runPaperTradingTick(env);
   const stopLimitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopLimitOrders.find((order) => order.type === 'stop_limit').status, 'filled');
@@ -191,8 +180,7 @@ try {
     market_id: 1, side: 'buy', type: 'market', quantity: 1, take_profit: 105,
   }), env);
   assert.equal((await protectedOrder.json()).position.status, 'open');
-  quotePrice = 105;
-  logicalNow += 6000;
+  setMarketPrice(105);
   await runPaperTradingTick(env);
   const afterTakeProfit = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(afterTakeProfit.length, 0);
@@ -204,18 +192,17 @@ try {
     market_id: 1, side: 'buy', type: 'limit', quantity: 1, limit_price: 95,
   }), env);
   assert.equal((await scheduledLimit.json()).status, 'pending');
-  quotePrice = 94;
-  logicalNow += 6000;
+  setMarketPrice(94);
   await runPaperTradingTick(env);
   const scheduledOrders = await db.prepare('SELECT status FROM paper_orders WHERE user_id = ? AND type = ?')
     .bind(userIds[1], 'limit').all();
   assert.equal(scheduledOrders.results[0].status, 'filled');
 
+  assert.equal(externalFetchCalls, 0, 'paper trading must use the stored D1 market prices');
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 10);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 1);
   console.log('PAPER_TRADING_TESTS_PASSED');
 } finally {
   globalThis.fetch = originalFetch;
-  Date.now = originalDateNow;
   db.sqlite.close();
 }
