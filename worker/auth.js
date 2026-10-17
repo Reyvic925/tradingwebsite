@@ -498,7 +498,8 @@ async function logout(request, env) {
 
 async function session(request, env) {
   const user = await findUserBySession(request, env);
-  return response({ user });
+  const token = sessionToken(request);
+  return response({ user }, 200, user && token ? sessionCookie(request, token) : null);
 }
 
 export async function handleAuthRequest(request, env) {

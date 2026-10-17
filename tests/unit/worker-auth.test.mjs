@@ -292,6 +292,7 @@ assert.equal(invalidPassword.status, 401);
 const session = await handleAuthRequest(request('/api/auth/session', { headers: { cookie: loginCookie } }), env);
 assert.equal(session.status, 200);
 assert.equal((await session.json()).user.email, 'trader@example.com');
+assert.doesNotMatch(session.headers.get('set-cookie'), /Max-Age|Expires=/i, 'Session restore should make existing cookies browser-session-only');
 
 const authenticated = await getAuthenticatedUser(request('/api/protected', { headers: { cookie: loginCookie } }), env);
 assert.equal(authenticated.email, 'trader@example.com');
