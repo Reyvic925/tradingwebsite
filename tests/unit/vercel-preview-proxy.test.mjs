@@ -39,6 +39,7 @@ await handler(request, response);
 
 assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/kyc-upload?id=17');
 assert.equal(capturedRequest.init.method, 'POST');
+assert.ok(capturedRequest.init.signal instanceof AbortSignal, 'Worker proxy requests should be abortable');
 assert.equal(capturedRequest.init.headers.get('cookie'), 'apex_session=preview-session');
 assert.equal(capturedRequest.init.body, JSON.stringify({ kind: 'document_front' }));
 assert.equal(response.statusCode, 201);
@@ -84,6 +85,30 @@ const vercelDevResponse = {
 await handler({ url: '/api/health', method: 'GET', headers: {} }, vercelDevResponse);
 assert.equal(capturedRequest.url, 'https://apex-prime-dev-worker.example.workers.dev/api/health');
 assert.equal(vercelDevResponse.statusCode, 200);
+
+const originalSetTimeout = globalThis.setTimeout;
+const originalConsoleError = console.error;
+let timeoutLog;
+globalThis.setTimeout = (callback, delay, ...args) => originalSetTimeout(callback, delay === 12_000 ? 0 : delay, ...args);
+globalThis.fetch = async (_url, init) => new Promise((_resolve, reject) => {
+  init.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+});
+console.error = (...args) => { timeoutLog = args; };
+const timedOutResponse = {
+  statusCode: 200,
+  headers: new Map(),
+  setHeader(name, value) { this.headers.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; this.writableEnded = true; },
+};
+try {
+  await handler({ url: '/api/auth/session', method: 'GET', headers: {} }, timedOutResponse);
+} finally {
+  globalThis.setTimeout = originalSetTimeout;
+  console.error = originalConsoleError;
+}
+assert.equal(timedOutResponse.statusCode, 504);
+assert.match(timedOutResponse.body, /Worker API request timed out/);
+assert.equal(timeoutLog[1].path, '/api/auth/session');
 
 delete process.env.WORKER_API_URL;
 const unconfiguredResponse = {

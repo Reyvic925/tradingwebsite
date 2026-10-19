@@ -1,4 +1,4 @@
-import { getAuthenticatedUser } from './auth.js';
+import { AuthD1TimeoutError, getAuthenticatedUser } from './auth.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -125,6 +125,9 @@ export async function handleAccountRequest(request, env) {
     if (pathname === '/api/wallet') return await handleWallet(request, env, user);
     return json({ error: 'Not found' }, 404);
   } catch (error) {
+    if (error instanceof AuthD1TimeoutError) {
+      return json({ error: 'Authentication service temporarily unavailable.' }, 503);
+    }
     console.error('[worker/account-api]', error);
     return json({ error: 'Internal server error' }, 500);
   }

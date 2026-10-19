@@ -266,20 +266,26 @@ const otpVerified = await handleAuthRequest(request('/api/auth/verification/conf
 }), env);
 assert.equal(otpVerified.status, 200);
 assert.ok(otpUser.email_verified_at);
-const cookie = cookieFrom(await handleAuthRequest(request('/api/auth/login', {
+const previewLogin = await handleAuthRequest(request('/api/auth/login', {
   method: 'POST',
-  headers: { 'content-type': 'application/json' },
+  headers: { 'content-type': 'application/json', origin: 'https://tradingwebsite.vercel.app' },
   body: JSON.stringify({ email: 'trader@example.com', password: 'correct horse battery staple' }),
-}), env));
+}), env);
+const cookie = cookieFrom(previewLogin);
 
 const login = await handleAuthRequest(request('/api/auth/login', {
   method: 'POST',
-  headers: { 'content-type': 'application/json' },
+  headers: { 'content-type': 'application/json', origin: 'https://www.theprimemarkets.com' },
   body: JSON.stringify({ email: 'TRADER@example.com', password: 'correct horse battery staple' }),
 }), env);
 assert.equal(login.status, 200);
 assert.doesNotMatch(login.headers.get('set-cookie'), /Max-Age|Expires=/i, 'Login cookie should expire with the browser session');
+assert.match(login.headers.get('set-cookie'), /Domain=\.theprimemarkets\.com/);
+assert.match(login.headers.get('set-cookie'), /Secure/);
 assert.match(login.headers.get('set-cookie'), /HttpOnly/);
+assert.match(login.headers.get('set-cookie'), /SameSite=Lax/);
+assert.match(previewLogin.headers.get('set-cookie'), /Path=\/; HttpOnly; SameSite=Lax/, 'Vercel preview cookie should remain host-only');
+assert.doesNotMatch(previewLogin.headers.get('set-cookie'), /Domain=/, 'Vercel preview cookie must not be scoped to the production domain');
 const loginCookie = cookieFrom(login);
 
 const invalidPassword = await handleAuthRequest(request('/api/auth/login', {
@@ -292,7 +298,7 @@ assert.equal(invalidPassword.status, 401);
 const session = await handleAuthRequest(request('/api/auth/session', { headers: { cookie: loginCookie } }), env);
 assert.equal(session.status, 200);
 assert.equal((await session.json()).user.email, 'trader@example.com');
-assert.doesNotMatch(session.headers.get('set-cookie'), /Max-Age|Expires=/i, 'Session restore should make existing cookies browser-session-only');
+assert.equal(session.headers.get('set-cookie'), null, 'Session restore must not write the session cookie again');
 
 const authenticated = await getAuthenticatedUser(request('/api/protected', { headers: { cookie: loginCookie } }), env);
 assert.equal(authenticated.email, 'trader@example.com');
@@ -370,6 +376,32 @@ assert.equal(logout.status, 200);
 assert.match(logout.headers.get('set-cookie'), /Max-Age=0/);
 const afterLogout = await handleAuthRequest(request('/api/auth/session', { headers: { cookie: loginCookie } }), env);
 assert.equal((await afterLogout.json()).user, null);
+
+const hangingEnv = {
+  DB: {
+    prepare() {
+      return {
+        bind() { return this; },
+        first() { return new Promise(() => {}); },
+      };
+    },
+  },
+};
+const originalConsoleError = console.error;
+let timeoutLog;
+console.error = (...args) => { timeoutLog = args; };
+let timedOutSession;
+try {
+  timedOutSession = await handleAuthRequest(request('/api/auth/session', {
+    headers: { cookie: 'apex_session=valid-token' },
+  }), hangingEnv);
+} finally {
+  console.error = originalConsoleError;
+}
+assert.equal(timedOutSession.status, 503);
+assert.deepEqual(await timedOutSession.json(), { error: 'Authentication service temporarily unavailable.' });
+assert.equal(timeoutLog[0], '[worker/auth] D1 query timed out');
+assert.equal(timeoutLog[1].path, '/api/auth/session');
 
 const expiredCookie = 'apex_session=expired-token';
 env.DB.sessions.set(await (async () => {

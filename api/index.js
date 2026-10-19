@@ -1,4 +1,5 @@
 async function proxyToWorker(req, res, urlPath) {
+  const workerTimeoutMs = 12_000;
   const workerOrigin = String(process.env.WORKER_API_URL || '').trim().replace(/\/+$/, '');
   if (!urlPath.startsWith('/api/')) return false;
 
@@ -25,25 +26,41 @@ async function proxyToWorker(req, res, urlPath) {
       : JSON.stringify(req.body);
   }
 
-  let upstream;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), workerTimeoutMs);
   try {
-    upstream = await fetch(target, { method, headers, body, redirect: 'manual' });
-  } catch (error) {
-    console.error('[api] Worker API request failed:', error);
-    res.statusCode = 502;
-    res.setHeader('content-type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ error: 'Worker API is unavailable.' }));
-    return true;
-  }
-  res.statusCode = upstream.status;
-  for (const [name, value] of upstream.headers) {
-    if (!['connection', 'content-encoding', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
-      res.setHeader(name, value);
+    const upstream = await fetch(target, {
+      method,
+      headers,
+      body,
+      redirect: 'manual',
+      signal: controller.signal,
+    });
+    res.statusCode = upstream.status;
+    for (const [name, value] of upstream.headers) {
+      if (!['connection', 'content-encoding', 'content-length', 'transfer-encoding', 'set-cookie'].includes(name.toLowerCase())) {
+        res.setHeader(name, value);
+      }
     }
+    const cookies = upstream.headers.getSetCookie?.();
+    if (cookies?.length) res.setHeader('set-cookie', cookies);
+    res.end(Buffer.from(await upstream.arrayBuffer()));
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    console.error(timedOut ? '[api] Worker API request timed out:' : '[api] Worker API request failed:', {
+      path: urlPath,
+      error,
+    });
+    if (!res.writableEnded) {
+      res.statusCode = timedOut ? 504 : 502;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({
+        error: timedOut ? 'Worker API request timed out.' : 'Worker API is unavailable.',
+      }));
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const cookies = upstream.headers.getSetCookie?.();
-  if (cookies?.length) res.setHeader('set-cookie', cookies);
-  res.end(Buffer.from(await upstream.arrayBuffer()));
   return true;
 }
 

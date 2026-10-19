@@ -5,6 +5,37 @@ const SESSION_COOKIE = 'apex_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const PASSWORD_MIN_LENGTH = 8;
 const PBKDF2_ITERATIONS = 100000;
+const AUTH_D1_TIMEOUT_MS = 8_000;
+const SESSION_COOKIE_DOMAIN = 'theprimemarkets.com';
+
+export class AuthD1TimeoutError extends Error {
+  constructor(operation) {
+    super(`D1 ${operation} timed out`);
+    this.name = 'AuthD1TimeoutError';
+    this.operation = operation;
+  }
+}
+
+async function authD1Query(request, operation, query) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new AuthD1TimeoutError(operation)), AUTH_D1_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([query(), timeout]);
+  } catch (error) {
+    if (error instanceof AuthD1TimeoutError) {
+      console.error('[worker/auth] D1 query timed out', {
+        operation: error.operation,
+        path: new URL(request.url).pathname,
+        timeoutMs: AUTH_D1_TIMEOUT_MS,
+      });
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function bytesToBase64Url(bytes) {
   let binary = '';
@@ -104,13 +135,30 @@ function response(body, status = 200, cookie = null) {
 }
 
 function cookieOptions(request, maxAge) {
-  const secure = new URL(request.url).protocol === 'https:';
-  return `${SESSION_COOKIE}=; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+  return `${SESSION_COOKIE}=; Max-Age=${maxAge}; ${sessionCookieAttributes(request)}`;
 }
 
 function sessionCookie(request, token) {
-  const secure = new URL(request.url).protocol === 'https:';
-  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+  return `${SESSION_COOKIE}=${token}; ${sessionCookieAttributes(request)}`;
+}
+
+function sessionCookieAttributes(request) {
+  let secure = new URL(request.url).protocol === 'https:';
+  const origin = request.headers.get('origin');
+  let domain = '';
+  if (origin) {
+    try {
+      const originUrl = new URL(origin);
+      const hostname = originUrl.hostname.toLowerCase();
+      secure = secure || originUrl.protocol === 'https:';
+      if (hostname === SESSION_COOKIE_DOMAIN || hostname.endsWith(`.${SESSION_COOKIE_DOMAIN}`)) {
+        domain = `; Domain=.${SESSION_COOKIE_DOMAIN}`;
+      }
+    } catch {
+      domain = '';
+    }
+  }
+  return `Path=/; HttpOnly; SameSite=Lax${domain}${secure ? '; Secure' : ''}`;
 }
 
 function sessionToken(request) {
@@ -136,12 +184,12 @@ async function findUserBySession(request, env) {
   const token = sessionToken(request);
   if (!token) return null;
   const tokenHash = await hashSessionToken(token);
-  const result = await env.DB.prepare(`
-    SELECT u.id, u.email, u.created_at, u.email_verified_at
-    FROM auth_sessions s
-    JOIN auth_users u ON u.id = s.user_id
-    WHERE s.id = ? AND s.expires_at > CURRENT_TIMESTAMP AND u.email_verified_at IS NOT NULL
-  `).bind(tokenHash).first();
+  const result = await authD1Query(request, 'session lookup', () => env.DB.prepare(`
+      SELECT u.id, u.email, u.created_at, u.email_verified_at
+      FROM auth_sessions s
+      JOIN auth_users u ON u.id = s.user_id
+      WHERE s.id = ? AND s.expires_at > CURRENT_TIMESTAMP AND u.email_verified_at IS NOT NULL
+    `).bind(tokenHash).first());
   return result ? publicUser(result) : null;
 }
 
@@ -152,10 +200,10 @@ export async function getAuthenticatedUser(request, env) {
 async function createSession(request, env, userId) {
   const token = randomToken();
   const tokenHash = await hashSessionToken(token);
-  await env.DB.prepare(`
-    INSERT INTO auth_sessions (id, user_id, expires_at)
-    VALUES (?, ?, datetime(CURRENT_TIMESTAMP, '+30 days'))
-  `).bind(tokenHash, userId).run();
+  await authD1Query(request, 'session creation', () => env.DB.prepare(`
+      INSERT INTO auth_sessions (id, user_id, expires_at)
+      VALUES (?, ?, datetime(CURRENT_TIMESTAMP, '+30 days'))
+    `).bind(tokenHash, userId).run());
   return token;
 }
 
@@ -354,7 +402,7 @@ async function login(request, env) {
   const password = body?.password;
   if (!email || !validPassword(password)) return response({ error: 'Invalid email or password.' }, 401);
 
-  const user = await env.DB.prepare('SELECT id, email, password_hash, created_at, email_verified_at FROM auth_users WHERE email = ?').bind(email).first();
+  const user = await authD1Query(request, 'login lookup', () => env.DB.prepare('SELECT id, email, password_hash, created_at, email_verified_at FROM auth_users WHERE email = ?').bind(email).first());
   if (!user || !(await verifyPassword(password, user.password_hash))) return response({ error: 'Invalid email or password.' }, 401);
   if (!user.email_verified_at) return response({ error: 'Confirm your email before signing in. Check your inbox for the verification code or link.' }, 403);
 
@@ -498,8 +546,7 @@ async function logout(request, env) {
 
 async function session(request, env) {
   const user = await findUserBySession(request, env);
-  const token = sessionToken(request);
-  return response({ user }, 200, user && token ? sessionCookie(request, token) : null);
+  return response({ user });
 }
 
 export async function handleAuthRequest(request, env) {
@@ -517,6 +564,9 @@ export async function handleAuthRequest(request, env) {
     if (request.method === 'GET' && url.pathname === '/api/auth/session') return await session(request, env);
     return response({ error: 'Method not allowed' }, 405);
   } catch (error) {
+    if (error instanceof AuthD1TimeoutError) {
+      return response({ error: 'Authentication service temporarily unavailable.' }, 503);
+    }
     console.error('[worker/auth]', error);
     return response({ error: 'Internal server error' }, 500);
   }
