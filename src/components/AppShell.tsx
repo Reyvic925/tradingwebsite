@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
 import { signOut as signOutAuth } from '../lib/auth';
-import { apiGet, apiSend, bootstrapProfile } from '../lib/api';
+import { apiGet, apiSend } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Notice, Wallet as WalletT } from '../types';
 
@@ -58,23 +58,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        await bootstrapProfile();
-        try {
-          await apiGet('/api/user/crypto-addresses');
-        } catch {
-          /* assignment happens in profile bootstrap; fail-open */
-        }
-      } catch {
-        /* first-login bootstrap */
-      }
-      if (alive) load();
-    })();
-    const id = setInterval(load, 30000);
+    void load();
+    const id = setInterval(() => void load(), 30000);
     return () => {
-      alive = false;
       clearInterval(id);
     };
   }, []);

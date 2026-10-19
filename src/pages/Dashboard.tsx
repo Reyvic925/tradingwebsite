@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import { apiGet, apiList, asList, bootstrapProfile } from '../lib/api';
+import { apiGet, apiList, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
 import type { Investment, Market, PaperAccount, Position, Profile, Txn } from '../types';
 
@@ -15,19 +15,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = async (bootstrap = false) => {
+  const load = async () => {
     try {
-      if (bootstrap) {
-        const prof = await bootstrapProfile();
-        if (prof.profile) setProfile(prof.profile as Profile);
-      }
-      const [paper, pos, mkt, tx, inv] = await Promise.all([
+      const [profileData, paper, pos, mkt, tx, inv] = await Promise.all([
+        apiGet<{ profile?: Profile }>('/api/profile').catch(() => null),
         apiGet<PaperAccount>('/api/paper/account').catch(() => null),
         apiList<Position>('/api/paper/positions'),
         apiList<Market>('/api/markets?featured=1&limit=12'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
+      if (profileData?.profile) setProfile(profileData.profile);
       if (paper) setPaperAccount(paper);
       setPositions(asList(pos));
       setMarkets(asList(mkt));
@@ -42,8 +40,8 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    load(true);
-    const id = setInterval(() => load(false), 30000);
+    void load();
+    const id = setInterval(() => void load(), 30000);
     return () => clearInterval(id);
   }, []);
 
