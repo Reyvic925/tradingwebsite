@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList } from '../lib/api';
@@ -39,15 +39,19 @@ export default function Dashboard() {
     }
   };
 
+  const loadEffect = useEffectEvent(load);
+
   useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 30000);
-    return () => clearInterval(id);
+    const timeout = window.setTimeout(() => void loadEffect(), 0);
+    const id = window.setInterval(() => void loadEffect(), 30000);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(id);
+    };
   }, []);
 
   const pnl = Number(paperAccount?.realized_pnl || 0) + Number(paperAccount?.unrealized_pnl || 0);
   const investmentSummary = investments.reduce((summary, investment) => {
-    const principal = Number(investment.amount || 0);
     summary.totalPnl += Number(investment.earned || 0);
     if (investment.status === 'completed') summary.completed += 1;
     else summary.active += 1;

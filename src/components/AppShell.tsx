@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -57,11 +57,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loadEffect = useEffectEvent(load);
+
   useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 30000);
+    const timeout = window.setTimeout(() => void loadEffect(), 0);
+    const id = window.setInterval(() => void loadEffect(), 30000);
     return () => {
-      clearInterval(id);
+      window.clearTimeout(timeout);
+      window.clearInterval(id);
     };
   }, []);
 
