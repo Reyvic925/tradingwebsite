@@ -17,6 +17,8 @@ assert.match(source, /signUp\(email, password,\s*\{[\s\S]*full_name:[\s\S]*phone
 assert.match(source, /verificationPending/, 'Signup should wait for email confirmation before authenticating');
 assert.match(source, /verifyEmailCode\(email, verificationCode\)/, 'Signup should accept the emailed verification code');
 assert.match(source, /resendVerificationEmail\(email\)/, 'Signup should allow resending the verification email');
+assert.match(source, /window\.location\.href\s*=\s*['"]\/app['"]/, 'Successful sign-in should use a full-page navigation to the app');
+assert.doesNotMatch(source, /apiGet|\/api\/profile/, 'Login should not fetch the profile immediately after authentication');
 assert.doesNotMatch(source, /Demo:/, 'Login must not advertise credentials that are not provisioned in production');
 assert.doesNotMatch(brandSource, /demoEmail|demoPassword/, 'Brand config must not contain public demo credentials');
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { resendVerificationEmail, signIn, signUp, verifyEmailCode } from '../lib/auth';
-import { apiGet, apiSend, clearReferral, takeReferral } from '../lib/api';
+import { apiSend, clearReferral, takeReferral } from '../lib/api';
 import Logo from '../components/Logo';
 
 export default function Login() {
@@ -29,13 +29,6 @@ export default function Login() {
   const emailVerificationFailed = params.get('email_verified') === '0';
 
   if (!loading && user) return <Navigate to="/app" replace />;
-
-  const finishAuthentication = async () => {
-    const data = await apiGet<{ profile?: { role?: string }; role?: string }>('/api/profile');
-    const profile = (data as { profile?: { role?: string } } | undefined)?.profile ?? data;
-    const role = String(profile?.role || '').toLowerCase();
-    navigate(role === 'admin' ? '/admin/dashboard' : '/app');
-  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,15 +57,17 @@ export default function Login() {
       if (mode === 'reset' && resetToken) {
         await apiSend('/api/auth/password-reset/confirm', 'POST', { token: resetToken, new_password: password });
         setResetComplete(true);
+        return;
       } else if (mode === 'reset') {
         await apiSend('/api/auth/password-reset/request', 'POST', { email });
         setResetSent(true);
+        return;
       } else if (mode === 'signup' && verificationPending) {
         await verifyEmailCode(email, verificationCode);
         setVerificationPending(false);
         setVerificationNotice('Email confirmed. Signing you in…');
         await signIn(email, password);
-        await finishAuthentication();
+        window.location.href = '/app';
         return;
       } else if (mode === 'signup') {
         const result = await signUp(email, password, {
@@ -92,7 +87,7 @@ export default function Login() {
       } else {
         await signIn(email, password);
       }
-      await finishAuthentication();
+      window.location.href = '/app';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       const networkIssue = /failed to fetch|network|timed out|timeout/i.test(message);
