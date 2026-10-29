@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList } from '../lib/api';
@@ -14,8 +14,14 @@ export default function Dashboard() {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadInFlight = useRef(false);
 
   const load = async () => {
+    // Do not let a slow production API response stack up with the next poll.
+    // Stacked dashboard requests make the terminal feel frozen on constrained
+    // connections and can unnecessarily amplify load on the API.
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     try {
       const [profileData, paper, pos, mkt, tx, inv] = await Promise.all([
         apiGet<{ profile?: Profile }>('/api/profile').catch(() => null),
@@ -36,6 +42,7 @@ export default function Dashboard() {
       setError(e instanceof Error ? e.message : 'Failed to load desk');
     } finally {
       setLoading(false);
+      loadInFlight.current = false;
     }
   };
 
