@@ -42,8 +42,16 @@ async function proxyToWorker(req, res, urlPath) {
         res.setHeader(name, value);
       }
     }
-    const cookies = upstream.headers.getSetCookie?.();
-    if (cookies?.length) res.setHeader('set-cookie', cookies);
+    // Node's Headers exposes getSetCookie(), but some Vercel runtimes only
+    // expose the standard get(). Do not drop the auth session in that case.
+    const getSetCookie = upstream.headers.getSetCookie;
+    const cookies = typeof getSetCookie === 'function'
+      ? getSetCookie.call(upstream.headers)
+      : (() => {
+        const cookie = upstream.headers.get('set-cookie');
+        return cookie ? [cookie] : [];
+      })();
+    if (cookies.length) res.setHeader('set-cookie', cookies);
     res.end(Buffer.from(await upstream.arrayBuffer()));
   } catch (error) {
     const timedOut = controller.signal.aborted;

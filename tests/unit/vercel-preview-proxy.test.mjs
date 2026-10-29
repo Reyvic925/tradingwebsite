@@ -50,6 +50,37 @@ assert.deepEqual([...response.body], [1, 2, 3]);
 
 assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarkets.workers.dev/api/kyc-upload?id=17');
 
+const fallbackCookieHeaders = new Headers({
+  'content-type': 'application/json',
+  'set-cookie': 'apex_session=fallback-session; Path=/; HttpOnly; SameSite=Lax',
+});
+fallbackCookieHeaders.getSetCookie = undefined;
+globalThis.fetch = async () => ({
+  status: 200,
+  headers: fallbackCookieHeaders,
+  arrayBuffer: async () => new Uint8Array([4]).buffer,
+});
+const fallbackCookieResponseHeaders = new Map();
+const fallbackCookieResponse = {
+  statusCode: 200,
+  setHeader(name, value) { fallbackCookieResponseHeaders.set(name.toLowerCase(), value); },
+  end(body) { this.body = body; },
+};
+await handler({ url: '/api/auth/login', method: 'POST', headers: {}, body: {} }, fallbackCookieResponse);
+assert.deepEqual(fallbackCookieResponseHeaders.get('set-cookie'), ['apex_session=fallback-session; Path=/; HttpOnly; SameSite=Lax']);
+
+globalThis.fetch = async (url, init) => {
+  capturedRequest = { url: String(url), init };
+  return new Response(new Uint8Array([1, 2, 3]), {
+    status: init.method === 'GET' ? 200 : 201,
+    headers: {
+      'content-type': 'application/octet-stream',
+      'content-encoding': 'gzip',
+      'set-cookie': 'apex_session=worker-session; Path=/; HttpOnly; SameSite=Lax',
+    },
+  });
+};
+
 const roiResponseHeaders = new Map();
 const roiResponse = {
   statusCode: 200,
