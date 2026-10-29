@@ -124,7 +124,6 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#05070b]">
-      <video className="absolute inset-0 h-full w-full object-cover opacity-30" autoPlay muted loop playsInline src="/videos/hero-trading-floor.mp4" />
       <div className="absolute inset-0 bg-gradient-to-br from-[#05070b] via-[#05070b]/85 to-amber-950/30" />
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-16">
         <div className="mb-8 flex justify-center"><Logo /></div>
