@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import AppShell from '../components/AppShell';
 import PriceChart from '../components/PriceChart';
 import { apiGet, apiList, apiMarkets, apiSend, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
+import { startVisibleInterval } from '../lib/visible-interval';
 import type { Market, Order, PaperAccount, Position } from '../types';
 
 export default function Trade() {
@@ -36,7 +37,7 @@ export default function Trade() {
     return markets.find((m) => m.symbol === symbol) || markets[0];
   }, [markets, symbol]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [m, p, o, account, wl, focused] = await Promise.all([
         apiMarkets<Market>({ class: filter, q: search || undefined, limit: 50 }),
@@ -73,13 +74,11 @@ export default function Trade() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, search, symbol]);
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 30000);
-    return () => clearInterval(id);
-  }, [filter, search, symbol]);
+    return startVisibleInterval(load, 30000);
+  }, [load]);
 
   const FILTERS = [
     { id: 'stock', label: 'Stocks' },

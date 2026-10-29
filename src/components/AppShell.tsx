@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -21,6 +21,7 @@ import Logo from './Logo';
 import { signOut as signOutAuth } from '../lib/auth';
 import { apiGet, apiSend } from '../lib/api';
 import { formatMoney } from '../lib/format';
+import { startVisibleInterval } from '../lib/visible-interval';
 import type { Notice, Wallet as WalletT } from '../types';
 
 const nav = [
@@ -44,7 +45,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<Notice[]>([]);
   const [showNotes, setShowNotes] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [w, n] = await Promise.all([
         apiGet<WalletT>('/api/wallet').catch(() => null),
@@ -55,18 +56,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     } catch {
       /* session may still be warming */
     }
-  };
-
-  const loadEffect = useEffectEvent(load);
+  }, []);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => void loadEffect(), 0);
-    const id = window.setInterval(() => void loadEffect(), 30000);
-    return () => {
-      window.clearTimeout(timeout);
-      window.clearInterval(id);
-    };
-  }, []);
+    const stopPolling = startVisibleInterval(load, 30000);
+    return stopPolling;
+  }, [load]);
 
   const unread = notes.filter((n) => !n.read).length;
 

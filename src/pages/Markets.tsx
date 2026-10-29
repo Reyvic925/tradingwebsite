@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiMarkets } from '../lib/api';
 import { formatPct, formatPrice, timeAgo } from '../lib/format';
+import { startVisibleInterval } from '../lib/visible-interval';
 import type { Market } from '../types';
 import IndexBoard from '../components/IndexBoard';
 
@@ -94,11 +95,10 @@ export default function Markets() {
         if (alive) setLoading(false);
       }
     };
-    load();
-    const id = setInterval(() => load(), 30000);
+    const stopPolling = startVisibleInterval(load, 30000);
     return () => {
       alive = false;
-      clearInterval(id);
+      stopPolling();
     };
   }, [filter, debounced, page]);
 

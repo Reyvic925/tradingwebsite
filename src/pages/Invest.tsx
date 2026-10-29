@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell';
 import InvestmentModal from '../components/InvestmentModal';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
+import { startVisibleInterval } from '../lib/visible-interval';
 import type { Investment, Plan, Wallet } from '../types';
 
 export default function Invest() {
@@ -36,9 +37,7 @@ export default function Invest() {
   };
 
   useEffect(() => {
-    void load();
-    const timer = setInterval(() => { void load(false); }, 10000);
-    return () => clearInterval(timer);
+    return startVisibleInterval(() => load(false), 10000);
   }, []);
 
   const subscribe = async (plan: Plan) => {

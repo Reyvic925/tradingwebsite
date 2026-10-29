@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { authHeaders } from './api';
+import { startVisibleInterval } from './visible-interval';
 
 /**
  * Hook to animate PnL numbers smoothly
@@ -152,16 +153,9 @@ export function useCopyTrading() {
   };
 
   useEffect(() => {
-    fetchFollows();
-    fetchSummary();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchFollows();
-      fetchSummary();
+    return startVisibleInterval(async () => {
+      await Promise.all([fetchFollows(), fetchSummary()]);
     }, 30000);
-
-    return () => clearInterval(interval);
   }, []);
 
   return {
@@ -205,11 +199,7 @@ export function useLeaderboard() {
       }
     };
 
-    fetchLeaderboard();
-
-    // Refresh every minute
-    const interval = setInterval(fetchLeaderboard, 60000);
-    return () => clearInterval(interval);
+    return startVisibleInterval(fetchLeaderboard, 60000);
   }, []);
 
   return { leaderboard, loading, error };
@@ -246,14 +236,12 @@ export function useTraderTrades(traderId: string | null) {
       }
     };
 
-    fetchTrades();
-
     // Refresh every 10 seconds
-    const interval = setInterval(fetchTrades, 10000);
+    const stopPolling = startVisibleInterval(fetchTrades, 10000);
     const handleOnline = () => fetchTrades();
     window.addEventListener('online', handleOnline);
     return () => {
-      clearInterval(interval);
+      stopPolling();
       window.removeEventListener('online', handleOnline);
     };
   }, [traderId]);
@@ -272,9 +260,7 @@ export function useTraderHistory(traderId: string | null) {
       if (response.ok) setHistory(await response.json());
     };
 
-    fetchHistory();
-    const interval = setInterval(fetchHistory, 30000);
-    return () => clearInterval(interval);
+    return startVisibleInterval(fetchHistory, 30000);
   }, [traderId]);
 
   return history;
@@ -312,11 +298,7 @@ export function useTraders(session: string | null = null, asset: string | null =
       }
     };
 
-    fetchTraders();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchTraders, 30000);
-    return () => clearInterval(interval);
+    return startVisibleInterval(fetchTraders, 30000);
   }, [session, asset]);
 
   return { traders, loading, error };
@@ -345,11 +327,7 @@ export function useNotifications() {
       }
     };
 
-    fetchNotifications();
-
-    // Poll every 15 seconds
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
+    return startVisibleInterval(fetchNotifications, 15000);
   }, []);
 
   const markAsRead = async (notificationId: string) => {

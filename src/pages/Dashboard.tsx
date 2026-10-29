@@ -1,8 +1,9 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
+import { startVisibleInterval } from '../lib/visible-interval';
 import type { Investment, Market, PaperAccount, Position, Profile, Txn } from '../types';
 
 export default function Dashboard() {
@@ -16,7 +17,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const loadInFlight = useRef(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     // Do not let a slow production API response stack up with the next poll.
     // Stacked dashboard requests make the terminal feel frozen on constrained
     // connections and can unnecessarily amplify load on the API.
@@ -44,18 +45,12 @@ export default function Dashboard() {
       setLoading(false);
       loadInFlight.current = false;
     }
-  };
-
-  const loadEffect = useEffectEvent(load);
+  }, []);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => void loadEffect(), 0);
-    const id = window.setInterval(() => void loadEffect(), 30000);
-    return () => {
-      window.clearTimeout(timeout);
-      window.clearInterval(id);
-    };
-  }, []);
+    const stopPolling = startVisibleInterval(load, 30000);
+    return stopPolling;
+  }, [load]);
 
   const pnl = Number(paperAccount?.realized_pnl || 0) + Number(paperAccount?.unrealized_pnl || 0);
   const investmentSummary = investments.reduce((summary, investment) => {
