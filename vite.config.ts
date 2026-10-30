@@ -9,7 +9,9 @@ import type { Connect, Plugin, ViteDevServer } from 'vite'
 // dev/preview server so relative /api/* calls work locally without a deployment.
 function localApiPlugin(): Plugin {
   const attach = (middlewares: Connect.Server) => {
-    middlewares.use('/api', (req: any, res: any, next: any) => {
+    middlewares.use((req: any, res: any, next: any) => {
+      if (!String(req.url || '').startsWith('/api/')) return next();
+
       if (typeof res.status !== 'function') {
         res.status = (code: number) => { res.statusCode = code; return res; };
       }
