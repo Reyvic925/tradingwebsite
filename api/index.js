@@ -13,7 +13,7 @@ async function proxyToWorker(req, res, urlPath) {
   const target = new URL(req.url || urlPath, workerOrigin);
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers || {})) {
-    if (value && !['connection', 'content-length', 'host'].includes(name.toLowerCase())) {
+    if (value && !['connection', 'content-length', 'expect', 'host'].includes(name.toLowerCase())) {
       headers.set(name, Array.isArray(value) ? value.join(', ') : String(value));
     }
   }

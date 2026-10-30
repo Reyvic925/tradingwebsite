@@ -31,7 +31,11 @@ const response = {
 const request = {
   url: '/api/kyc-upload?id=17',
   method: 'POST',
-  headers: { 'content-type': 'application/json', cookie: 'apex_session=preview-session' },
+  headers: {
+    'content-type': 'application/json',
+    cookie: 'apex_session=preview-session',
+    expect: '100-continue',
+  },
   body: { kind: 'document_front' },
 };
 
@@ -41,6 +45,7 @@ assert.equal(capturedRequest.url, 'https://apex-prime-staging-worker.dprimemarke
 assert.equal(capturedRequest.init.method, 'POST');
 assert.ok(capturedRequest.init.signal instanceof AbortSignal, 'Worker proxy requests should be abortable');
 assert.equal(capturedRequest.init.headers.get('cookie'), 'apex_session=preview-session');
+assert.equal(capturedRequest.init.headers.has('expect'), false, 'Worker proxy should not forward the unsupported Expect header');
 assert.equal(capturedRequest.init.body, JSON.stringify({ kind: 'document_front' }));
 assert.equal(response.statusCode, 201);
 assert.equal(responseHeaders.get('content-type'), 'application/octet-stream');
