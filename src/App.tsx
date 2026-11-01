@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -71,18 +71,42 @@ class RouteErrorBoundary extends Component<
   }
 }
 
+function AppLoadingFallback() {
+  const [takingTooLong, setTakingTooLong] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setTakingTooLong(true), 12_000);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#05070b] px-5 text-stone-100">
+      <section aria-live="polite" className="flex max-w-md flex-col items-center gap-4 text-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
+        {takingTooLong && (
+          <>
+            <p className="text-sm text-stone-300">The page is taking longer than expected to load.</p>
+            <p className="text-xs text-stone-500">Check your connection, then reload the app.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-sm bg-amber-400 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#1a1304]"
+            >
+              Reload app
+            </button>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <RouteErrorBoundary>
-          <Suspense
-            fallback={
-              <div className="flex min-h-screen items-center justify-center bg-[#05070b]">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
-              </div>
-            }
-          >
+          <Suspense fallback={<AppLoadingFallback />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
