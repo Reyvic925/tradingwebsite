@@ -40,7 +40,7 @@ export default function Trade() {
   const load = useCallback(async () => {
     try {
       const [m, p, o, account, wl, focused] = await Promise.all([
-        apiMarkets<Market>({ class: filter, q: search || undefined, limit: 50 }),
+        apiMarkets<Market>({ class: filter, q: search || undefined, limit: 12 }),
         apiGet<Position[]>('/api/paper/positions'),
         apiGet<Order[]>('/api/paper/orders'),
         apiGet<PaperAccount>('/api/paper/account'),
@@ -149,7 +149,7 @@ export default function Trade() {
   };
 
   const book = useMemo(() => {
-    if (!selected) return { bids: [], asks: [] };
+    if (!selected || selected.price == null) return { bids: [], asks: [] };
     const mid = Number(selected.price);
     const asks = Array.from({ length: 8 }, (_, i) => {
       const p = mid * (1 + (i + 1) * 0.00035);
@@ -162,10 +162,10 @@ export default function Trade() {
     return { bids, asks };
   }, [selected]);
 
-  const isLiveQuote = Boolean(selected?.price_source && selected.price_source !== 'D1 reference');
-  const quoteSourceLabel = isLiveQuote && selected?.quote_updated_at
-    ? `${selected.price_source} · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
-    : 'D1 reference mark';
+  const isLiveQuote = Boolean(selected?.quote_updated_at && !selected.quote_stale);
+  const quoteSourceLabel = selected?.quote_updated_at
+    ? `${selected.quote_stale ? 'Stale ? ' : ''}${selected.price_source} · ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(selected.quote_updated_at))} UTC`
+    : 'Market quote unavailable';
 
   return (
     <AppShell>
@@ -214,8 +214,8 @@ export default function Trade() {
                   <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'futures' ? 'Futures' : m.asset_class === 'jp' || m.asset_class === 'jp-etf' || m.asset_class === 'ca' || m.asset_class === 'ca-etf' || m.asset_class === 'uk' || m.asset_class === 'uk-etf' || m.asset_class === 'eu' || m.asset_class === 'eu-etf' || m.asset_class === 'de' || m.asset_class === 'de-etf' || m.asset_class === 'fr' || m.asset_class === 'fr-etf' || m.asset_class === 'in' || m.asset_class === 'in-etf' ? 'Stocks' : 'Stocks'}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-xs">{formatPrice(latestPrice[m.symbol] ?? Number(m.price))}</div>
-                  <div className={`text-[10px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>
+                  <div className="font-mono text-xs">{m.price == null ? 'Unavailable' : formatPrice(latestPrice[m.symbol] ?? Number(m.price))}</div>
+                  <div className={`text-[10px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '?' : formatPct(Number(m.change_24h))}</div>
                 </div>
               </button>
             ))}
@@ -232,8 +232,8 @@ export default function Trade() {
                   <div className="font-display text-4xl">{selected.symbol}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-3xl">{formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
-                  <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{formatPct(Number(selected.change_24h))} 24h</div>
+                  <div className="font-mono text-3xl">{selected.price == null ? 'Unavailable' : formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
+                  <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{selected.change_24h == null ? '?' : formatPct(Number(selected.change_24h))} 24h</div>
                   <div className={`mt-1 text-[10px] uppercase tracking-widest ${isLiveQuote ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function Trade() {
                 </div>
                 <div className="rounded-sm border border-white/5 p-3">
                   <div className="text-stone-500">Volume</div>
-                  <div className="mt-1 font-mono">{Number(selected.volume).toLocaleString()}</div>
+                  <div className="mt-1 font-mono">{selected.volume == null ? '?' : Number(selected.volume).toLocaleString()}</div>
                 </div>
               </div>
             </>
@@ -348,7 +348,7 @@ export default function Trade() {
               Buying power {formatMoney(Number(paperAccount?.available_cash || 0))} · 100% cash collateral
             </div>
             {msg && <div className="mt-2 text-xs text-amber-200">{msg}</div>}
-            <button disabled={busy} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>
+            <button disabled={busy || !isLiveQuote} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>
               {busy ? 'Routing…' : `${side} ${selected?.symbol || ''}`}
             </button>
           </form>

@@ -161,8 +161,8 @@ export default function Dashboard() {
                   <div className="text-[11px] text-stone-500">{m.name}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-sm">{formatPrice(Number(m.price))}</div>
-                  <div className={`text-[11px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</div>
+                  <div className="font-mono text-sm">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' ? stale' : ''}</div>
+                  <div className={`text-[11px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '?' : formatPct(Number(m.change_24h))}</div>
                 </div>
               </Link>
             ))}

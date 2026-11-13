@@ -3,12 +3,13 @@ export type Market = {
   symbol: string;
   name: string;
   asset_class: 'stock' | 'etf' | 'forex' | 'crypto' | 'futures' | string;
-  price: number;
-  change_24h: number;
-  volume: number;
+  price: number | null;
+  change_24h: number | null;
+  volume: number | null;
   high_24h: number | null;
   low_24h: number | null;
   price_source?: string;
+  quote_stale?: boolean;
   quote_updated_at?: string | null;
 };
 

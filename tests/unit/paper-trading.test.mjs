@@ -1,3 +1,4 @@
+import { clearQuoteCache } from '../../worker/market-quotes.js';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
@@ -84,9 +85,9 @@ const originalFetch = globalThis.fetch;
 let externalFetchCalls = 0;
 globalThis.fetch = async () => {
   externalFetchCalls += 1;
-  throw new Error('External market price fetching must remain disabled.');
+  return Response.json({ price: String(db.sqlite.prepare('SELECT price FROM markets WHERE id = 1').get().price), time: new Date().toISOString(), volume: '1' });
 };
-const setMarketPrice = (price) => db.sqlite.prepare('UPDATE markets SET price = ? WHERE id = 1').run(price);
+const setMarketPrice = (price) => { clearQuoteCache(); db.sqlite.prepare('UPDATE markets SET price = ? WHERE id = 1').run(price); };
 
 const env = { DB: db };
 const request = (path, userId, method = 'GET', body) => new Request(`https://app.test${path}`, {
@@ -128,7 +129,7 @@ try {
   await runPaperTradingTick(env);
   const positions = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(positions[0].unrealized_pnl, 10);
-  assert.equal(positions[0].price_source, 'D1 reference');
+  assert.equal(positions[0].price_source, 'Coinbase');
   const accountAtMark = await (await handlePaperTradingRequest(request('/api/paper/account', userIds[0]), env)).json();
   assert.equal(accountAtMark.equity, 100010);
 
@@ -198,9 +199,18 @@ try {
     .bind(userIds[1], 'limit').all();
   assert.equal(scheduledOrders.results[0].status, 'filled');
 
-  assert.equal(externalFetchCalls, 0, 'paper trading must use the stored D1 market prices');
+  assert.ok(externalFetchCalls > 0, 'paper trading must fetch provider prices');
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 10);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 1);
+  clearQuoteCache();
+  globalThis.fetch = async () => new Response('', { status: 429 });
+  const beforeOutage = db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_orders').get().count;
+  const unavailable = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
+    market_id: 1, side: 'buy', type: 'market', quantity: 1,
+  }), env);
+  assert.equal(unavailable.status, 503);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_orders').get().count, beforeOutage,
+    'provider outage must not place an order or use the seeded D1 price');
   console.log('PAPER_TRADING_TESTS_PASSED');
 } finally {
   globalThis.fetch = originalFetch;

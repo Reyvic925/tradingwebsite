@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from './auth.js';
+import { getMarketQuote } from './market-quotes.js';
 
 const INITIAL_PAPER_CASH = 100000;
 const OPEN_ORDER_STATUSES = ['pending', 'triggered'];
@@ -34,18 +35,10 @@ async function ensurePaperAccount(db, userId) {
 
 async function getQuote(db, marketId, symbol) {
   const market = await db.prepare(`
-    SELECT symbol, price FROM markets WHERE id = ? AND upper(symbol) = upper(?)
+    SELECT symbol, asset_class FROM markets WHERE id = ? AND upper(symbol) = upper(?)
   `).bind(marketId, symbol).first();
-  const price = Number(market?.price);
-  if (!Number.isFinite(price) || price <= 0) {
-    throw new Error(`No valid D1 reference price is available for ${symbol}.`);
-  }
-  return {
-    symbol: market.symbol,
-    price,
-    price_source: 'D1 reference',
-    quote_updated_at: null,
-  };
+  if (!market) throw new Error('Unknown market.');
+  return getMarketQuote(market, { forTrading: true });
 }
 
 function limitCrossed(order, price) {
@@ -273,8 +266,12 @@ async function createPaperOrder(request, env, userId) {
   if (stopLoss !== null && !(stopLoss > 0)) return json({ error: 'Stop loss must be a positive price.' }, 400);
   if (takeProfit !== null && !(takeProfit > 0)) return json({ error: 'Take profit must be a positive price.' }, 400);
 
-  const market = await db.prepare('SELECT id, symbol FROM markets WHERE id = ?').bind(marketId).first();
+  const market = await db.prepare('SELECT id, symbol, asset_class FROM markets WHERE id = ?').bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
+  if (type === 'market') {
+    try { await getMarketQuote(market, { forTrading: true }); }
+    catch { return json({ error: 'A fresh market quote is unavailable. No order was placed.' }, 503); }
+  }
   await ensurePaperAccount(db, userId);
   const operationId = crypto.randomUUID();
   const order = await db.prepare(`
@@ -301,7 +298,7 @@ async function createPaperOrder(request, env, userId) {
     const current = await db.prepare('SELECT * FROM paper_orders WHERE id = ?').bind(order.id).first();
     if (current.status === 'rejected') return json({ error: 'Insufficient virtual buying power.' }, 400);
     const position = await db.prepare('SELECT * FROM paper_positions WHERE entry_order_id = ?').bind(order.id).first();
-    return json({ order: current, position, quote_source: current.quote_source, quote_updated_at: current.quote_updated_at }, 201);
+    return json({ order: current, position, price_source: current.quote_source, quote_source: current.quote_source, quote_updated_at: current.quote_updated_at }, 201);
   }
 
   await processPendingOrders(db, userId);

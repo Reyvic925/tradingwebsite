@@ -45,7 +45,7 @@ export default function Markets() {
   const [error, setError] = useState('');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [regionMapping, setRegionMapping] = useState(DEFAULT_REGION_FROM);
-  const pageSize = 50;
+  const pageSize = 12;
   const assetFilters = filters.filter((f) => ['stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
   const regionFilters = filters.filter((f) => !['stocks', 'etf', 'forex', 'crypto', 'futures'].includes(String(f.id).toLowerCase()));
 
@@ -168,19 +168,19 @@ export default function Markets() {
                 <td className="px-3 py-3 text-stone-400">{m.name}</td>
                 <td className="px-3 py-3 uppercase text-[11px] text-stone-500">{m.asset_class}</td>
                 <td className="px-3 py-3 font-mono">
-                  <span>{formatPrice(Number(m.price))}</span>
+                  <span>{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}</span>
                   <span
                     className="mt-1 block text-[9px] leading-none text-stone-500"
                     title={m.price_source || 'Price source unavailable'}
                   >
-                    {m.price_source === 'D1 reference'
+                    {m.price_source === 'Unavailable' ? 'Feed unavailable' : m.price_source === 'D1 reference'
                       ? 'Reference'
                       : m.quote_updated_at
-                        ? `As of ${timeAgo(m.quote_updated_at)}`
+                        ? `${m.quote_stale ? 'Stale · ' : ''}${m.price_source} · ${timeAgo(m.quote_updated_at)}`
                         : 'Price source unavailable'}
                   </span>
                 </td>
-                <td className={`px-3 py-3 font-mono ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatPct(Number(m.change_24h))}</td>
+                <td className={`px-3 py-3 font-mono ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '—' : formatPct(Number(m.change_24h))}</td>
                 <td className="px-3 py-3 font-mono text-xs text-stone-500">
                   {m.high_24h == null ? '—' : formatPrice(Number(m.high_24h))} / {m.low_24h == null ? '—' : formatPrice(Number(m.low_24h))}
                 </td>

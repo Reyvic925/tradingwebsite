@@ -1,4 +1,5 @@
 import { UNIVERSE } from '../api-handlers/universe-data.js';
+import { quoteMarkets } from './market-quotes.js';
 import { getDefaultPlans } from '../api-handlers/plan-data.js';
 
 const CLASS_MAP = {
@@ -174,7 +175,8 @@ async function markets(url, db) {
   const requestedClass = String(url.searchParams.get('class') || url.searchParams.get('asset_class') || 'all').toLowerCase();
   const assetClasses = requestedClass === 'all' ? null : CLASS_MAP[requestedClass];
   const featured = url.searchParams.get('featured') === '1';
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || (featured ? 12 : 50)));
+  // Keep provider and cache subrequests within the free Worker's per-request budget.
+  const limit = Math.min(12, Math.max(1, Number(url.searchParams.get('limit')) || 12));
   const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
   const symbol = String(url.searchParams.get('symbol') || '').trim().toUpperCase();
 
@@ -197,8 +199,8 @@ async function markets(url, db) {
   const countQuery = db.prepare(`SELECT COUNT(*) AS total FROM markets ${where}`).bind(...values);
   const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM markets ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
-  const items = dataResult.results && dataResult.results.length ? dataResult.results : defaultMarkets();
-  const marketItems = items.map((item) => ({ ...item, price_source: 'D1 reference' }));
+  const items = dataResult.results && dataResult.results.length ? dataResult.results : defaultMarkets().slice(0, limit);
+  const marketItems = await quoteMarkets(items);
   const total = Number(countResult?.total || 0) || items.length;
   return json({
     items: featured && !dataResult.results?.length ? marketItems.slice(0, limit) : marketItems,

@@ -1,3 +1,4 @@
+import { getMarketQuote } from './market-quotes.js';
 import { getAuthenticatedUser } from './auth.js';
 import { sendUserEmail } from './email.js';
 
@@ -192,35 +193,37 @@ async function listPositions(request, db, userId) {
   const status = new URL(request.url).searchParams.get('status') || 'open';
   const result = status === 'all'
     ? await db.prepare(`
-      SELECT p.*, m.price AS latest_price
+      SELECT p.*, m.asset_class AS quote_asset_class
       FROM positions p LEFT JOIN markets m ON m.id = p.market_id
       WHERE p.user_id = ?
       ORDER BY p.id DESC
     `).bind(userId).all()
     : await db.prepare(`
-      SELECT p.*, m.price AS latest_price
+      SELECT p.*, m.asset_class AS quote_asset_class
       FROM positions p LEFT JOIN markets m ON m.id = p.market_id
       WHERE p.user_id = ? AND p.status = ?
       ORDER BY p.id DESC
     `).bind(userId, status).all();
 
   const rows = result.results || [];
-  const positions = rows.map((position) => {
+  const positions = await Promise.all(rows.map(async (position) => {
     const isOpen = position.status === 'open';
-    const price = Number(isOpen ? position.latest_price ?? position.current_price ?? 0 : position.current_price ?? 0);
+    const quote = isOpen ? await getMarketQuote({ symbol: position.symbol, asset_class: position.quote_asset_class }) : null;
+    const price = Number(quote?.price ?? position.current_price ?? 0);
     const direction = ['long', 'buy'].includes(position.side) ? 1 : -1;
     const pnl = isOpen
       ? (price - Number(position.entry_price)) * Number(position.quantity) * direction
       : Number(position.pnl || 0);
-    const { latest_price: _latestPrice, ...row } = position;
+    const { quote_asset_class: _quoteAssetClass, ...row } = position;
     return {
       ...row,
       current_price: price,
       pnl,
-      price_source: 'D1 reference',
-      quote_updated_at: null,
+      price_source: quote?.price_source || 'Last position mark',
+      quote_updated_at: quote?.quote_updated_at || null,
+      quote_stale: !quote || quote.quote_stale,
     };
-  });
+  }));
   return json(positions);
 }
 
@@ -267,11 +270,16 @@ async function createOrder(request, env, userId) {
   if (stopLoss.error) return json({ error: stopLoss.error }, 400);
   if (takeProfit.error) return json({ error: takeProfit.error }, 400);
 
-  const market = await db.prepare('SELECT id, symbol, price FROM markets WHERE id = ?')
+  const market = await db.prepare('SELECT id, symbol, price, asset_class FROM markets WHERE id = ?')
     .bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
 
-  const price = type === 'limit' ? Number(body.price) : Number(market.price);
+  let quote;
+  if (type !== 'limit') {
+    try { quote = await getMarketQuote(market, { forTrading: true }); }
+    catch { return json({ error: 'A fresh market quote is unavailable. No order was placed.' }, 503); }
+  }
+  const price = type === 'limit' ? Number(body.price) : quote.price;
   if (!Number.isFinite(price) || price <= 0) return json({ error: 'A valid order price is required.' }, 400);
   const operationId = crypto.randomUUID();
   if (type === 'limit') {
@@ -363,7 +371,7 @@ async function createOrder(request, env, userId) {
       subject: `Filled ${side.toUpperCase()} ${market.symbol}`,
       text: `${quantity} ${market.symbol} filled at ${price}. The order used 10% initial margin.`,
     }, 'worker/private-api');
-    return json({ order, position, price_source: 'D1 reference', quote_updated_at: null }, 201);
+    return json({ order, position, price_source: quote.price_source, quote_updated_at: quote.quote_updated_at }, 201);
   } catch (error) {
     if (/idx_positions_one_open_per_market|UNIQUE constraint failed: positions/i.test(String(error?.message || ''))) {
       return json({ error: 'The open position changed concurrently. Refresh before submitting another order.' }, 409);
@@ -416,7 +424,11 @@ async function closePosition(request, env, userId) {
   `).bind(id, userId).first();
   if (!position) return json({ error: 'Open position not found.' }, 404);
 
-  const closePrice = Number(position.close_price);
+  const market = await db.prepare('SELECT symbol, asset_class FROM markets WHERE id = ?').bind(position.market_id).first();
+  let quote;
+  try { quote = await getMarketQuote(market || { symbol: position.symbol }, { forTrading: true }); }
+  catch { return json({ error: 'A fresh market quote is unavailable. The position remains open.' }, 503); }
+  const closePrice = quote.price;
   if (!Number.isFinite(closePrice) || closePrice <= 0) return json({ error: 'Unable to determine a valid close price.' }, 409);
   const direction = ['long', 'buy'].includes(position.side) ? 1 : -1;
   const pnl = (closePrice - Number(position.entry_price)) * Number(position.quantity) * direction;

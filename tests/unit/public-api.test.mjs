@@ -46,9 +46,11 @@ const stagingDb = new FakeDatabase('staging');
 const request = (path) => new Request(`http://localhost${path}`);
 const originalFetch = globalThis.fetch;
 let externalFetchCalls = 0;
-globalThis.fetch = async () => {
+globalThis.fetch = async (url) => {
   externalFetchCalls += 1;
-  throw new Error('External market price fetching must remain disabled.');
+  return Response.json(String(url).includes('coinbase')
+    ? { price: '63251', time: new Date().toISOString(), volume: '1' }
+    : { chart: { result: [{ meta: { currency: 'USD', regularMarketPrice: 1, regularMarketTime: Math.floor(Date.now() / 1000), chartPreviousClose: 1, regularMarketVolume: 1, regularMarketDayHigh: 1, regularMarketDayLow: 1 } }] } });
 };
 
 assert.equal(selectPublicDatabase({ DB: productionDb, STAGING_DB: stagingDb }), productionDb);
@@ -64,25 +66,24 @@ const stagingLanding = await handlePublicRequest(request('/api/landing'), { PUBL
 assert.equal((await stagingLanding.json()).features[0].source, 'staging');
 
 const stagingMarkets = await handlePublicRequest(request('/api/markets?featured=1&limit=12'), { PUBLIC_API_DATABASE: 'staging', DB: productionDb, STAGING_DB: stagingDb });
-assert.deepEqual(await stagingMarkets.json(), {
-  items: [{ id: 1, symbol: 'STAGE', name: 'staging market', asset_class: 'stock', price: 1, change_24h: 0, volume: 1, high_24h: 1, low_24h: 1, price_source: 'D1 reference' }],
-  total: 1,
-  limit: 12,
-  offset: 0,
-});
+const stagingQuotes = await stagingMarkets.json();
+assert.equal(stagingQuotes.items[0].symbol, 'STAGE');
+assert.equal(stagingQuotes.items[0].price_source, 'Yahoo Finance (may be delayed)');
+assert.ok(stagingQuotes.items[0].quote_updated_at);
+assert.equal(stagingQuotes.total, 1);
 
 const stockMarkets = await handlePublicRequest(request('/api/markets?class=stocks'), { DB: productionDb });
 assert.equal((await stockMarkets.json()).items[0].price, 1);
-assert.deepEqual(productionDb.statements.at(-1).values, ['stock', 50, 0]);
+assert.deepEqual(productionDb.statements.at(-1).values, ['stock', 12, 0]);
 await handlePublicRequest(request('/api/markets?class=fx'), { DB: productionDb });
-assert.deepEqual(productionDb.statements.at(-1).values, ['forex', 50, 0]);
+assert.deepEqual(productionDb.statements.at(-1).values, ['forex', 12, 0]);
 
 const storedBtcResponse = await handlePublicRequest(request('/api/markets?symbol=BTCUSD&limit=1'), { DB: productionDb });
 const storedBtc = await storedBtcResponse.json();
 assert.equal(storedBtcResponse.status, 200);
-assert.equal(storedBtc.items[0].price, 63250);
-assert.equal(storedBtc.items[0].price_source, 'D1 reference');
-assert.equal(externalFetchCalls, 0, 'market reads must not fetch prices from external services');
+assert.equal(storedBtc.items[0].price, 63251);
+assert.equal(storedBtc.items[0].price_source, 'Coinbase');
+assert.ok(externalFetchCalls > 0, 'market reads fetch provider quotes');
 globalThis.fetch = originalFetch;
 
 const missingStaging = await handlePublicRequest(request('/api/markets'), { PUBLIC_API_DATABASE: 'staging', DB: productionDb });
