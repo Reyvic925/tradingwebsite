@@ -2,6 +2,7 @@ import { getCatalogMarket } from '../shared/market-catalog.js';
 // Keyless public feeds. Never blend provider prices with seeded or random values.
 const cache = new Map();
 const pending = new Map();
+let yahooRetryAfter = 0;
 const TTL = 15000;
 const MAX_AGE = 20 * 60 * 1000;
 const FUTURES = new Set(['ES', 'NQ', 'YM', 'RTY', 'GC', 'SI', 'CL', 'NG', 'HG', 'HO', 'BZ', 'ZS', 'ZW', 'KC', 'SB', 'CT', 'DX', '6E', '6J', '6B', '6A', '6C', '6S']);
@@ -15,7 +16,7 @@ async function readJson(url) {
     if (cached) return cached.json();
   } catch { /* cache failures must not disable providers */ }
   const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(6000) });
-  if (!response.ok) throw new Error(`Market provider returned ${response.status}`);
+  if (!response.ok) throw Object.assign(new Error(`Market provider returned ${response.status}`), { status: response.status });
   const data = await response.json();
   try {
     await edge?.put(key, new Response(JSON.stringify(data), { headers: {
@@ -48,6 +49,7 @@ async function fetchQuote(symbol, assetClass) {
       change_24h: null, high_24h: null, low_24h: null, volume: null });
   }
   // Spot metals and oil must not silently become futures contracts.
+  if (Date.now() < yahooRetryAfter) throw new Error('Yahoo provider is cooling down after throttling');
   const mapped = getCatalogMarket(symbol)?.provider_symbol || INDICES[symbol] || (FUTURES.has(symbol) ? `${symbol}=F`
     : assetClass === 'forex' && /^[A-Z]{6}$/.test(symbol) ? `${symbol}=X` : symbol);
   const data = await readJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mapped)}?interval=1m&range=1d`);
@@ -64,6 +66,32 @@ async function fetchQuote(symbol, assetClass) {
     volume: meta.regularMarketVolume ?? null });
 }
 
+async function fetchTradingViewQuote(symbol) {
+  const market = getCatalogMarket(symbol);
+  if (!market?.tradingview_symbol || market.provider !== 'Yahoo Finance') throw new Error('No verified fallback symbol');
+  const response = await fetch('https://scanner.tradingview.com/global/scan', {
+    method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+    signal: AbortSignal.timeout(6000),
+    body: JSON.stringify({ symbols: { tickers: [market.tradingview_symbol] },
+      columns: ['close|1', 'time|1', 'update_mode', 'currency', 'change', 'high', 'low', 'volume'] }),
+  });
+  if (!response.ok) throw new Error(`TradingView fallback returned ${response.status}`);
+  const payload = await response.json();
+  const row = payload.data?.find((item) => item.s === market.tradingview_symbol);
+  const [price, timestamp, mode, currency, change, high, low, volume] = row?.d || [];
+  if (!Number.isFinite(timestamp) || !currency || currency !== market.currency) throw new Error('Fallback quote metadata is incomplete');
+  const delay = /^delayed_streaming_(\d+)$/.exec(String(mode || ''));
+  const seconds = delay ? Number(delay[1]) : mode === 'streaming' ? 0 : null;
+  if (seconds === null) throw new Error('Fallback quote delay is unknown');
+  return validate({ symbol, price: Number(price),
+    price_source: `TradingView (${seconds ? `${seconds / 60}m delayed; ` : ''}1m bars)`,
+    // time|1 is the minute-bar opening time, never the HTTP retrieval time.
+    quote_updated_at: new Date(timestamp * 1000).toISOString(),
+    quote_timestamp_kind: 'minute_bar', quote_delay_seconds: seconds,
+    quote_currency: currency, quote_tradable: market.currency_supported,
+    change_24h: change ?? null, high_24h: high ?? null, low_24h: low ?? null, volume: volume ?? null });
+}
+
 export async function getMarketQuote(market, { forTrading = false } = {}) {
   const symbol = String(market.symbol || '').toUpperCase();
   const assetClass = market.asset_class || 'stock';
@@ -74,7 +102,15 @@ export async function getMarketQuote(market, { forTrading = false } = {}) {
     if (!task) {
       task = (async () => {
         let value = null;
-        try { value = await fetchQuote(symbol, assetClass); } catch { /* unavailable is explicit below */ }
+        try { value = await fetchQuote(symbol, assetClass); }
+        catch (error) {
+          console.warn('[market-quotes] Provider unavailable', symbol, error?.message || 'Unknown provider error');
+          if (getCatalogMarket(symbol)?.provider === 'Yahoo Finance') {
+            if (error?.status === 429) yahooRetryAfter = Date.now() + 60000;
+            try { value = await fetchTradingViewQuote(symbol); }
+            catch (fallbackError) { console.warn('[market-quotes] Fallback unavailable', symbol, fallbackError?.message || 'Unknown provider error'); }
+          }
+        }
         if (cache.size >= 1000) cache.delete(cache.keys().next().value);
         const result = { value, expires: Date.now() + (value?.price_source === 'Gold API (USD/oz)' ? 30000 : value ? TTL : 5000) };
         cache.set(key, result);
@@ -99,10 +135,12 @@ export async function quoteMarkets(items) {
       const item = items[index];
       const quote = await getMarketQuote(item);
       results[index] = quote ? { ...item, ...quote } : { ...item, price: null, change_24h: null,
-        high_24h: null, low_24h: null, volume: null, price_source: 'Unavailable', quote_updated_at: null, quote_stale: true };
+        high_24h: null, low_24h: null, volume: null, price_source: 'Unavailable', quote_updated_at: null, quote_stale: true,
+        quote_currency: getCatalogMarket(item.symbol)?.currency,
+        quote_tradable: getCatalogMarket(item.symbol)?.currency_supported ?? false };
     }
   }));
   return results;
 }
 
-export function clearQuoteCache() { cache.clear(); }
+export function clearQuoteCache() { cache.clear(); yahooRetryAfter = 0; }
