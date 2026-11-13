@@ -280,10 +280,9 @@ function attachWalletHandlers() {
     connectBtn.addEventListener('click', showWalletModal);
   }
 
-  const status = document.getElementById('walletStatus');
-  const address = document.getElementById('walletAddress');
-  if (status) status.textContent = 'No wallet connected yet';
-  if (address) address.textContent = 'Not connected';
+  // AppShell supplies the initial labels. Rewriting text here creates childList
+  // mutations that retrigger our observer indefinitely and freeze the page.
+  // Leave status changes to the wallet connection actions.
 }
 
 function observeWalletUI() {
