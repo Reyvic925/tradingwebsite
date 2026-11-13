@@ -1,4 +1,3 @@
-import { UNIVERSE } from '../api-handlers/universe-data.js';
 import { quoteMarkets } from './market-quotes.js';
 import { getDefaultPlans } from '../api-handlers/plan-data.js';
 
@@ -69,39 +68,6 @@ const DEFAULT_TESTIMONIALS = [
   { id: 3, name: 'Kenji Nakamura', country: 'Japan', amount: 241800, quote: 'Gold plan compounded exactly as advertised.', video_url: '/videos/testimonial-3.mp4', avatar_url: '/images/avatar-3.jpg', role: 'Private investor' },
   { id: 4, name: 'Sofia Alvarez', country: 'Spain', amount: 67340, quote: 'Copying two lead traders while I run FX.', video_url: '/videos/testimonial-4.mp4', avatar_url: '/images/avatar-4.jpg', role: 'FX specialist' },
 ];
-
-function defaultMarkets() {
-  const seen = new Set();
-  const list = [];
-  for (const market of UNIVERSE || []) {
-    const symbol = String(market?.symbol || '').trim();
-    if (!symbol || seen.has(symbol)) continue;
-    seen.add(symbol);
-    list.push({
-      id: list.length + 1,
-      symbol,
-      name: String(market?.name || symbol),
-      asset_class: String(market?.asset_class || 'stock'),
-      price: Number(market?.price || 0),
-      change_24h: Number(market?.change_24h || 0),
-      volume: Number(market?.volume || 0),
-      high_24h: Number(market?.high_24h || 0),
-      low_24h: Number(market?.low_24h || 0),
-    });
-    if (list.length >= 24) break;
-  }
-  if (!list.length) {
-    return [
-      { id: 1, symbol: 'NVDA', name: 'NVIDIA', asset_class: 'stock', price: 131.05, change_24h: 1.84, volume: 42000000, high_24h: 132.2, low_24h: 127.9 },
-      { id: 2, symbol: 'AAPL', name: 'Apple', asset_class: 'stock', price: 228.2, change_24h: 0.92, volume: 27100000, high_24h: 230.1, low_24h: 224.8 },
-      { id: 3, symbol: 'EURUSD', name: 'Euro / US Dollar', asset_class: 'forex', price: 1.0863, change_24h: 0.12, volume: 96000000, high_24h: 1.0884, low_24h: 1.0827 },
-      { id: 4, symbol: 'BTCUSD', name: 'Bitcoin / US Dollar', asset_class: 'crypto', price: 67380, change_24h: 2.15, volume: 31000000000, high_24h: 68200, low_24h: 64600 },
-      { id: 5, symbol: 'ETHUSD', name: 'Ethereum / US Dollar', asset_class: 'crypto', price: 3491.1, change_24h: 1.7, volume: 18000000000, high_24h: 3565, low_24h: 3342 },
-      { id: 6, symbol: 'XAUUSD', name: 'Gold / US Dollar', asset_class: 'forex', price: 4300, change_24h: 1.52, volume: 12800000, high_24h: 4314, low_24h: 4238 },
-    ];
-  }
-  return list;
-}
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -199,7 +165,7 @@ async function markets(url, db) {
   const countQuery = db.prepare(`SELECT COUNT(*) AS total FROM markets ${where}`).bind(...values);
   const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM markets ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
-  const items = dataResult.results && dataResult.results.length ? dataResult.results : defaultMarkets().slice(0, limit);
+  const items = dataResult.results || [];
   const marketItems = await quoteMarkets(items);
   const total = Number(countResult?.total || 0) || items.length;
   return json({

@@ -90,4 +90,13 @@ const missingStaging = await handlePublicRequest(request('/api/markets'), { PUBL
 assert.equal(missingStaging.status, 503);
 assert.match((await missingStaging.json()).error, /STAGING_DB is unavailable/);
 
+const emptyDb = {
+  prepare() {
+    return { bind() { return this; }, async first() { return { total: 0 }; }, async all() { return { results: [] }; } };
+  },
+};
+const emptySearch = await handlePublicRequest(request('/api/markets?q=NO_SUCH_SYMBOL&offset=12'), { DB: emptyDb });
+assert.deepEqual(await emptySearch.json(), { items: [], total: 0, limit: 12, offset: 12 },
+  'empty search or page must not be replaced with unrelated seeded markets');
+
 console.log('PUBLIC_API_DATABASE_TESTS_PASSED');

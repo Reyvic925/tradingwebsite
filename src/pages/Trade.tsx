@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import AppShell from '../components/AppShell';
@@ -16,7 +16,12 @@ export default function Trade() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [watch, setWatch] = useState<{ id: number; market_id: number; symbol: string }[]>([]);
   const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
-  const [filter, setFilter] = useState<'stock' | 'forex' | 'crypto' | 'futures'>('stock');
+  const [filter, setFilter] = useState<'all' | 'stock' | 'etf' | 'forex' | 'crypto' | 'futures'>('stock');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pageMarkets, setPageMarkets] = useState<Market[]>([]);
+  const requestId = useRef(0);
+  const pageSize = 12;
   const [search, setSearch] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [otype, setOtype] = useState<'market' | 'limit' | 'stop' | 'stop_limit'>('market');
@@ -37,16 +42,24 @@ export default function Trade() {
     return markets.find((m) => m.symbol === symbol) || markets[0];
   }, [markets, symbol]);
 
+  useEffect(() => {
+    if (!symbol && selected) navigate(`/app/trade/${encodeURIComponent(selected.symbol)}`, { replace: true });
+  }, [symbol, selected, navigate]);
+
   const load = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     try {
       const [m, p, o, account, wl, focused] = await Promise.all([
-        apiMarkets<Market>({ class: filter, q: search || undefined, limit: 12 }),
+        apiMarkets<Market>({ class: filter, q: search || undefined, limit: pageSize, offset: page * pageSize }),
         apiGet<Position[]>('/api/paper/positions'),
         apiGet<Order[]>('/api/paper/orders'),
         apiGet<PaperAccount>('/api/paper/account'),
         apiList<{ id: number; market_id: number; symbol: string }>('/api/watchlist'),
         symbol ? apiMarkets<Market>({ symbol, limit: 1 }) : Promise.resolve({ items: [] as Market[] }),
       ]);
+      if (currentRequest !== requestId.current) return;
+      setPageMarkets(m.items);
+      setTotal(m.total);
       const merged = [...m.items];
       focused.items.forEach((row) => {
         if (!merged.some((x) => x.id === row.id)) merged.unshift(row);
@@ -70,24 +83,30 @@ export default function Trade() {
       
       setErr('');
     } catch (e: unknown) {
+      if (currentRequest !== requestId.current) return;
       setErr(e instanceof Error ? e.message : 'Desk unavailable');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [filter, search, symbol]);
+  }, [filter, search, symbol, page]);
 
   useEffect(() => {
-    return startVisibleInterval(load, 30000);
+    setLoading(true);
+    const stop = startVisibleInterval(load, 30000);
+    return () => { stop(); requestId.current++; };
   }, [load]);
 
   const FILTERS = [
+    { id: 'all', label: 'All' },
     { id: 'stock', label: 'Stocks' },
+    { id: 'etf', label: 'ETFs' },
     { id: 'forex', label: 'Forex' },
     { id: 'crypto', label: 'Crypto' },
     { id: 'futures', label: 'Futures' },
   ] as const;
 
-  const list = markets;
+  const list = pageMarkets;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const watched = (id: number) => watch.some((w) => w.market_id === id);
 
   const toggleWatch = async (m: Market) => {
@@ -175,7 +194,7 @@ export default function Trade() {
             {FILTERS.map((f) => (
               <button
                 key={f.id}
-                onClick={() => setFilter(f.id)}
+                onClick={() => { setFilter(f.id); setPage(0); }}
                 className={`shrink-0 rounded-sm px-2 py-1.5 text-[10px] uppercase tracking-widest ${filter === f.id ? 'bg-amber-400/15 text-amber-200' : 'text-stone-500'}`}
               >
                 {f.label}
@@ -185,13 +204,14 @@ export default function Trade() {
           <div className="border-b border-white/5 p-2">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Find AAPL, SPY…"
               className="w-full rounded-sm border border-white/10 bg-black/40 px-2 py-1.5 text-xs outline-none"
             />
           </div>
           <div className="max-h-[72vh] overflow-auto">
             {loading && <div className="p-4 text-sm text-stone-500">Loading books…</div>}
+            {!loading && !list.length && <div className="p-4 text-sm text-stone-500">No matching markets.</div>}
             {list.map((m) => (
               <button
                 key={m.id}
@@ -219,6 +239,11 @@ export default function Trade() {
                 </div>
               </button>
             ))}
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-white/5 p-3 text-xs text-stone-400">
+            <button type="button" disabled={loading || page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))} className="rounded border border-white/10 px-2 py-1 disabled:opacity-30">Previous</button>
+            <span aria-live="polite" className="text-center">{total.toLocaleString()} markets<br />Page {page + 1} of {pageCount}</span>
+            <button type="button" disabled={loading || page + 1 >= pageCount} onClick={() => setPage((value) => value + 1)} className="rounded border border-white/10 px-2 py-1 disabled:opacity-30">Next</button>
           </div>
         </aside>
 
