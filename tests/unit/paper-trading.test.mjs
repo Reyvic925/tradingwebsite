@@ -203,6 +203,18 @@ try {
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 10);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 1);
   clearQuoteCache();
+  db.sqlite.prepare('INSERT INTO markets (id, symbol, name, asset_class, price) VALUES (2, ?, ?, ?, ?)')
+    .run('FLT12', 'FLT12 Holdings', 'stock', 1);
+  const excluded = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
+    market_id: 2, side: 'buy', type: 'limit', quantity: 1, limit_price: 1,
+  }), env);
+  assert.equal(excluded.status, 400, 'direct order requests cannot bypass catalog exclusions');
+  db.sqlite.prepare('INSERT INTO markets (id, symbol, name, asset_class, price) VALUES (3, ?, ?, ?, ?)')
+    .run('7203.T', 'Toyota Motor', 'jp', 3000);
+  const nativeCurrency = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
+    market_id: 3, side: 'buy', type: 'limit', quantity: 1, limit_price: 3000,
+  }), env);
+  assert.equal(nativeCurrency.status, 400, 'quotes-only markets cannot create unsettled USD orders');
   globalThis.fetch = async () => new Response('', { status: 429 });
   const beforeOutage = db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_orders').get().count;
   const unavailable = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {

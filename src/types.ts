@@ -10,6 +10,8 @@ export type Market = {
   low_24h: number | null;
   price_source?: string;
   quote_stale?: boolean;
+  quote_currency?: string;
+  quote_tradable?: boolean;
   quote_updated_at?: string | null;
 };
 

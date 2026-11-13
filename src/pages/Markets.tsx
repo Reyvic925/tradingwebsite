@@ -168,7 +168,7 @@ export default function Markets() {
                 <td className="px-3 py-3 text-stone-400">{m.name}</td>
                 <td className="px-3 py-3 uppercase text-[11px] text-stone-500">{m.asset_class}</td>
                 <td className="px-3 py-3 font-mono">
-                  <span>{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}</span>
+                  <span>{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}{m.quote_currency ? ` ${m.quote_currency}` : ''}</span>
                   <span
                     className="mt-1 block text-[9px] leading-none text-stone-500"
                     title={m.price_source || 'Price source unavailable'}

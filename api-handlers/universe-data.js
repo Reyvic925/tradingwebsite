@@ -1,3 +1,4 @@
+import { getCatalogMarket, isSelectableMarket } from '../shared/market-catalog.js';
 /** Liquid US-listed stocks and ETFs for the Apex desk. */
 function row(symbol, name, asset_class, price, volume) {
   const ch = Number(((Math.sin(symbol.length * 1.7) * 1.8)).toFixed(2));
@@ -13,13 +14,11 @@ function row(symbol, name, asset_class, price, volume) {
   };
 }
 
-const EXTRA_STOCKS = Array.from({ length: 540 }, (_, index) => {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const symbol = `${letters[(index * 2 + 5) % 26]}${letters[(index * 3 + 11) % 26]}${letters[(index * 5 + 19) % 26]}${String((index % 88) + 12).padStart(2, '0')}`;
-  return row(symbol, `${symbol} Holdings`, 'stock', Number((18 + ((index * 13) % 200) * 0.82).toFixed(2)), 260000 + ((index * 997) % 16000000));
-});
-
 export const UNIVERSE = [
+  ...['AAPL', 'MSFT', 'NVDA', 'AMZN', 'TSLA'].map((symbol) => ({
+    symbol, name: getCatalogMarket(symbol).name, asset_class: 'stock',
+    price: null, change_24h: null, volume: null, high_24h: null, low_24h: null,
+  })),
   // Technology
   row('GOOGL', 'Alphabet Inc. Class A', 'stock', 172.4, 24100000),
   row('GOOG', 'Alphabet Inc. Class C', 'stock', 174.1, 18200000),
@@ -611,8 +610,7 @@ export const UNIVERSE = [
   row('UVXY', 'ProShares Ultra VIX Short-Term', 'etf', 24.2, 14200000),
   row('SVXY', 'ProShares Short VIX Short-Term', 'etf', 52.8, 2200000),
   row('VXX', 'iPath Series B S&P 500 VIX', 'etf', 48.6, 5400000),
-  ...EXTRA_STOCKS,
-].filter((r) => r.symbol !== 'MRNA2' && r.symbol !== 'SHOP2');
+].filter((market) => isSelectableMarket(market.symbol));
 
 export const CRYPTO_PAIRS = [
   row('BTCUSD', 'Bitcoin / USD', 'crypto', 63250, 2450000000),
@@ -703,7 +701,7 @@ export const CRYPTO_PAIRS = [
   row('TRUMPUSD', 'Official Trump / USD', 'crypto', 12.4, 180000000),
   row('JTOUSD', 'Jito / USD', 'crypto', 2.8, 32000000),
   row('RAYUSD', 'Raydium / USD', 'crypto', 4.2, 26000000),
-];
+].filter((market) => isSelectableMarket(market.symbol));
 
 export const FX_PAIRS = [
   row('EURUSD', 'Euro / US Dollar', 'fx', 1.0845, 2100000000),
@@ -770,7 +768,7 @@ export const FX_PAIRS = [
   row('USDNGN', 'US Dollar / Nigerian Naira', 'fx', 1490, 45000000),
   row('USDKES', 'US Dollar / Kenyan Shilling', 'fx', 129.4, 42000000),
   row('EURCAD', 'Euro / Canadian Dollar', 'fx', 1.48, 200000000),
-];
+].filter((market) => isSelectableMarket(market.symbol));
 
 export const FUTURE_PAIRS = [
   row('USOIL', 'WTI Crude Oil', 'futures', 75.6, 52000000),
@@ -844,6 +842,6 @@ export const FUTURE_PAIRS = [
   row('US=F', 'US Dollar Index', 'futures', 101.8, 3700000),
   row('FDAX=F', 'FDAX Index', 'futures', 18387, 3600000),
   row('CME=F', 'CME Rate Index', 'futures', 92.1, 3500000),
-];
+].filter((market) => isSelectableMarket(market.symbol));
 
 export const MARKET_UNIVERSE = [...UNIVERSE, ...CRYPTO_PAIRS, ...FX_PAIRS, ...FUTURE_PAIRS];

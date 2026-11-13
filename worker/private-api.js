@@ -1,4 +1,5 @@
 import { getMarketQuote } from './market-quotes.js';
+import { isSelectableMarket, isTradableMarket } from '../shared/market-catalog.js';
 import { getAuthenticatedUser } from './auth.js';
 import { sendUserEmail } from './email.js';
 
@@ -273,6 +274,8 @@ async function createOrder(request, env, userId) {
   const market = await db.prepare('SELECT id, symbol, price, asset_class FROM markets WHERE id = ?')
     .bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
+  if (!isSelectableMarket(market.symbol)) return json({ error: 'This symbol is not in the verified market catalog.' }, 400);
+  if (!isTradableMarket(market.symbol)) return json({ error: 'This market is quotes-only until native-currency settlement is supported.' }, 400);
 
   let quote;
   if (type !== 'limit') {

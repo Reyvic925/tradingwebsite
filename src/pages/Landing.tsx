@@ -351,7 +351,7 @@ export default function Landing() {
                     <div className="font-mono text-sm">{m.symbol}</div>
                     <div className="text-[10px] uppercase tracking-widest text-stone-600">{m.asset_class === 'forex' ? 'Forex' : m.asset_class === 'crypto' ? 'Crypto' : m.asset_class === 'futures' ? 'Futures' : 'Stocks'}</div>
                   </div>
-                  <div className="mt-2 font-mono text-lg">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' ? stale' : ''}</div>
+                  <div className="mt-2 font-mono text-lg">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}{m.quote_currency ? ` ${m.quote_currency}` : ''}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' ? stale' : ''}</div>
                   <div className={`text-xs ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '?' : formatPct(Number(m.change_24h))}</div>
                 </div>
               ))}

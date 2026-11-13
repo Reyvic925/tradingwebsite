@@ -1,3 +1,4 @@
+import { getCatalogMarket } from '../shared/market-catalog.js';
 // Keyless public feeds. Never blend provider prices with seeded or random values.
 const cache = new Map();
 const pending = new Map();
@@ -47,16 +48,16 @@ async function fetchQuote(symbol, assetClass) {
       change_24h: null, high_24h: null, low_24h: null, volume: null });
   }
   // Spot metals and oil must not silently become futures contracts.
-  const mapped = INDICES[symbol] || (FUTURES.has(symbol) ? `${symbol}=F`
+  const mapped = getCatalogMarket(symbol)?.provider_symbol || INDICES[symbol] || (FUTURES.has(symbol) ? `${symbol}=F`
     : assetClass === 'forex' && /^[A-Z]{6}$/.test(symbol) ? `${symbol}=X` : symbol);
   const data = await readJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mapped)}?interval=1m&range=1d`);
   const meta = data.chart?.result?.[0]?.meta;
-  if (!meta || meta.currency !== 'USD' && !['forex', 'futures'].includes(assetClass) && !INDICES[symbol]) {
-    throw new Error('Unsupported quote currency');
-  }
+  if (!meta) throw new Error('Provider quote unavailable');
   const price = Number(meta.regularMarketPrice);
   const previous = Number(meta.chartPreviousClose || meta.previousClose);
   return validate({ symbol, price, price_source: 'Yahoo Finance (may be delayed)',
+    quote_currency: meta.currency,
+    quote_tradable: getCatalogMarket(symbol)?.currency_supported ?? (meta.currency === 'USD' || assetClass === 'forex'),
     quote_updated_at: new Date(Number(meta.regularMarketTime) * 1000).toISOString(),
     change_24h: previous > 0 ? (price / previous - 1) * 100 : null,
     high_24h: meta.regularMarketDayHigh ?? null, low_24h: meta.regularMarketDayLow ?? null,
@@ -85,6 +86,7 @@ export async function getMarketQuote(market, { forTrading = false } = {}) {
   }
   const quote = entry.value ? validate(entry.value) : null;
   if (forTrading && (!quote || quote.quote_stale)) throw new Error(`A fresh provider quote is unavailable for ${symbol}.`);
+  if (forTrading && quote.quote_tradable === false) throw new Error(`Quotes for ${symbol} are in ${quote.quote_currency}; USD settlement is not supported.`);
   return quote;
 }
 

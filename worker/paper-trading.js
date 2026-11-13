@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from './auth.js';
 import { getMarketQuote } from './market-quotes.js';
+import { isSelectableMarket, isTradableMarket } from '../shared/market-catalog.js';
 
 const INITIAL_PAPER_CASH = 100000;
 const OPEN_ORDER_STATUSES = ['pending', 'triggered'];
@@ -110,6 +111,7 @@ async function processPendingOrders(db, userId) {
   const updates = [];
 
   for (const order of pending.results || []) {
+    if (!isSelectableMarket(order.symbol)) continue;
     let quote;
     try {
       quote = await getQuote(db, order.market_id, order.symbol);
@@ -268,6 +270,8 @@ async function createPaperOrder(request, env, userId) {
 
   const market = await db.prepare('SELECT id, symbol, asset_class FROM markets WHERE id = ?').bind(marketId).first();
   if (!market) return json({ error: 'Unknown market.' }, 400);
+  if (!isSelectableMarket(market.symbol)) return json({ error: 'This symbol is not in the verified market catalog.' }, 400);
+  if (!isTradableMarket(market.symbol)) return json({ error: 'This market is quotes-only until native-currency settlement is supported.' }, 400);
   if (type === 'market') {
     try { await getMarketQuote(market, { forTrading: true }); }
     catch { return json({ error: 'A fresh market quote is unavailable. No order was placed.' }, 503); }

@@ -1,0 +1,13 @@
+{
+  "audited_at": "2026-11-13T21:32:58.591Z",
+  "total": 1954,
+  "selectable": 1320,
+  "statuses": {
+    "verified": 811,
+    "verified_quote_only": 509,
+    "chart_unverified": 2,
+    "provider_unsupported_or_unverified": 83,
+    "provider_stale": 9,
+    "fabricated": 540
+  }
+}

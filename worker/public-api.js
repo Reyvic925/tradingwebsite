@@ -1,4 +1,5 @@
 import { quoteMarkets } from './market-quotes.js';
+import { selectableMarketsSql, getCatalogMarket } from '../shared/market-catalog.js';
 import { getDefaultPlans } from '../api-handlers/plan-data.js';
 
 const CLASS_MAP = {
@@ -146,7 +147,7 @@ async function markets(url, db) {
   const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
   const symbol = String(url.searchParams.get('symbol') || '').trim().toUpperCase();
 
-  const clauses = [];
+  const clauses = [selectableMarketsSql];
   const values = [];
   if (q) {
     clauses.push('(lower(symbol) LIKE ? OR lower(name) LIKE ?)');
@@ -165,7 +166,7 @@ async function markets(url, db) {
   const countQuery = db.prepare(`SELECT COUNT(*) AS total FROM markets ${where}`).bind(...values);
   const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM markets ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
-  const items = dataResult.results || [];
+  const items = (dataResult.results || []).map((item) => ({ ...item, name: getCatalogMarket(item.symbol)?.name || item.name }));
   const marketItems = await quoteMarkets(items);
   const total = Number(countResult?.total || 0) || items.length;
   return json({

@@ -14,7 +14,7 @@ globalThis.fetch = async (url) => {
   if (String(url).includes('gold-api')) return Response.json({ symbol: 'XAU', currency: 'USD', price, updatedAt: timestamp });
   return Response.json(String(url).includes('coinbase')
     ? { price: String(price), time: timestamp }
-    : { chart: { result: [{ meta: { currency: 'USD', regularMarketPrice: price,
+    : { chart: { result: [{ meta: { currency: String(url).includes('7203.T') ? 'JPY' : 'USD', regularMarketPrice: price,
       regularMarketTime: Math.floor(Date.parse(timestamp) / 1000), chartPreviousClose: price / 1.02,
       regularMarketDayHigh: price + 2, regularMarketDayLow: price - 2, regularMarketVolume: 123 } }] } });
 };
@@ -36,6 +36,11 @@ try {
   assert.ok(urls.at(-1).includes('GC%3DF'));
   await getMarketQuote({ symbol: 'XAUUSD', asset_class: 'forex' });
   assert.ok(urls.at(-1).includes('gold-api.com/price/XAU'), 'spot gold must not be substituted with gold futures');
+  const toyota = { symbol: '7203.T', asset_class: 'jp' };
+  const nativeQuote = await getMarketQuote(toyota);
+  assert.equal(nativeQuote.quote_currency, 'JPY');
+  assert.equal(nativeQuote.quote_tradable, false);
+  await assert.rejects(getMarketQuote(toyota, { forTrading: true }), /USD settlement is not supported/);
 
   clearQuoteCache();
   timestamp = new Date(Date.now() - 21 * 60000).toISOString();

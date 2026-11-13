@@ -39,7 +39,7 @@ export default function Trade() {
 
   const selected = useMemo(() => {
     if (!markets.length) return null;
-    return markets.find((m) => m.symbol === symbol) || markets[0];
+    return symbol ? markets.find((m) => m.symbol === symbol) || null : markets[0];
   }, [markets, symbol]);
 
   useEffect(() => {
@@ -248,6 +248,7 @@ export default function Trade() {
         </aside>
 
         <section className="space-y-4">
+          {!loading && symbol && !selected && <div className="rounded-sm border border-amber-400/20 bg-amber-400/5 p-3 text-sm text-amber-200">This symbol is not in the verified market catalog. Choose a market from the list.</div>}
           {err && <div className="rounded-sm border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{err}</div>}
           {selected && (
             <>
@@ -257,7 +258,7 @@ export default function Trade() {
                   <div className="font-display text-4xl">{selected.symbol}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-3xl">{selected.price == null ? 'Unavailable' : formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}</div>
+                  <div className="font-mono text-3xl">{selected.price == null ? 'Unavailable' : formatPrice(latestPrice[selected.symbol] ?? Number(selected.price))}{selected.quote_currency ? ` ${selected.quote_currency}` : ''}</div>
                   <div className={Number(selected.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{selected.change_24h == null ? '?' : formatPct(Number(selected.change_24h))} 24h</div>
                   <div className={`mt-1 text-[10px] uppercase tracking-widest ${isLiveQuote ? 'text-emerald-300' : 'text-stone-500'}`}>{quoteSourceLabel}</div>
                 </div>
@@ -372,8 +373,9 @@ export default function Trade() {
             <div className="mt-3 text-[11px] text-stone-500">
               Buying power {formatMoney(Number(paperAccount?.available_cash || 0))} · 100% cash collateral
             </div>
+            {selected?.quote_tradable === false && <div className="mt-2 text-xs text-amber-200">Quotes only: {selected.quote_currency} settlement is not supported by the USD trading account.</div>}
             {msg && <div className="mt-2 text-xs text-amber-200">{msg}</div>}
-            <button disabled={busy || !isLiveQuote} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>
+            <button disabled={busy || !isLiveQuote || selected?.quote_tradable === false} className={`mt-4 w-full rounded-sm py-2.5 text-xs font-semibold uppercase tracking-[0.18em] ${side === 'buy' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-black'}`}>
               {busy ? 'Routing…' : `${side} ${selected?.symbol || ''}`}
             </button>
           </form>

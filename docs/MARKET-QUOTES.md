@@ -6,7 +6,7 @@ The Cloudflare Worker uses `worker/market-quotes.js` for market lists, the landi
 - Spot gold, silver, platinum, palladium: Gold API, USD per troy ounce, with its provider update timestamp. These are not substituted with futures prices.
 - US equities, ETFs, FX, supported futures and indices: Yahoo Finance chart endpoint, with `regularMarketTime`. Quotes can be delayed. The public endpoint is unofficial and can throttle or change.
 
-Prices are used exactly as returned. Missing change, volume, or high/low fields stay null. Unsupported symbols, provider failures, and non-USD stock quotes show unavailable instead of seeded prices. International currency conversion is not implemented.
+Prices are used exactly as returned. Missing change, volume, or high/low fields stay null. Unsupported symbols and provider failures show unavailable instead of seeded prices. Verified international listings display their native currency and are quotes-only until currency settlement is supported; conversion to USD is not implemented. See `market-catalog/README.md` for the full symbol audit and eligibility rules.
 
 Successful quotes are cached for 15 seconds in memory and at the Cloudflare edge; metals use 30 seconds. Concurrent requests within an isolate are shared. Market pages contain at most 12 symbols to stay within free Worker subrequest limits. The UI polls every 30 seconds. This is polled market data, not a streaming execution feed.
 
