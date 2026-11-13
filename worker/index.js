@@ -10,7 +10,8 @@ import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 import { handleTraderRequest } from './traders-api.js';
-import { handleCopyRequest, runCopyTradingTick } from './copy-trading.js';
+import { handleCopyRequest } from './copy-trading.js';
+import { handleCronRequest, runCronJob } from './cron.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -23,9 +24,11 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 const pendingMarketResponses = new Map();
 
 export default {
-  async scheduled(_controller, env, context) {
+  async scheduled(controller, env, context) {
     context.waitUntil(runPaperTradingTick(env));
-    context.waitUntil(runCopyTradingTick(env));
+    const now = new Date(controller.scheduledTime || Date.now());
+    context.waitUntil(runCronJob('copy-trading', env, now));
+    context.waitUntil(runCronJob('roi', env, now));
   },
 
   async fetch(request, env) {
@@ -54,6 +57,10 @@ export default {
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleAuthRequest(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/cron/')) {
+      return handleCronRequest(request, env);
     }
 
     if (['/api/copy-trades', '/api/copy-summary', '/api/copy-activity'].includes(url.pathname)) {

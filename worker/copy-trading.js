@@ -138,8 +138,10 @@ export async function runCopyTradingTick(env, now = new Date()) {
   const db = env.DB;
   const tick = Math.floor(now.getTime() / 300000);
   const at = new Date(tick * 300000).toISOString();
+  const summary = { traders: 0, updated: 0, follower_events: 0, timestamp: at };
   const { results: traders } = await db.prepare("SELECT * FROM traders WHERE is_active=1 OR EXISTS (SELECT 1 FROM copy_follows WHERE trader_id=traders.id AND status<>'stopped')").all();
   for (const trader of traders || []) {
+    summary.traders++;
     const strategies = ['momentum', 'mean_reversion', 'scalper', 'swing', 'conservative'];
     const config = normalizeSyntheticConfig({ assets: JSON.parse(trader.asset_focus), session: trader.session_type, startingEquity: trader.current_equity / Math.max(0.0001, 1 + trader.total_return / 100),
       strategyType: strategies[trader.id % strategies.length], riskProfile: trader.risk_score });
@@ -174,7 +176,8 @@ export async function runCopyTradingTick(env, now = new Date()) {
         WHERE id=? AND ${guard}`, result.state.equity, (result.state.equity / config.startingEquity - 1) * 100,
         result.state.maxDrawdown, at, trader.id, ...guardArgs));
       batch.push(statement(db, `UPDATE copy_simulation_state SET last_tick=?,state=? WHERE trader_id=? AND last_tick=?`, tick, JSON.stringify(result.state), ...guardArgs));
-      await db.batch(batch);
+      const applied = await db.batch(batch);
+      if (applied.at(-1).meta?.changes) summary.updated++;
     }
     const stored = await statement(db, 'SELECT * FROM copy_simulation_ticks WHERE trader_id=? AND tick=?', trader.id, tick).first();
     if (!stored) continue;
@@ -231,11 +234,12 @@ export async function runCopyTradingTick(env, now = new Date()) {
       }
       value.fee += executionFees;
       if (nextPosition) nextPosition.total_fees = Number(position?.total_fees || 0) + value.fee;
-      await applyCopyEvent(db, follow, value, { id, at, kind, tick,
+      const applied = await applyCopyEvent(db, follow, value, { id, at, kind, tick,
         trade_pnl: nextPosition === null ? (trade.side === 'BUY' ? 1 : -1) * (trade.exit_price - trade.entry_price) * trade.quantity - Number(position?.total_fees || 0) - value.fee : null,
         symbol: trade.symbol, side: trade.side, quantity: trade.quantity,
         entry_price: trade.entry_price, exit_price: trade.exit_price,
         reason: closeReason || (kind === 'opened' ? 'strategy_entry' : 'market_move') }, nextPosition);
+      if (applied) summary.follower_events++;
     }
     await statement(db, `UPDATE traders SET total_trades=(SELECT count(*) FROM trader_trades WHERE trader_id=? AND status='CLOSED'),
       win_rate_trades=coalesce((SELECT 100.0*sum(pnl>0)/nullif(count(*),0) FROM trader_trades WHERE trader_id=? AND status='CLOSED'),0),
@@ -244,4 +248,5 @@ export async function runCopyTradingTick(env, now = new Date()) {
       trader.id, trader.id, trader.id, trader.id, trader.id).run();
   }
   await statement(db, 'DELETE FROM copy_simulation_ticks WHERE tick < ?', tick - 576).run();
+  return summary;
 }
