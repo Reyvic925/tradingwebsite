@@ -10,6 +10,18 @@ const ASSET_SPECS = {
   'USD-JPY': { basePrice: 148.9, volatility: 0.0028, drift: 0.0001, correlation: 'fx' },
   NASDAQ: { basePrice: 15180.5, volatility: 0.006, drift: 0.0003, correlation: 'equities' },
   SPX500: { basePrice: 4825.3, volatility: 0.004, drift: 0.00025, correlation: 'equities' },
+  AAPL: { basePrice: 190, volatility: 0.007, drift: 0.0002, correlation: 'equities' },
+  NVDA: { basePrice: 130, volatility: 0.012, drift: 0.0003, correlation: 'equities' },
+  TSLA: { basePrice: 240, volatility: 0.014, drift: 0.0002, correlation: 'equities' },
+  MSFT: { basePrice: 420, volatility: 0.006, drift: 0.0002, correlation: 'equities' },
+  AMZN: { basePrice: 200, volatility: 0.008, drift: 0.0002, correlation: 'equities' },
+  DAX40: { basePrice: 19000, volatility: 0.005, drift: 0.0002, correlation: 'equities' },
+  CAC40: { basePrice: 7600, volatility: 0.005, drift: 0.0002, correlation: 'equities' },
+  'AVAX-USD': { basePrice: 30, volatility: 0.02, drift: 0.0003, correlation: 'crypto' },
+  'USD-CHF': { basePrice: 0.88, volatility: 0.002, drift: 0, correlation: 'fx' },
+  'GBP-JPY': { basePrice: 190, volatility: 0.0035, drift: 0.0001, correlation: 'fx' },
+  'USD-BRL': { basePrice: 5.1, volatility: 0.004, drift: 0.0001, correlation: 'fx' },
+  'USD-MXN': { basePrice: 19, volatility: 0.004, drift: 0.0001, correlation: 'fx' },
 };
 
 const STRATEGY_PROFILES = {
@@ -45,7 +57,10 @@ export function normalizeSyntheticConfig(config = {}) {
   const strategyType = String(config.strategyType || 'momentum').toLowerCase();
   const profile = STRATEGY_PROFILES[strategyType] || STRATEGY_PROFILES.momentum;
   const assets = [...new Set((Array.isArray(config.assets) ? config.assets : ['BTC-USD'])
-    .map((asset) => String(asset).trim().toUpperCase())
+    .map((asset) => {
+      const symbol = String(asset).trim().toUpperCase();
+      return ASSET_SPECS[symbol] ? symbol : symbol.endsWith('-USD') && ASSET_SPECS[symbol.slice(0, -4)] ? symbol.slice(0, -4) : symbol;
+    })
     .filter((asset) => ASSET_SPECS[asset]))];
 
   const targetReturnProfile = Number.isFinite(Number(config.targetReturnProfile))
@@ -113,79 +128,89 @@ export function deriveMetrics({ startingEquity, equity, trades = [], history = [
 export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const normalizedConfig = normalizeSyntheticConfig(config);
   const random = seededRandom(`${traderId}:${tickId}:${normalizedConfig.strategyType}`);
-  const previousPrices = { ...(state.prices || {}) };
-  const nextPrices = { ...previousPrices };
+  const profile = STRATEGY_PROFILES[normalizedConfig.strategyType];
+  // Market shocks are shared across traders; strategy decisions use a separate seed.
+  const regime = seededRandom(`regime:${Math.floor(tickId / 24)}`)();
+  const stress = regime < 0.12 ? 2.5 : regime > 0.85 ? 0.55 : 1;
+  const previousPrices = state.prices || {};
+  const date = new Date(timestamp);
+  const hour = date.getUTCHours();
+  const weekday = date.getUTCDay() !== 0 && date.getUTCDay() !== 6;
+  const sessionOpen = normalizedConfig.session === 'crypto' || (weekday && ({
+    sydney: hour >= 22 || hour <= 7, asia: hour >= 22 || hour <= 7,
+    tokyo: hour < 9, london: hour >= 8 && hour < 17, nyc: hour >= 13 && hour < 22,
+  })[normalizedConfig.session]);
+  const assetOpen = asset => {
+    const group = getAssetSpec(asset).correlation;
+    return group === 'crypto' || (weekday && (group !== 'equities' || hour >= 13 && hour < 22));
+  };
+  const nextPrices = {};
   const marketMoves = {};
-  const correlationFactors = {};
-
   for (const asset of normalizedConfig.assets) {
     const spec = getAssetSpec(asset);
-    const previous = Number(previousPrices[asset]) || spec.basePrice;
-    const factor = correlationFactors[spec.correlation] ?? ((random() - 0.5) * 2);
-    correlationFactors[spec.correlation] = factor;
-    const idiosyncraticNoise = (random() - 0.5) * 2;
-    const move = spec.drift + (factor * 0.65 + idiosyncraticNoise * 0.35) * spec.volatility * normalizedConfig.volatilityProfile;
-    nextPrices[asset] = Number((previous * Math.max(0.0001, 1 + move)).toFixed(8));
+    const factor = seededRandom(`market:${tickId}:${spec.correlation}`)() * 2 - 1;
+    const noise = seededRandom(`asset:${tickId}:${asset}`)() * 2 - 1;
+    const move = assetOpen(asset) ? spec.drift + (factor * 0.7 + noise * 0.3) * spec.volatility * stress : 0;
+    nextPrices[asset] = Number(((Number(previousPrices[asset]) || spec.basePrice) * Math.max(0.01, 1 + move)).toFixed(8));
     marketMoves[asset] = move;
   }
-
-  const asset = normalizedConfig.assets[tickId % normalizedConfig.assets.length];
-  const move = marketMoves[asset];
-  const profile = STRATEGY_PROFILES[normalizedConfig.strategyType] || STRATEGY_PROFILES.momentum;
-  const opensTrade = random() <= profile.tradeProbability;
-  const price = nextPrices[asset];
-  const previousPrice = Number(previousPrices[asset]) || getAssetSpec(asset).basePrice;
-  const trendSignal = move >= 0;
-  const winningDecision = random() <= normalizedConfig.targetWinRate;
-  const bullishDecision = winningDecision ? trendSignal : !trendSignal;
-  const side = bullishDecision ? 'BUY' : 'SELL';
-  const equity = Number(state.equity) || normalizedConfig.startingEquity;
-  const lossStreak = Number(state.lossStreak) || 0;
-  const martingaleMultiplier = normalizedConfig.strategyType === 'martingale'
-    ? Math.min(8, 1 + lossStreak * 0.5)
-    : 1;
-  const accountBase = normalizedConfig.compounding ? equity : normalizedConfig.startingEquity;
-  const margin = accountBase * profile.riskFraction * martingaleMultiplier;
-  const leverage = Math.min(normalizedConfig.maxLeverage, 1 + random() * (normalizedConfig.maxLeverage - 1));
-  const riskDistance = Math.max(0.0005, getAssetSpec(asset).volatility * normalizedConfig.volatilityProfile);
-  const rewardRisk = winningDecision ? normalizedConfig.averageWinR : normalizedConfig.averageLossR;
-  const riskQuantity = margin * leverage * rewardRisk / (previousPrice * riskDistance);
-  const maxQuantity = accountBase * normalizedConfig.maxExposureFraction / previousPrice;
-  const quantity = Math.min(riskQuantity, maxQuantity);
-  const tradeMove = side === 'BUY' ? price - previousPrice : previousPrice - price;
-  const pnl = opensTrade ? tradeMove * quantity : 0;
-  const nextEquity = Math.max(0.01, equity + pnl);
-  const trade = opensTrade ? {
-    event_id: `${traderId}:${tickId}`,
-    trader_id: traderId,
-    symbol: asset,
-    side,
-    quantity: Number(quantity.toFixed(8)),
-    entry_price: Number(previousPrice.toFixed(8)),
-    exit_price: Number(price.toFixed(8)),
-    margin: Number(margin.toFixed(2)),
-    leverage: Number(leverage.toFixed(4)),
-    notional: Number((quantity * previousPrice).toFixed(2)),
-    pnl: Number(pnl.toFixed(2)),
-    price_move_percent: Number((((price - previousPrice) / previousPrice) * 100).toFixed(4)),
-    trade_return_percent: Number(((pnl / Math.max(margin, 0.01)) * 100).toFixed(4)),
-    account_return_percent: Number(((pnl / Math.max(equity, 0.01)) * 100).toFixed(4)),
-    pnl_percent: Number(((pnl / Math.max(equity, 0.01)) * 100).toFixed(4)),
-    status: 'CLOSED',
-    traded_at: timestamp,
-    closed_at: timestamp,
-  } : null;
-  const nextState = {
-    ...state,
-    prices: nextPrices,
-    equity: nextEquity,
-    peakEquity: Math.max(Number(state.peakEquity) || normalizedConfig.startingEquity, nextEquity),
-    tickIndex: tickId,
-    lossStreak: pnl < 0 ? lossStreak + 1 : 0,
-    lastProcessedAt: timestamp,
-  };
-
-  return { config: normalizedConfig, state: nextState, trade, marketMoves };
+  const spreadBps = Math.min(100, Math.max(0, Number(config.spreadBps ?? 2)));
+  const slippageBps = Math.min(100, Math.max(0, Number(config.slippageBps ?? 1)));
+  const feeBps = Math.min(100, Math.max(0, Number(config.feeBps ?? 1)));
+  const friction = (spreadBps / 2 + slippageBps * stress) / 10000;
+  let equity = Number(state.equity ?? normalizedConfig.startingEquity);
+  let position = state.position ? { ...state.position } : null;
+  let trade = null;
+  let openedTrade = null;
+  let lossStreak = Number(state.lossStreak || 0);
+  if (position) {
+    const price = nextPrices[position.symbol];
+    const mark = Number(previousPrices[position.symbol]) || position.entry_price;
+    const direction = position.side === 'BUY' ? 1 : -1;
+    equity += direction * (price - mark) * position.quantity;
+    if (assetOpen(position.symbol)) position.age += 1;
+    const tradeLoss = direction * (price - position.entry_price) / position.entry_price;
+    if (assetOpen(position.symbol) && (position.age >= profile.holdingTicks || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
+      const exit = price * (1 - direction * friction);
+      const exitFee = exit * position.quantity * feeBps / 10000;
+      equity += direction * (exit - price) * position.quantity - exitFee;
+      const fees = position.entry_fee + exitFee;
+      const pnl = direction * (exit - position.entry_price) * position.quantity - fees;
+      trade = { ...position, exit_price: exit, fees: Number(fees.toFixed(2)), pnl: Number(pnl.toFixed(2)),
+        pnl_percent: pnl / position.equity_at_entry * 100, status: 'CLOSED', closed_at: timestamp,
+        close_reason: tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : 'strategy_exit' };
+      lossStreak = pnl < 0 ? lossStreak + 1 : 0;
+      position = null;
+    }
+  } else if (config.tradingEnabled !== false && sessionOpen && equity > 1 && random() < profile.tradeProbability && assetOpen(normalizedConfig.assets[tickId % normalizedConfig.assets.length])) {
+    const asset = normalizedConfig.assets[tickId % normalizedConfig.assets.length];
+    // Decisions use only the previous tick's signal, never the move being traded.
+    const signal = Number(state.signals?.[asset] || 0);
+    let bullish = signal >= 0;
+    if (normalizedConfig.strategyType === 'mean_reversion') bullish = !bullish;
+    if (normalizedConfig.strategyType === 'scalper' || Math.abs(signal) < 0.0001) bullish = random() < profile.directionBias;
+    const side = bullish ? 'BUY' : 'SELL';
+    const direction = bullish ? 1 : -1;
+    const mark = nextPrices[asset];
+    const entry = mark * (1 + direction * friction);
+    const martingale = normalizedConfig.strategyType === 'martingale' ? Math.min(4, 1 + lossStreak * 0.5) : 1;
+    const riskBase = normalizedConfig.compounding ? equity : normalizedConfig.startingEquity;
+    const exposure = Math.min(normalizedConfig.maxExposureFraction, normalizedConfig.riskFraction * martingale / getAssetSpec(asset).volatility);
+    const quantity = Math.min(equity, riskBase) * exposure / entry;
+    const entryFee = entry * quantity * feeBps / 10000;
+    position = { event_id: `${traderId}:${tickId}`, trader_id: traderId, symbol: asset, side,
+      quantity, entry_price: entry, entry_fee: entryFee, equity_at_entry: equity,
+      margin: quantity * entry, leverage: 1, notional: quantity * entry, age: 0,
+      status: 'OPEN', traded_at: timestamp };
+    equity += direction * (mark - entry) * quantity - entryFee;
+    openedTrade = { ...position };
+  }
+  const peakEquity = Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity);
+  const maxDrawdown = Math.max(Number(state.maxDrawdown || 0), peakEquity > 0 ? (peakEquity - Math.max(0, equity)) / peakEquity * 100 : 0);
+  const nextState = { ...state, maxDrawdown, prices: nextPrices, signals: marketMoves, position,
+    equity: Math.max(0, equity), peakEquity: Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity),
+    tickIndex: tickId, lossStreak, lastProcessedAt: timestamp };
+  return { config: normalizedConfig, state: nextState, trade, openedTrade, marketMoves };
 }
 
 export const syntheticAssetRegistry = ASSET_SPECS;

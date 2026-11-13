@@ -1,5 +1,6 @@
 import { getD1Admin } from './admin-auth.js';
 import { normalizeAssetFocus, validateTraderRecord } from '../api-handlers/trader-validation.js';
+import { compareHistory } from '../shared/trader-comparison.js';
 
 const TRADER_FIELDS = [
   'name', 'country', 'avatar_url', 'bio', 'specialty', 'asset_focus',
@@ -216,6 +217,23 @@ async function listTraderActivity(env, url, table) {
 export async function handleTraderRequest(request, env) {
   const url = new URL(request.url);
   try {
+    if (url.pathname === '/api/trader-comparison' && request.method === 'GET') {
+      const ids = [...new Set(String(url.searchParams.get('ids') || '').split(',').map(parseId))];
+      const period = Number(url.searchParams.get('period') || 30);
+      if (ids.some(id => !id) || ids.length > 3 || ![30, 90].includes(period)) return json({ error: 'Choose one to three traders and a 30 or 90 day period.' }, 400);
+      const placeholders = ids.map(() => '?').join(',');
+      const [traders, history, trades] = await Promise.all([
+        env.DB.prepare(`SELECT id,name FROM traders WHERE id IN (${placeholders})`).bind(...ids).all(),
+        env.DB.prepare(`SELECT trader_id,snapshot_date,equity FROM trader_history WHERE trader_id IN (${placeholders}) ORDER BY snapshot_date`).bind(...ids).all(),
+        env.DB.prepare(`SELECT trader_id,status,traded_at,closed_at FROM trader_trades WHERE trader_id IN (${placeholders}) AND traded_at >= date('now','-91 days')`).bind(...ids).all(),
+      ]);
+      const ordered = ids.map(id => (traders.results || []).find(trader => trader.id === id)).filter(Boolean);
+      return json(compareHistory(ordered, history.results || [], trades.results || [], period));
+    }
+    if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
+      const { results } = await env.DB.prepare('SELECT * FROM traders WHERE is_active=1 ORDER BY total_return DESC,id LIMIT 20').all();
+      return json((results || []).map((row, index) => ({ ...parseTrader(row), rank: index + 1, medal: ['gold','silver','bronze'][index] })));
+    }
     if (url.pathname === '/api/traders') {
       if (request.method === 'GET') return await listTraders(request, env, url);
       if (request.method === 'POST') return await createTrader(request, env);

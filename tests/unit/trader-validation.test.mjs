@@ -20,13 +20,12 @@ assert.equal(valid.is_active, true);
 const deduped = normalizeAssetFocus(['GBP', 'EUR', 'GBP', '1']);
 assert.deepEqual(deduped, ['GBP-USD', 'EUR-USD']);
 
-const extremeSynthetic = sanitizeTraderRecord({
+assert.throws(() => sanitizeTraderRecord({
   name: 'Extreme Synthetic',
   total_return: 5.97e23,
   asset_focus: ['BTC-USD'],
   is_active: true,
-});
-assert.equal(extremeSynthetic.total_return, 5.97e23);
+}), /total_return must be between/);
 
 const visible = filterVisibleTraders([
   { id: 1, name: 'Open', is_active: true, total_return: 25, followers: 100 },

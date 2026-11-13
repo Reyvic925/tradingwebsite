@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { authHeaders } from './api';
+import { authHeaders, apiGet, apiSend } from './api';
 import { startVisibleInterval } from './visible-interval';
 
 /**
@@ -54,125 +54,40 @@ export function usePnlAnimation(targetValue: number, duration: number = 1000, de
  */
 export function useCopyTrading() {
   const [follows, setFollows] = useState<any[]>([]);
-  const [summary, setSummary] = useState<Record<string, any>>({
-    total_invested: 0,
-    total_current: 0,
-    total_pnl: 0,
-    total_pnl_percent: 0,
-    count: 0
-  });
-  const [loading, setLoading] = useState<boolean>(true);
+  const [summary, setSummary] = useState<Record<string, any>>({ total_invested: 0, total_current: 0, total_pnl: 0, total_pnl_percent: 0, count: 0 });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const fetchFollows = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/copy-trades', {
-        headers: await authHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to fetch follows');
-      const data = await response.json();
-      setFollows(data);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    const data = await apiGet<any[]>('/api/copy-trades'); setFollows(data); return data;
   };
-
-  const fetchSummary = async () => {
-    try {
-      const response = await fetch('/api/copy-summary', {
-        headers: await authHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to fetch summary');
-      const data = await response.json();
-      setSummary(data);
-    } catch (err: unknown) {
-      console.error('Summary error:', err);
-    }
+  const fetchSummary = async () => { setSummary(await apiGet<Record<string, any>>('/api/copy-summary')); };
+  const refresh = async () => {
+    try { await Promise.all([fetchFollows(), fetchSummary()]); setError(null); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Unable to load copy portfolio'); }
+    finally { setLoading(false); }
   };
-
+  const changed = async () => { await refresh(); window.dispatchEvent(new Event('copy-portfolio-change')); };
   const followTrader = async (traderId: string | number, allocatedAmount: number, settings: Record<string, any> = {}) => {
-    try {
-      const response = await fetch('/api/copy-trades', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({
-          trader_id: traderId,
-          allocated_amount: allocatedAmount,
-          stop_loss_percent: (settings as any).stopLoss || 20,
-          take_profit_percent: (settings as any).takeProfit || 200,
-          leverage_multiplier: (settings as any).leverage || 1
-        })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || `Failed to follow trader (${response.status})`);
-      await fetchFollows();
-      await fetchSummary();
-      return data;
-    } catch (err) {
-      throw err;
-    }
+    const data = await apiSend('/api/copy-trades', 'POST', { trader_id: traderId, allocated_amount: allocatedAmount,
+      stop_loss_percent: settings.stopLoss ?? 20, take_profit_percent: settings.takeProfit ?? 200, leverage_multiplier: settings.leverage ?? 1 });
+    await changed(); return data;
   };
-
-  const updateFollow = async (followId: string, settings: Record<string, any>) => {
-    try {
-      const response = await fetch(`/api/copy-trades?id=${followId}`, {
-        method: 'PUT',
-        headers: await authHeaders(),
-        body: JSON.stringify({
-          stop_loss_percent: (settings as any).stopLoss,
-          take_profit_percent: (settings as any).takeProfit,
-          leverage_multiplier: (settings as any).leverage
-        })
-      });
-      if (!response.ok) throw new Error('Failed to update follow');
-      const data = await response.json();
-      await fetchFollows();
-      return data;
-    } catch (err) {
-      throw err;
-    }
+  const updateFollow = async (id: string, settings: Record<string, any>) => {
+    const data = await apiSend(`/api/copy-trades?id=${encodeURIComponent(id)}`, 'PUT', {
+      stop_loss_percent: settings.stopLoss, take_profit_percent: settings.takeProfit,
+      leverage_multiplier: settings.leverage, status: settings.status });
+    await changed(); return data;
   };
-
-  const stopCopying = async (followId: string) => {
-    try {
-      const response = await fetch(`/api/copy-trades?id=${followId}`, {
-        method: 'DELETE',
-        headers: await authHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to stop copying');
-      await fetchFollows();
-      await fetchSummary();
-      return { ok: true };
-    } catch (err: unknown) {
-      throw err;
-    }
+  const stopCopying = async (id: string) => {
+    await apiSend(`/api/copy-trades?id=${encodeURIComponent(id)}`, 'DELETE'); await changed();
   };
-
   useEffect(() => {
-    return startVisibleInterval(async () => {
-      await Promise.all([fetchFollows(), fetchSummary()]);
-    }, 30000);
+    const stop = startVisibleInterval(refresh, 30000);
+    const onChange = () => { void refresh(); };
+    window.addEventListener('copy-portfolio-change', onChange);
+    return () => { stop(); window.removeEventListener('copy-portfolio-change', onChange); };
   }, []);
-
-  return {
-    follows,
-    summary,
-    loading,
-    error,
-    fetchFollows,
-    fetchSummary,
-    followTrader,
-    updateFollow,
-    stopCopying,
-    refresh: () => {
-      fetchFollows();
-      fetchSummary();
-    }
-  };
+  return { follows, summary, loading, error, fetchFollows, fetchSummary, followTrader, updateFollow, stopCopying, refresh };
 }
 
 /**

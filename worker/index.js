@@ -10,6 +10,7 @@ import { handleReferralRequest } from './referral-api.js';
 import { handleRoiWithdrawalRequest } from './roi-withdrawal-api.js';
 import { handleWithdrawalRequest } from './withdrawal-api.js';
 import { handleTraderRequest } from './traders-api.js';
+import { handleCopyRequest, runCopyTradingTick } from './copy-trading.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -24,6 +25,7 @@ const pendingMarketResponses = new Map();
 export default {
   async scheduled(_controller, env, context) {
     context.waitUntil(runPaperTradingTick(env));
+    context.waitUntil(runCopyTradingTick(env));
   },
 
   async fetch(request, env) {
@@ -54,6 +56,10 @@ export default {
       return handleAuthRequest(request, env);
     }
 
+    if (['/api/copy-trades', '/api/copy-summary', '/api/copy-activity'].includes(url.pathname)) {
+      return handleCopyRequest(request, env);
+    }
+
     if (url.pathname.startsWith('/api/paper/')) {
       return handlePaperTradingRequest(request, env);
     }
@@ -71,7 +77,7 @@ export default {
     }
 
     if ([
-      '/api/traders', '/api/trader-trades', '/api/trader-history',
+      '/api/traders', '/api/trader-trades', '/api/trader-history', '/api/trader-comparison', '/api/leaderboard',
     ].includes(url.pathname)) {
       return handleTraderRequest(request, env);
     }

@@ -195,6 +195,10 @@ export type CopyTrade = {
 };
 
 export type UserFollow = {
+  status?: 'active' | 'paused' | 'stopped';
+  drawdown_percent?: number;
+  peak_value?: number;
+  fees?: number;
   id: string;
   user_id: string;
   trader_id: number;
@@ -213,6 +217,8 @@ export type UserFollow = {
 };
 
 export type TradeLog = {
+  fees?: number;
+  close_reason?: string;
   id: string;
   trader_id: number;
   symbol: string;

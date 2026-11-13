@@ -1,3 +1,6 @@
+import FollowModal from '../components/FollowModal';
+import CopyActivity from '../components/CopyActivity';
+import TraderComparison from '../components/TraderComparison';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
@@ -29,192 +32,9 @@ import { apiGet } from '../lib/api';
 import { getMarketStatus } from '../lib/session-utils';
 import type { Trader, UserFollow, Wallet } from '../types';
 
-// Follow Modal Component
-function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { trader: Trader; isOpen: boolean; availableBalance: number; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
-  const [allocation, setAllocation] = useState(1000);
-  const [stopLoss, setStopLoss] = useState(20);
-  const [takeProfit, setTakeProfit] = useState(200);
-  const [leverage, setLeverage] = useState(1);
-  const [riskProfile, setRiskProfile] = useState('Balanced');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) setAllocation(Math.min(1000, Math.max(0, availableBalance)));
-  }, [availableBalance, isOpen]);
-
-  const handleFollow = async () => {
-    if (availableBalance < 100) {
-      alert('You need at least $100 available balance to copy a trader.');
-      return;
-    }
-    if (allocation > availableBalance) {
-      alert('Allocation cannot exceed your available balance.');
-      return;
-    }
-    try {
-      setLoading(true);
-      await onFollow(trader.id, allocation, {
-        stopLoss,
-        takeProfit,
-        leverage
-      });
-      onClose();
-    } catch (error) {
-      console.error('Follow error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to follow trader');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const chooseRisk = (profile: 'Conservative' | 'Balanced' | 'Aggressive') => {
-    setRiskProfile(profile);
-    if (profile === 'Conservative') {
-      setStopLoss(10);
-      setTakeProfit(100);
-      setLeverage(0.5);
-    } else if (profile === 'Aggressive') {
-      setStopLoss(30);
-      setTakeProfit(300);
-      setLeverage(2);
-    } else {
-      setStopLoss(20);
-      setTakeProfit(200);
-      setLeverage(1);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:items-center">
-      <div className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-white/10 bg-gray-900 p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/70">Continuous copy</div>
-            <h2 className="mt-1 text-xl font-bold text-white">Copy {trader.name}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
-          <div className="text-sm text-gray-400 mb-1">Available balance</div>
-          <div className="text-2xl font-bold text-emerald-400">
-            {formatMoney(availableBalance)}
-          </div>
-          <div className="text-sm text-gray-500 mt-1">
-            Live ROI: <span className="text-emerald-400">
-              +{Math.max(Number(trader.total_return) || 0, 0).toFixed(2)}%
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-100">
-            Copying stays active until you stop it or a risk limit closes it. There is no fixed term or maturity date.
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-300 block mb-2">
-              Starting balance: <span className="text-emerald-400">{formatMoney(allocation)}</span>
-            </label>
-            <input
-              type="range"
-              min="100"
-              max={Math.max(100, availableBalance)}
-              step="100"
-              value={allocation}
-              onChange={(e) => setAllocation(Number(e.target.value))}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>$100</span>
-              <span>{formatMoney(availableBalance)}</span>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-sm text-gray-300">Risk appetite</div>
-            <div className="grid grid-cols-3 gap-2">
-              {(['Conservative', 'Balanced', 'Aggressive'] as const).map((profile) => (
-                <button
-                  key={profile}
-                  type="button"
-                  onClick={() => chooseRisk(profile)}
-                  className={`rounded-md border px-2 py-2 text-xs transition ${riskProfile === profile ? 'border-emerald-400 bg-emerald-400/15 text-emerald-200' : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/25'}`}
-                >
-                  {profile}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-300 block mb-2">Maximum drawdown (%)</label>
-            <input
-              type="number"
-              min="5"
-              max="100"
-              value={stopLoss}
-              onChange={(e) => setStopLoss(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-300 block mb-2">Profit target (%)</label>
-            <input
-              type="number"
-              min="10"
-              max="1000"
-              value={takeProfit}
-              onChange={(e) => setTakeProfit(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-300 block mb-2">Trade size multiplier</label>
-            <select
-              value={leverage}
-              onChange={(e) => setLeverage(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
-            >
-              <option value={0.5}>0.5x</option>
-              <option value={1}>1x</option>
-              <option value={2}>2x</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 transition text-sm font-semibold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleFollow}
-            disabled={loading || availableBalance < 100}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition text-sm font-semibold"
-          >
-            {loading ? 'Starting copy...' : availableBalance < 100 ? 'Insufficient balance' : 'Start copying'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Leaderboard Section
 function LeaderboardSection() {
-  const { leaderboard, loading } = useLeaderboard();
+  const { leaderboard, loading, error } = useLeaderboard();
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
@@ -222,6 +42,7 @@ function LeaderboardSection() {
 
   return (
     <div className="mb-8">
+      {error && <p role="alert" className="mb-3 text-rose-300">{error}</p>}
       <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
         <Crown size={20} className="text-yellow-500" />
         Top Traders
@@ -251,10 +72,10 @@ function LeaderboardSection() {
                 </div>
               </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400 mb-2">
+            <div className={`text-2xl font-bold mb-2 ${Number(trader.total_return) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {formatPct(Number(trader.total_return ?? 0))}
             </div>
-            <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">90-day ROI</div>
+            <div className="mb-3 text-[10px] uppercase tracking-widest text-gray-500">Total return</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="text-gray-400">Win rate: <span className="text-white font-semibold">{Number(trader.win_rate_trades || 0).toFixed(1)}%</span></div>
               <div className="text-gray-400">Copiers: <span className="text-white font-semibold">{trader.copiers_current ?? 0}</span></div>
@@ -268,7 +89,7 @@ function LeaderboardSection() {
 
 // Portfolio Summary Banner
 function PortfolioSummary() {
-  const { summary } = useCopyTrading();
+  const { summary, error } = useCopyTrading();
   const animatedPnL = usePnlAnimation(summary.total_pnl, 1000, 2);
 
   const isPositive = summary.total_pnl >= 0;
@@ -280,6 +101,7 @@ function PortfolioSummary() {
   return (
     <div className="mb-8 p-6 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-white/10">
       <h2 className="text-lg font-semibold text-white mb-4">Your Copy Portfolio</h2>
+      {error && <p role="alert" className="mb-3 text-rose-300">{error}</p>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Invested</div>
@@ -324,7 +146,7 @@ function PortfolioSummary() {
 }
 
 // Trader Card Component
-function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<void> }) {
+function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<unknown> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [, refreshStatus] = useState(Date.now());
   const isProfit = Number(trader.total_return ?? 0) >= 0;
@@ -400,11 +222,12 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
             <div className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
               {formatPct(Number(trader.total_return ?? 0))}
             </div>
-            <div className="text-gray-500">90-day ROI</div>
+            <div className="text-gray-500">Total return</div>
           </div>
           <div>
             <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(0)}%</div>
             <div className="text-gray-500">Win Rate</div>
+            <div className="mt-2 text-gray-400">Drawdown {Number(trader.max_drawdown).toFixed(1)}% / {trader.total_trades} trades</div>
           </div>
         </div>
 
@@ -431,7 +254,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
 
 function CopyDetailModal({ follow, onClose, onEdit, onStop }: { follow: UserFollow; onClose: () => void; onEdit: () => void; onStop: () => void }) {
   const isProfit = Number(follow.pnl_percent || 0) >= 0;
-  const nearStopLoss = Number(follow.pnl_percent || 0) <= -(Number(follow.stop_loss_percent || 20) * 0.8);
+  const nearStopLoss = Number(follow.drawdown_percent || 0) >= Number(follow.stop_loss_percent || 20) * 0.8;
   const trader = follow.trader;
 
   return (
@@ -458,14 +281,15 @@ function CopyDetailModal({ follow, onClose, onEdit, onStop }: { follow: UserFoll
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500"><ShieldCheck size={14} /> Risk controls</div><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><div className="text-xs text-gray-500">Max drawdown</div><div className="mt-1 font-mono text-white">-{Number(follow.stop_loss_percent || 20).toFixed(0)}%</div></div><div><div className="text-xs text-gray-500">Profit target</div><div className="mt-1 font-mono text-white">+{Number(follow.take_profit_percent || 200).toFixed(0)}%</div></div></div></div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500"><Activity size={14} /> Copy settings</div><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><div className="text-xs text-gray-500">Trade multiplier</div><div className="mt-1 font-mono text-white">{Number(follow.leverage_multiplier || 1).toFixed(1)}x</div></div><div><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-mono text-emerald-300">Copying</div></div></div></div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4"><div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500"><Activity size={14} /> Copy settings</div><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><div className="text-xs text-gray-500">Trade multiplier</div><div className="mt-1 font-mono text-white">{Number(follow.leverage_multiplier || 1).toFixed(1)}x</div></div><div><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-mono text-emerald-300">{follow.status === 'paused' ? 'Paused: existing positions remain open' : 'Copying'}</div></div></div></div>
         </div>
 
+        <CopyActivity followId={follow.id} />
         {nearStopLoss && <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"><AlertCircle size={16} /> This copy is approaching its maximum drawdown.</div>}
 
         <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-white/10 pt-5">
           <button type="button" onClick={onEdit} className="rounded-md bg-white/5 px-4 py-2 text-xs font-semibold text-gray-200 transition hover:bg-white/10">Edit risk</button>
-          <button type="button" onClick={onStop} className="rounded-md bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20">Stop copying</button>
+          <button type="button" onClick={onStop} className="rounded-md bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20">Close and stop</button>
         </div>
       </div>
     </div>
@@ -474,13 +298,15 @@ function CopyDetailModal({ follow, onClose, onEdit, onStop }: { follow: UserFoll
 
 // My Positions Section
 function MyPositions() {
-  const { follows, stopCopying, loading } = useCopyTrading();
+  const { follows, stopCopying, updateFollow, loading, error } = useCopyTrading();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedFollow, setSelectedFollow] = useState<UserFollow | null>(null);
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-lg bg-white/5" />;
   }
+
+  if (error) return <p role="alert" className="text-rose-300">{error}</p>;
 
   if (follows.length === 0) {
     return (
@@ -496,7 +322,7 @@ function MyPositions() {
       {((follows as any[]) || []).map((follow: UserFollow) => {
         const isProfit = (follow.pnl_percent || 0) >= 0;
         const nearStopLoss =
-          (follow.pnl_percent || 0) <= -(follow.stop_loss_percent * 0.8);
+          Number(follow.drawdown_percent || 0) >= follow.stop_loss_percent * 0.8;
 
         return (
           <div
@@ -546,7 +372,7 @@ function MyPositions() {
                 </div>
               )}
               <div className="text-gray-500">
-                SL: -{follow.stop_loss_percent}% | TP: +{follow.take_profit_percent}%
+                Peak drawdown: {Number(follow.drawdown_percent || 0).toFixed(2)}% / {follow.stop_loss_percent}% | Target: +{follow.take_profit_percent}%
               </div>
             </div>
 
@@ -563,16 +389,17 @@ function MyPositions() {
               >
                 {editingId === follow.id ? 'Done' : 'Edit Risk'}
               </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); void updateFollow(follow.id, { status: follow.status === 'paused' ? 'active' : 'paused' }).catch(error => alert(error.message)); }} className="text-xs px-3 py-1 rounded-lg bg-white/5 text-gray-300">{follow.status === 'paused' ? 'Resume' : 'Pause new trades'}</button>
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (confirm('Stop copying this trader?')) {
-                    stopCopying(follow.id);
+                  if (confirm('Close copied positions and return their current value to your balance?')) {
+                    void stopCopying(follow.id).catch(error => alert(error.message));
                   }
                 }}
                 className="text-xs px-3 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition"
               >
-                Stop
+                Close and stop
               </button>
             </div>
 
@@ -585,11 +412,11 @@ function MyPositions() {
       })}
       {selectedFollow && (
         <CopyDetailModal
-          follow={selectedFollow}
+          follow={follows.find(follow => follow.id === selectedFollow.id) || selectedFollow}
           onClose={() => setSelectedFollow(null)}
           onEdit={() => { setSelectedFollow(null); setEditingId(selectedFollow.id); }}
           onStop={() => {
-            if (confirm('Stop copying this trader?')) {
+            if (confirm('Close copied positions and return their current value to your balance?')) {
               void stopCopying(selectedFollow.id);
               setSelectedFollow(null);
             }
@@ -627,7 +454,7 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
   return (
     <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
       <div>
-        <label className="text-xs text-gray-400 block mb-1">Stop Loss (%)</label>
+        <label className="text-xs text-gray-400 block mb-1">Maximum drawdown from peak (%)</label>
         <input
           type="number"
           value={stopLoss}
@@ -636,7 +463,7 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
         />
       </div>
       <div>
-        <label className="text-xs text-gray-400 block mb-1">Take Profit (%)</label>
+        <label className="text-xs text-gray-400 block mb-1">Profit target (%)</label>
         <input
           type="number"
           value={takeProfit}
@@ -645,7 +472,7 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
         />
       </div>
       <div>
-        <label className="text-xs text-gray-400 block mb-1">Leverage</label>
+        <label className="text-xs text-gray-400 block mb-1">Trade size for new entries</label>
         <select
           value={leverage}
           onChange={(e) => setLeverage(Number(e.target.value))}
@@ -653,8 +480,7 @@ function EditFollowForm({ follow, onClose }: { follow: UserFollow; onClose: () =
         >
           <option value={1}>1x</option>
           <option value={2}>2x</option>
-          <option value={3}>3x</option>
-          <option value={5}>5x</option>
+          <option value={0.5}>0.5x</option>
         </select>
       </div>
       <div className="flex gap-2">
@@ -677,17 +503,23 @@ export default function Social() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [view, setView] = useState<'discover' | 'leaderboard' | 'dashboard'>('discover');
   const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'popular' | 'return' | 'winRate'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'return' | 'winRate' | 'drawdown'>('popular');
   const [showFilters, setShowFilters] = useState(false);
+  const [maxRisk, setMaxRisk] = useState(10);
+  const [minTrades, setMinTrades] = useState(0);
 
   useEffect(() => {
-    apiGet<Wallet>('/api/wallet').then(setWallet).catch(() => setWallet(null));
+    const refresh = () => { void apiGet<Wallet>('/api/wallet').then(setWallet).catch(() => setWallet(null)); };
+    refresh();
+    window.addEventListener('copy-portfolio-change', refresh);
+    return () => window.removeEventListener('copy-portfolio-change', refresh);
   }, []);
 
   const visibleTraders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = ((traders as any[]) || [])
       .filter((trader: Trader) => trader.is_active !== false)
+      .filter((trader: Trader) => Number(trader.risk_score) <= maxRisk && Number(trader.total_trades) >= minTrades)
       .filter((trader: Trader) => {
         if (!normalizedQuery) return true;
         return [trader.name, trader.bio, trader.specialty, ...(trader.asset_focus || [])]
@@ -696,11 +528,12 @@ export default function Social() {
       });
 
     return [...filtered].sort((first: Trader, second: Trader) => {
+      if (sortBy === 'drawdown') return Number(first.max_drawdown) - Number(second.max_drawdown);
       if (sortBy === 'return') return Number(second.total_return) - Number(first.total_return);
       if (sortBy === 'winRate') return Number(second.win_rate_trades) - Number(first.win_rate_trades);
       return Number(second.followers || 0) - Number(first.followers || 0);
     });
-  }, [query, sortBy, traders]);
+  }, [query, sortBy, traders, maxRisk, minTrades]);
 
   return (
     <AppShell>
@@ -742,7 +575,9 @@ export default function Social() {
             <TrendingUp size={20} className="text-emerald-500" />
             Your active copies
           </h2>
+          <p className="mb-4 text-xs text-gray-400">Pause blocks new entries; existing positions remain exposed. Close and stop exits positions and returns the current value.</p>
           <MyPositions />
+          <CopyActivity />
         </>
       )}
 
@@ -750,12 +585,14 @@ export default function Social() {
         <>
           <PortfolioSummary />
           <LeaderboardSection />
+          <TraderComparison traders={traders} />
         </>
       )}
 
       {view === 'discover' && (
         <>
           <PortfolioSummary />
+          <TraderComparison traders={traders} />
           <div className="mb-5 flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-sm">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
@@ -774,10 +611,14 @@ export default function Social() {
                 <option value="popular">Most followed</option>
                 <option value="return">Highest return</option>
                 <option value="winRate">Highest win rate</option>
+                <option value="drawdown">Lowest drawdown</option>
               </select>
             </div>
           </div>
-          {showFilters && <div className="mb-5 rounded-md border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-100">Showing active strategies. Use the sort menu to compare popularity, return, or win rate.</div>}
+          {showFilters && <div className="mb-5 flex flex-wrap gap-4 rounded-md border border-amber-400/20 p-4 text-xs">
+            <label>Maximum risk score <select className="ml-2 bg-gray-900 p-2" value={maxRisk} onChange={event => setMaxRisk(Number(event.target.value))}>{[3,5,7,10].map(value => <option key={value} value={value}>{value}/10</option>)}</select></label>
+            <label>Minimum closed trades <select className="ml-2 bg-gray-900 p-2" value={minTrades} onChange={event => setMinTrades(Number(event.target.value))}>{[0,10,50,100].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          </div>}
 
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
             <Zap size={20} className="text-yellow-500" />

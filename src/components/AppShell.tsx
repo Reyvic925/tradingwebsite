@@ -60,7 +60,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stopPolling = startVisibleInterval(load, 30000);
-    return stopPolling;
+    const onChange = () => { void load(); };
+    window.addEventListener('copy-portfolio-change', onChange);
+    return () => { stopPolling(); window.removeEventListener('copy-portfolio-change', onChange); };
   }, [load]);
 
   const unread = notes.filter((n) => !n.read).length;

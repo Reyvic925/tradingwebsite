@@ -1,3 +1,6 @@
+import FollowModal from '../components/FollowModal';
+import { apiGet } from '../lib/api';
+import type { Wallet } from '../types';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
@@ -20,6 +23,9 @@ import type { Trader, TradeLog } from '../types';
  */
 export default function TraderProfile() {
   const { traderId } = useParams();
+  const [showCopy, setShowCopy] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  useEffect(() => { apiGet<Wallet>('/api/wallet').then(wallet => setAvailableBalance(Number(wallet.available))).catch(() => setAvailableBalance(0)); }, []);
   const navigate = useNavigate();
   const [trader, setTrader] = useState<Trader | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +35,7 @@ export default function TraderProfile() {
   const { trades, error: tradesError } = useTraderTrades(traderId as string);
   const history = useTraderHistory(traderId as string);
   const { followTrader } = useCopyTrading();
-  const animatedReturn = usePnlAnimation(Math.max(Number(trader?.total_return ?? 0), 0), 1000, 2);
+  const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
 
   // Load trader details
   useEffect(() => {
@@ -87,16 +93,17 @@ export default function TraderProfile() {
     );
   }
 
-  const isProfit = true;
+  const isProfit = Number(trader.total_return) >= 0;
   const marketStatus = getMarketStatus(trader.session_type);
   const sessionOpen = marketStatus.status === 'Live';
-  const equityCurve = history.map((snapshot, index) => ({
-    day: index === 0 ? 'Start' : snapshot.snapshot_date,
+  const equityCurve = [...history].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date)).map((snapshot) => ({
+    day: snapshot.snapshot_date,
     equity: Number(snapshot.equity || 0),
   }));
 
   return (
     <AppShell>
+      <FollowModal trader={trader} isOpen={showCopy} availableBalance={availableBalance} onClose={() => setShowCopy(false)} onFollow={async (id, amount, settings) => { await followTrader(id, amount, settings); setAvailableBalance(value => value - amount); }} />
       {/* Header Section */}
       <div className="mb-8">
         <button
@@ -130,19 +137,12 @@ export default function TraderProfile() {
           </div>
 
           <button
-            onClick={() => {
-              // Open follow modal
-              const amt = 1000;
-              followTrader(trader.id, amt, {
-                stopLoss: 20,
-                takeProfit: 200,
-                leverage: 1
-              }).catch(err => alert('Failed to follow: ' + err.message));
-            }}
+            onClick={() => setShowCopy(true)}
+            disabled={!trader.is_active}
             className="flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition font-semibold"
           >
             <Plus size={18} />
-            Follow Trader
+            Copy Trader
           </button>
         </div>
       </div>
@@ -152,7 +152,7 @@ export default function TraderProfile() {
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                   <div className="text-xs text-gray-400 mb-1">Trader Equity</div>
                   <div className="text-2xl font-bold text-white">{formatMoney(trader.current_equity ?? 0)}</div>
-          <div className="text-xs text-gray-500 mt-1">Starting: $100,000</div>
+          <div className="text-xs text-gray-500 mt-1">Equity at each recorded snapshot</div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
@@ -165,7 +165,7 @@ export default function TraderProfile() {
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Win Rate</div>
-          <div className="text-2xl font-bold text-white">{Number(trader.win_rate_trades || 50).toFixed(1)}%</div>
+          <div className="text-2xl font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(1)}%</div>
           <div className="text-xs text-gray-500 mt-1">{trader.total_trades || 0} total trades</div>
         </div>
 
@@ -184,7 +184,7 @@ export default function TraderProfile() {
 
       {/* Equity Curve */}
       <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">
-        <h2 className="text-lg font-semibold text-white mb-4">Equity Curve (90 Days)</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Recorded equity history</h2>
         <div className="h-64 rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={equityCurve} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -238,7 +238,7 @@ export default function TraderProfile() {
             <h2 className="text-lg font-semibold text-white">Trading activity</h2>
             <p className="mt-1 text-xs text-gray-500">BUY and SELL activity for {trader.name}'s configured assets</p>
           </div>
-          <div className="text-right text-xs text-gray-500">{trades.length} biggest wins &amp; losses</div>
+          <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
         </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {typeof navigator !== 'undefined' && !navigator.onLine ? (
@@ -323,6 +323,8 @@ export default function TraderProfile() {
               <button type="button" onClick={() => setSelectedTrade(null)} className="text-sm text-gray-400 hover:text-white">Close</button>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Fees</div><div className="mt-1 font-mono text-white">{formatMoney(Number(selectedTrade.fees || 0))}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit reason</div><div className="mt-1 text-white">{selectedTrade.close_reason?.replaceAll('_', ' ') || (selectedTrade.status === 'OPEN' ? 'Position remains open' : 'Not recorded')}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Side</div><div className="mt-1 font-semibold text-white">{selectedTrade.side}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-semibold text-white">{selectedTrade.status}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{formatMoney(selectedTrade.entry_price)}</div></div>
