@@ -175,9 +175,9 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
   return (
     <>
       <div
-        className={`rounded-lg border p-5 backdrop-blur-sm transition hover:border-white/30 ${
+        className={`rounded-2xl border p-5 backdrop-blur-sm transition hover:border-amber-200/40 ${
           isProfit
-            ? 'bg-emerald-500/5 border-emerald-500/20'
+            ? 'bg-gradient-to-br from-[#1a1d23] to-[#0c121b] border-amber-200/15'
             : 'bg-red-500/5 border-red-500/20'
         }`}
       >

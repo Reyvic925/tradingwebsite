@@ -1,3 +1,4 @@
+import TraderAnalytics from '../components/TraderAnalytics';
 import FollowModal from '../components/FollowModal';
 import { apiGet } from '../lib/api';
 import type { Wallet } from '../types';
@@ -32,7 +33,7 @@ export default function TraderProfile() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTrade, setSelectedTrade] = useState<TradeLog | null>(null);
   const [, refreshStatus] = useState(Date.now());
-  const { trades, error: tradesError } = useTraderTrades(traderId as string);
+  const { trades, loading: tradesLoading, error: tradesError } = useTraderTrades(traderId as string);
   const history = useTraderHistory(traderId as string);
   const { followTrader } = useCopyTrading();
   const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
@@ -113,15 +114,15 @@ export default function TraderProfile() {
           ← Back to Traders
         </button>
 
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             <TraderAvatar src={trader.avatar_url} name={trader.name} className="h-20 w-20 rounded-full object-cover" />
             <div>
               <h1 className="text-3xl font-bold text-white">{trader.name}</h1>
               <p className="text-gray-400 text-sm">{trader.bio}</p>
-              <div className="flex gap-4 mt-2 text-xs">
+              <div className="flex flex-wrap gap-4 mt-2 text-xs">
                 <span className="text-gray-500">
-                  Badge: <span className="text-amber-300">{trader.badge || 'Gold'}</span>
+                  Badge: <span className="text-amber-300">{trader.badge || 'Unrated'}</span>
                 </span>
                 <span className="text-gray-500">
                   Session: <span className="text-white">{getSessionLabel(trader.session_type)}</span>
@@ -181,6 +182,8 @@ export default function TraderProfile() {
           <div className="text-xs text-gray-500 mt-1">Currently copying</div>
         </div>
       </div>
+
+      <TraderAnalytics trader={trader} trades={trades} loading={tradesLoading} error={tradesError} />
 
       {/* Equity Curve */}
       <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">

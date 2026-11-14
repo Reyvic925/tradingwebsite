@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 type TraderAvatarProps = {
   name?: string | null;
   src?: string | null;
@@ -15,17 +17,19 @@ function initials(name: string) {
 }
 
 export default function TraderAvatar({ name = '', src, className }: TraderAvatarProps) {
-  if (src?.trim()) {
-    return <img src={src} alt={name || 'Trader'} className={className} />;
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  if (src?.trim() && failedSource !== src) {
+    return <img src={src} alt={name || 'Trader'} onError={() => setFailedSource(src)} className={className} />;
   }
 
   return (
     <div
+      style={{ backgroundImage: 'url(/images/traders/monogram-texture.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}
       role="img"
-      aria-label={`${name || 'Trader'} profile photo not provided`}
-      className={`${className} flex items-center justify-center bg-white/10 font-semibold text-gray-300`}
+      aria-label={`${name || 'Trader'} monogram`}
+      className={`${className} flex items-center justify-center border border-amber-200/25 bg-[#101214] font-serif font-medium tracking-wider text-amber-100 shadow-inner`}
     >
-      {initials(name || '')}
+      <span>{initials(name || '')}</span>
     </div>
   );
 }
