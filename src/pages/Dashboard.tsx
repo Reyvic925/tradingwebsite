@@ -4,12 +4,13 @@ import AppShell from '../components/AppShell';
 import { apiGet, apiList, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
 import { startVisibleInterval } from '../lib/visible-interval';
-import type { Investment, Market, PaperAccount, Position, Profile, Txn } from '../types';
+import type { Snapshot, TerminalPosition } from '../components/trading/types';
+import type { Investment, Market, PaperAccount, Profile, Txn } from '../types';
 
 export default function Dashboard() {
   const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [positions, setPositions] = useState<Position[]>([]);
+  const [positions, setPositions] = useState<TerminalPosition[]>([]);
   const [markets, setMarkets] = useState<Market[]>([]);
   const [txns, setTxns] = useState<Txn[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -24,17 +25,16 @@ export default function Dashboard() {
     if (loadInFlight.current) return;
     loadInFlight.current = true;
     try {
-      const [profileData, paper, pos, mkt, tx, inv] = await Promise.all([
+      const [profileData, trading, mkt, tx, inv] = await Promise.all([
         apiGet<{ profile?: Profile }>('/api/profile').catch(() => null),
-        apiGet<PaperAccount>('/api/paper/account').catch(() => null),
-        apiList<Position>('/api/paper/positions'),
+        apiGet<Snapshot>('/api/paper/snapshot'),
         apiList<Market>('/api/markets?featured=1&limit=12'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
       if (profileData?.profile) setProfile(profileData.profile);
-      if (paper) setPaperAccount(paper);
-      setPositions(asList(pos));
+      setPaperAccount(trading.account);
+      setPositions(asList(trading.positions));
       setMarkets(asList(mkt));
       setTxns(asList<Txn>(tx).slice(0, 6));
       setInvestments(asList(inv));
@@ -104,7 +104,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 rounded-md border border-white/5">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
             <div>
-              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2>
+              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">Paper positions | server-calculated unrealized P&amp;L | refreshes every 30 seconds</p>
             </div>
             <Link to="/app/trade" className="text-xs text-amber-300">Desk →</Link>
           </div>
@@ -116,7 +116,7 @@ export default function Dashboard() {
                   <th className="px-3 py-2 font-medium">Side</th>
                   <th className="px-3 py-2 font-medium">Qty</th>
                   <th className="px-3 py-2 font-medium">Entry</th>
-                  <th className="px-3 py-2 font-medium">Mark</th>
+                  <th className="px-3 py-2 font-medium">Mark / quote time</th>
                   <th className="px-5 py-2 font-medium">P&L</th>
                 </tr>
               </thead>
@@ -132,8 +132,8 @@ export default function Dashboard() {
                     <td className={`px-3 py-3 uppercase ${p.side === 'long' || p.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}`}>{p.side}</td>
                     <td className="px-3 py-3 font-mono">{p.quantity}</td>
                     <td className="px-3 py-3 font-mono">{formatPrice(Number(p.entry_price))}</td>
-                    <td className="px-3 py-3 font-mono">{formatPrice(Number(p.current_price))}</td>
-                    <td className={`px-5 py-3 font-mono ${Number(p.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(p.pnl))}</td>
+                    <td className="px-3 py-3 font-mono">{formatPrice(Number(p.current_price))}<div className={`mt-1 text-[10px] ${p.quote_stale ? 'text-amber-300' : 'text-stone-500'}`}>{p.quote_updated_at && Number.isFinite(Date.parse(p.quote_updated_at)) ? new Date(p.quote_updated_at).toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', timeZoneName:'short'}) : 'Quote time unavailable'}{p.quote_stale ? ' | stale' : ''}</div></td>
+                    <td className={`px-5 py-3 font-mono ${Number(p.unrealized_pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(p.unrealized_pnl))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -161,7 +161,7 @@ export default function Dashboard() {
                   <div className="text-[11px] text-stone-500">{m.name}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-sm">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}{m.quote_currency ? ` ${m.quote_currency}` : ''}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' ? stale' : ''}</div>
+                  <div className="font-mono text-sm">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}{m.quote_currency ? ` ${m.quote_currency}` : ''}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' | stale' : ''}</div>
                   <div className={`text-[11px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '?' : formatPct(Number(m.change_24h))}</div>
                 </div>
               </Link>
