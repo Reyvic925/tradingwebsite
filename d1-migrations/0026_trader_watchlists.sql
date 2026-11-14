@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS trader_watchlists (
+  user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+  trader_id INTEGER NOT NULL REFERENCES traders(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, trader_id)
+);

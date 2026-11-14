@@ -1,3 +1,5 @@
+import TraderWatchButton from '../components/TraderWatchButton';
+import { useTraderWatchlist } from '../lib/trader-watchlist';
 import FollowModal from '../components/FollowModal';
 import CopyActivity from '../components/CopyActivity';
 import TraderComparison from '../components/TraderComparison';
@@ -146,7 +148,7 @@ function PortfolioSummary() {
 }
 
 // Trader Card Component
-function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<unknown> }) {
+function TraderCard({ trader, availableBalance, onFollow, saved, watchPending, onToggleWatch }: { saved: boolean; watchPending: boolean; onToggleWatch: () => void; trader: Trader; availableBalance: number; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<unknown> }) {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [, refreshStatus] = useState(Date.now());
   const isProfit = Number(trader.total_return ?? 0) >= 0;
@@ -197,6 +199,7 @@ function TraderCard({ trader, availableBalance, onFollow }: { trader: Trader; av
           </div>
         </div>
 
+        <div className="mb-3 flex justify-end"><TraderWatchButton name={trader.name} saved={saved} disabled={watchPending} onClick={onToggleWatch} /></div>
         <p className="text-xs text-gray-400 mb-3 line-clamp-2">{trader.bio}</p>
 
         {/* Asset Focus Pills */}
@@ -503,6 +506,8 @@ export default function Social() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [view, setView] = useState<'discover' | 'leaderboard' | 'dashboard'>('discover');
   const [query, setQuery] = useState('');
+  const watchlist = useTraderWatchlist();
+  const [savedOnly, setSavedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'popular' | 'return' | 'winRate' | 'drawdown'>('popular');
   const [showFilters, setShowFilters] = useState(false);
   const [maxRisk, setMaxRisk] = useState(10);
@@ -519,6 +524,7 @@ export default function Social() {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = ((traders as any[]) || [])
       .filter((trader: Trader) => trader.is_active !== false)
+      .filter((trader: Trader) => !savedOnly || watchlist.ids.includes(trader.id))
       .filter((trader: Trader) => Number(trader.risk_score) <= maxRisk && Number(trader.total_trades) >= minTrades)
       .filter((trader: Trader) => {
         if (!normalizedQuery) return true;
@@ -533,13 +539,13 @@ export default function Social() {
       if (sortBy === 'winRate') return Number(second.win_rate_trades) - Number(first.win_rate_trades);
       return Number(second.followers || 0) - Number(first.followers || 0);
     });
-  }, [query, sortBy, traders, maxRisk, minTrades]);
+  }, [query, sortBy, traders, maxRisk, minTrades, savedOnly, watchlist.ids]);
 
   return (
     <AppShell>
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-300/70">Social desk / 01</div>
+          <div className="mb-2 text-xs uppercase tracking-[0.24em] text-amber-300/70">Social desk</div>
           <h1 className="mb-2 text-3xl font-bold text-white sm:text-4xl">Copy Trading</h1>
           <p className="max-w-2xl text-sm text-gray-400">
             Discover disciplined lead traders, compare their live track records, and copy a strategy with risk controls that stay in your hands.
@@ -547,7 +553,7 @@ export default function Social() {
         </div>
         <div className="flex items-center gap-2 text-xs text-stone-400">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          Live strategies updating
+          Recorded strategy activity
         </div>
       </div>
 
@@ -593,6 +599,11 @@ export default function Social() {
         <>
           <PortfolioSummary />
           <TraderComparison traders={traders} />
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <button type="button" aria-pressed={savedOnly} onClick={() => setSavedOnly(current => !current)} className={`rounded-lg border px-3 py-2 text-xs ${savedOnly ? 'border-amber-200/40 bg-amber-200/10 text-amber-200' : 'border-white/10 text-gray-400'}`}>Watchlist ({watchlist.ids.length})</button>
+            {watchlist.loading && <span className="text-xs text-gray-500">Loading watchlist...</span>}
+            {watchlist.error && <span role="alert" className="text-xs text-amber-200">{watchlist.error}</span>}
+          </div>
           <div className="mb-5 flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-sm">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
@@ -630,7 +641,7 @@ export default function Social() {
             </div>
           ) : visibleTraders.length > 0 ? (
             <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {visibleTraders.map((trader: Trader) => <TraderCard key={trader.id} trader={trader} availableBalance={Number(wallet?.available || 0)} onFollow={followTrader} />)}
+              {visibleTraders.map((trader: Trader) => <TraderCard key={trader.id} trader={trader} availableBalance={Number(wallet?.available || 0)} onFollow={followTrader} saved={watchlist.ids.includes(trader.id)} watchPending={watchlist.loading || watchlist.pending.includes(trader.id)} onToggleWatch={() => void watchlist.toggle(trader.id)} />)}
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-white/15 py-12 text-center text-sm text-stone-500">No strategies match that search.</div>

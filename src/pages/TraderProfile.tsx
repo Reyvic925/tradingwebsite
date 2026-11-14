@@ -1,4 +1,7 @@
 import TraderAnalytics from '../components/TraderAnalytics';
+import TraderResearch from '../components/TraderResearch';
+import TraderWatchButton from '../components/TraderWatchButton';
+import { useTraderWatchlist } from '../lib/trader-watchlist';
 import FollowModal from '../components/FollowModal';
 import { apiGet } from '../lib/api';
 import type { Wallet } from '../types';
@@ -31,6 +34,7 @@ function formatTradeDate(value: string) {
 export default function TraderProfile() {
   const { traderId } = useParams();
   const [showCopy, setShowCopy] = useState(false);
+  const watchlist = useTraderWatchlist();
   const [availableBalance, setAvailableBalance] = useState(0);
   useEffect(() => { apiGet<Wallet>('/api/wallet').then(wallet => setAvailableBalance(Number(wallet.available))).catch(() => setAvailableBalance(0)); }, []);
   const navigate = useNavigate();
@@ -143,6 +147,8 @@ export default function TraderProfile() {
             </div>
           </div>
 
+          <div className="flex items-center gap-3">
+          <TraderWatchButton name={trader.name} saved={watchlist.ids.includes(trader.id)} disabled={watchlist.loading || watchlist.pending.includes(trader.id)} onClick={() => void watchlist.toggle(trader.id)} />
           <button
             onClick={() => setShowCopy(true)}
             disabled={!trader.is_active}
@@ -151,7 +157,9 @@ export default function TraderProfile() {
             <Plus size={18} />
             Copy Trader
           </button>
+          </div>
         </div>
+        {watchlist.error && <p role="alert" className="mt-3 text-xs text-amber-200">{watchlist.error}</p>}
       </div>
 
       {/* Key Metrics */}
@@ -190,6 +198,7 @@ export default function TraderProfile() {
       </div>
 
       <TraderAnalytics trader={trader} trades={trades} loading={tradesLoading} error={tradesError} />
+      <TraderResearch key={trader.id} trader={trader} />
 
       {/* Equity Curve */}
       <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">

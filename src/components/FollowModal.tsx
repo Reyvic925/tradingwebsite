@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
 import type { Trader } from '../types';
+import CopyAllocationPreview from './CopyAllocationPreview';
 
 // Follow Modal Component
 export default function FollowModal({ trader, isOpen, availableBalance, onClose, onFollow }: { trader: Trader; isOpen: boolean; availableBalance: number; onClose: () => void; onFollow: (id: string | number, amount: number, settings: Record<string, any>) => Promise<unknown> }) {
@@ -168,6 +169,7 @@ export default function FollowModal({ trader, isOpen, availableBalance, onClose,
           <p className="mt-2">Initial drawdown trigger: {formatMoney(allocation * (1 - stopLoss / 100))}. The trigger rises with peak equity. Execution can occur below it.</p>
           <p className="mt-2">Profit target: {formatMoney(allocation * (1 + takeProfit / 100))}. Performance fee: {Number(trader.profit_sharing_fee || 0)}% of new profits above the previous high.</p>
         </div>
+        <CopyAllocationPreview allocation={allocation} multiplier={leverage} feePercent={Number(trader.profit_sharing_fee || 0)} stopLoss={stopLoss} takeProfit={takeProfit} drawdown={Number(trader.max_drawdown)} />
         {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
         <div className="mt-6 flex gap-2">
           <button

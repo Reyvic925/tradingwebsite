@@ -13,7 +13,9 @@ export function compareHistory(traders, histories, trades, days, now = new Date(
     return { id: trader.id, name: trader.name,
       return: full && window[0].equity > 0 ? (window.at(-1).equity / window[0].equity - 1) * 100 : null,
       drawdown: full ? drawdown : null,
-      trades: trades.filter(row => row.trader_id === trader.id && row.status === 'CLOSED' && String(row.closed_at || row.traded_at).slice(0, 10) >= start).length,
+      trades: trades.filter(row => row.trader_id === trader.id && row.status === 'CLOSED'
+        && String(row.closed_at || row.traded_at).slice(0, 10) >= start
+        && String(row.closed_at || row.traded_at).slice(0, 10) <= end).length,
       history_days: history.length ? Math.floor((Date.parse(history.at(-1).snapshot_date) - Date.parse(history[0].snapshot_date)) / 86400000) + 1 : 0 };
   });
   const dates = (series[0] || []).map(row => row.snapshot_date).filter(date => date >= start && date <= end && series.every(rows => rows.some(row => row.snapshot_date === date && row.equity > 0)));

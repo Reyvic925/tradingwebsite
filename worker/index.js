@@ -88,6 +88,7 @@ export default {
 
     if ([
       '/api/traders', '/api/trader-trades', '/api/trader-history', '/api/trader-comparison', '/api/leaderboard',
+      '/api/trader-watchlist', '/api/trader-analytics',
     ].includes(url.pathname)) {
       return handleTraderRequest(request, env);
     }

@@ -1,6 +1,8 @@
 import { getD1Admin } from './admin-auth.js';
 import { normalizeAssetFocus, validateTraderRecord } from '../api-handlers/trader-validation.js';
 import { compareHistory } from '../shared/trader-comparison.js';
+import { calculateTraderAnalytics, calculateTraderExposure } from '../shared/trader-analytics.js';
+import { getAuthenticatedUser } from './auth.js';
 
 const TRADER_FIELDS = [
   'name', 'country', 'avatar_url', 'bio', 'specialty', 'asset_focus',
@@ -217,18 +219,60 @@ async function listTraderActivity(env, url, table) {
 export async function handleTraderRequest(request, env) {
   const url = new URL(request.url);
   try {
+    if (url.pathname === '/api/trader-watchlist') {
+      const user = await getAuthenticatedUser(request, env);
+      if (!user) return json({ error: 'Sign in to save strategies.' }, 401);
+      if (request.method === 'GET') {
+        const { results } = await env.DB.prepare('SELECT trader_id FROM trader_watchlists WHERE user_id=? ORDER BY created_at DESC,trader_id').bind(user.id).all();
+        return json({ trader_ids: (results || []).map(row => row.trader_id) });
+      }
+      const id = parseId(url.searchParams.get('traderId'));
+      if (!id) return json({ error: 'A valid trader ID is required.' }, 400);
+      if (request.method === 'PUT') {
+        const trader = await env.DB.prepare('SELECT id FROM traders WHERE id=? AND is_active=1').bind(id).first();
+        if (!trader) return json({ error: 'Strategy is unavailable.' }, 404);
+        await env.DB.prepare('INSERT OR IGNORE INTO trader_watchlists (user_id,trader_id) VALUES (?,?)').bind(user.id, id).run();
+      } else if (request.method === 'DELETE') {
+        await env.DB.prepare('DELETE FROM trader_watchlists WHERE user_id=? AND trader_id=?').bind(user.id, id).run();
+      } else return json({ error: 'Method not allowed' }, 405);
+      return json({ saved: request.method === 'PUT' });
+    }
+    if (url.pathname === '/api/trader-analytics' && request.method === 'GET') {
+      const id = parseId(url.searchParams.get('traderId'));
+      if (!id) return json({ error: 'A valid trader ID is required.' }, 400);
+      const trader = await env.DB.prepare('SELECT * FROM traders WHERE id=? AND is_active=1').bind(id).first();
+      if (!trader) return json({ error: 'Strategy is unavailable.' }, 404);
+      const [history, openTrades, simulation, records] = await Promise.all([
+        env.DB.prepare('SELECT snapshot_date,equity FROM trader_history WHERE trader_id=? ORDER BY snapshot_date').bind(id).all(),
+        env.DB.prepare("SELECT * FROM trader_trades WHERE trader_id=? AND status='OPEN'").bind(id).all(),
+        env.DB.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=?').bind(id).first(),
+        env.DB.prepare("SELECT min(traded_at) first_trade,max(COALESCE(closed_at,traded_at)) latest_trade,count(*) total,sum(price_basis='market') market_trades FROM trader_trades WHERE trader_id=?").bind(id).first(),
+      ]);
+      return json({ ...calculateTraderAnalytics(trader, history.results || []),
+        exposure: calculateTraderExposure(trader, openTrades.results || [], JSON.parse(simulation?.state || '{}')),
+        records, updated_at: trader.updated_at, strategy: trader.bio, specialty: trader.specialty,
+        generated_at: new Date().toISOString() });
+    }
     if (url.pathname === '/api/trader-comparison' && request.method === 'GET') {
       const ids = [...new Set(String(url.searchParams.get('ids') || '').split(',').map(parseId))];
       const period = Number(url.searchParams.get('period') || 30);
-      if (ids.some(id => !id) || ids.length > 3 || ![30, 90].includes(period)) return json({ error: 'Choose one to three traders and a 30 or 90 day period.' }, 400);
+      if (ids.some(id => !id) || ids.length < 1 || ids.length > 3 || ![30, 90].includes(period)) return json({ error: 'Choose one to three traders and a 30 or 90 day period.' }, 400);
       const placeholders = ids.map(() => '?').join(',');
       const [traders, history, trades] = await Promise.all([
-        env.DB.prepare(`SELECT id,name FROM traders WHERE id IN (${placeholders})`).bind(...ids).all(),
+        env.DB.prepare(`SELECT * FROM traders WHERE id IN (${placeholders}) AND is_active=1`).bind(...ids).all(),
         env.DB.prepare(`SELECT trader_id,snapshot_date,equity FROM trader_history WHERE trader_id IN (${placeholders}) ORDER BY snapshot_date`).bind(...ids).all(),
-        env.DB.prepare(`SELECT trader_id,status,traded_at,closed_at FROM trader_trades WHERE trader_id IN (${placeholders}) AND traded_at >= date('now','-91 days')`).bind(...ids).all(),
+        env.DB.prepare(`SELECT trader_id,status,traded_at,closed_at FROM trader_trades WHERE trader_id IN (${placeholders}) AND COALESCE(closed_at,traded_at) >= date('now','-91 days')`).bind(...ids).all(),
       ]);
       const ordered = ids.map(id => (traders.results || []).find(trader => trader.id === id)).filter(Boolean);
-      return json(compareHistory(ordered, history.results || [], trades.results || [], period));
+      const comparison = compareHistory(ordered, history.results || [], trades.results || [], period);
+      comparison.metrics = comparison.metrics.map(metric => {
+        const trader = ordered.find(row => row.id === metric.id);
+        const start = new Date(Date.now() - period * 86400000).toISOString().slice(0, 10);
+        const analytics = calculateTraderAnalytics(trader, (history.results || []).filter(row => row.trader_id === trader.id && row.snapshot_date >= start));
+        return { ...metric, sharpe: analytics.sharpe, sortino: analytics.sortino,
+          risk_score: trader.risk_score, performance_fee: trader.profit_sharing_fee, specialty: trader.specialty };
+      });
+      return json(comparison);
     }
     if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
       const { results } = await env.DB.prepare('SELECT * FROM traders WHERE is_active=1 ORDER BY total_return DESC,id LIMIT 20').all();
