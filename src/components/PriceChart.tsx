@@ -1,9 +1,9 @@
 import { getCatalogMarket } from '../../shared/market-catalog.js';
 import { useEffect, useRef } from 'react';
 
-type Props = { symbol: string; price: number; change: number };
+type Props = { symbol: string; price: number; change: number; interval?:string; timezone?:string };
 
-export default function PriceChart({ symbol }: Props) {
+export default function PriceChart({ symbol, interval='1d', timezone='UTC' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,8 +34,8 @@ export default function PriceChart({ symbol }: Props) {
       new tv.widget({
         autosize: true,
         symbol: mapped,
-        interval: 'D',
-        timezone: 'Etc/UTC',
+        interval: ({'1m':'1','5m':'5','15m':'15','1h':'60','1d':'D'})[interval]||'D',
+        timezone: timezone==='UTC'?'Etc/UTC':timezone,
         theme: 'dark',
         style: '1',
         locale: 'en',
@@ -74,7 +74,7 @@ export default function PriceChart({ symbol }: Props) {
     return () => {
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
-  }, [symbol]);
+  }, [symbol,interval,timezone]);
 
   if (!getCatalogMarket(symbol)) return <div className="flex h-full items-center justify-center text-sm text-stone-500">No verified chart is available for this symbol.</div>;
 

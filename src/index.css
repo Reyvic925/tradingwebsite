@@ -90,3 +90,17 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Advanced paper-trading workspace */
+.terminal-panel { border: 1px solid rgb(255 255 255 / .07); border-radius: .5rem; background: #080b11; }
+.terminal-input { border: 1px solid rgb(255 255 255 / .11); border-radius: .25rem; background: #05080d; padding: .5rem .65rem; color: #e7e5e4; font: 12px ui-monospace, monospace; outline: none; }
+.terminal-input:focus { border-color: rgb(252 211 77 / .55); box-shadow: 0 0 0 2px rgb(252 211 77 / .06); }
+.terminal-input option { background: #080b11; color: #e7e5e4; }
+.terminal-label { display: block; margin-top: .8rem; margin-bottom: .35rem; color: #78716c; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.terminal-button { border: 1px solid rgb(255 255 255 / .12); border-radius: .25rem; padding: .4rem .65rem; font-size: 10px; color: #d6d3d1; }
+.terminal-button:hover { border-color: rgb(252 211 77 / .4); color: #fde68a; }
+.terminal-button:disabled { opacity: .35; cursor: not-allowed; }
+.terminal-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
+.terminal-table th { padding: .7rem .75rem; font-size: 9px; font-weight: 400; text-transform: uppercase; letter-spacing: .07em; color: #78716c; }
+.terminal-table td { border-top: 1px solid rgb(255 255 255 / .05); padding: .7rem .75rem; vertical-align: top; }
+.terminal-table tr:hover { background: rgb(255 255 255 / .015); }

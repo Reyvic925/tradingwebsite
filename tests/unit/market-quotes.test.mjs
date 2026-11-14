@@ -28,6 +28,14 @@ try {
   assert.equal(execution.quote_updated_at, timestamp);
   assert.equal(execution.price_source, 'Coinbase');
   assert.equal(execution.change_24h, null, 'missing statistics must not be fabricated');
+  const originalNow=Date.now;
+  let clock=originalNow();Date.now=()=>clock;
+  try {
+    clearQuoteCache();const before=calls;
+    await getMarketQuote(btc,{maxCacheMs:5000});clock+=6000;
+    await getMarketQuote(btc,{maxCacheMs:5000});
+    assert.equal(calls-before,2,'active crypto execution does not reuse a fifteen-second cache');
+  }finally{Date.now=originalNow;clearQuoteCache();}
 
   const fx = await getMarketQuote({ symbol: 'USDJPY', asset_class: 'forex' });
   assert.ok(urls.at(-1).includes('USDJPY%3DX'));

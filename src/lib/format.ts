@@ -26,9 +26,10 @@ export function formatPct(n: number, digits = 2): string {
 }
 
 export function formatPrice(n: number): string {
+  if (!Number.isFinite(n)) return '—';
   if (n >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (n >= 1) return n.toFixed(4);
-  return n.toFixed(6);
+  return n.toFixed(n>0?Math.min(12,Math.max(6,-Math.floor(Math.log10(n))+3)):6);
 }
 
 export function timeAgo(iso: string): string {

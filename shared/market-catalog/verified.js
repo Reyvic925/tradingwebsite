@@ -78,7 +78,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "1INCH-USD",
     "tradingview_symbol": "COINBASE:1INCHUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "2002.T",
@@ -1898,7 +1900,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "AAVE-USD",
     "tradingview_symbol": "COINBASE:AAVEUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "ABBN.SW",
@@ -2028,7 +2032,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ADA-USD",
     "tradingview_symbol": "COINBASE:ADAUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "ADBE",
@@ -2248,7 +2254,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ALGO-USD",
     "tradingview_symbol": "COINBASE:ALGOUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "ALL",
@@ -2458,7 +2466,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "APT-USD",
     "tradingview_symbol": "COINBASE:APTUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "ARBUSD",
@@ -2468,7 +2478,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ARB-USD",
     "tradingview_symbol": "COINBASE:ARBUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "ARGX.BR",
@@ -2658,7 +2670,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ATOM-USD",
     "tradingview_symbol": "COINBASE:ATOMUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "AUDCAD",
@@ -2748,7 +2762,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "AVAX-USD",
     "tradingview_symbol": "COINBASE:AVAXUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "AVGO",
@@ -2798,7 +2814,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "AXS-USD",
     "tradingview_symbol": "COINBASE:AXSUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "AZN.L",
@@ -3028,7 +3046,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "BCH-USD",
     "tradingview_symbol": "COINBASE:BCHUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "BDX",
@@ -3218,7 +3238,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "BNB-USD",
     "tradingview_symbol": "COINBASE:BNBUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 0.00001
   },
   {
     "symbol": "BND",
@@ -3298,7 +3320,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "BONK-USD",
     "tradingview_symbol": "COINBASE:BONKUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 1e-8,
+    "quantity_increment": 1
   },
   {
     "symbol": "BOTZ",
@@ -3388,7 +3412,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "BTC-USD",
     "tradingview_symbol": "COINBASE:BTCUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "BX",
@@ -3678,7 +3704,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "CHZ-USD",
     "tradingview_symbol": "COINBASE:CHZUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "CI",
@@ -3888,7 +3916,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "COMP-USD",
     "tradingview_symbol": "COINBASE:COMPUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "CON.DE",
@@ -4048,7 +4078,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "CRV-USD",
     "tradingview_symbol": "COINBASE:CRVUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "CRWD",
@@ -4498,7 +4530,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "DOGE-USD",
     "tradingview_symbol": "COINBASE:DOGEUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "DOL.TO",
@@ -4518,7 +4552,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "DOT-USD",
     "tradingview_symbol": "COINBASE:DOTUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "DOV",
@@ -4768,7 +4804,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "EGLD-USD",
     "tradingview_symbol": "COINBASE:EGLDUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "EICHERMOT.NS",
@@ -4938,7 +4976,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ENS-USD",
     "tradingview_symbol": "COINBASE:ENSUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "EOAN.DE",
@@ -5058,7 +5098,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ETC-USD",
     "tradingview_symbol": "COINBASE:ETCUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "ETHA",
@@ -5078,7 +5120,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ETH-USD",
     "tradingview_symbol": "COINBASE:ETHUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "ETN",
@@ -5438,7 +5482,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "FARTCOIN-USD",
     "tradingview_symbol": "COINBASE:FARTCOINUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "FAS",
@@ -5518,7 +5564,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "FET-USD",
     "tradingview_symbol": "COINBASE:FETUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "FEZ",
@@ -5568,7 +5616,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "FIL-USD",
     "tradingview_symbol": "COINBASE:FILUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "FINX",
@@ -5668,7 +5718,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "FLOW-USD",
     "tradingview_symbol": "COINBASE:FLOWUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "FM.TO",
@@ -6088,7 +6140,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "GNO-USD",
     "tradingview_symbol": "COINBASE:GNOUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 0.0001
   },
   {
     "symbol": "GNRC",
@@ -6148,7 +6202,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "GRT-USD",
     "tradingview_symbol": "COINBASE:GRTUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "GS",
@@ -6248,7 +6304,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "HBAR-USD",
     "tradingview_symbol": "COINBASE:HBARUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "HCA",
@@ -6758,7 +6816,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ICP-USD",
     "tradingview_symbol": "COINBASE:ICPUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.0001
   },
   {
     "symbol": "IDXX",
@@ -6948,7 +7008,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "IMX-USD",
     "tradingview_symbol": "COINBASE:IMXUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "INCY",
@@ -7028,7 +7090,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "INJ-USD",
     "tradingview_symbol": "COINBASE:INJUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "INTC",
@@ -7508,7 +7572,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "JTO-USD",
     "tradingview_symbol": "COINBASE:JTOUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "KAVAUSD",
@@ -7518,7 +7584,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "KAVA-USD",
     "tradingview_symbol": "COINBASE:KAVAUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "KBC.BR",
@@ -7768,7 +7836,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "LDO-USD",
     "tradingview_symbol": "COINBASE:LDOUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "LE=F",
@@ -7838,7 +7908,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "LINK-USD",
     "tradingview_symbol": "COINBASE:LINKUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "LLOY.L",
@@ -7958,7 +8030,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "LTC-USD",
     "tradingview_symbol": "COINBASE:LTCUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "LULU",
@@ -8028,7 +8102,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "MANA-USD",
     "tradingview_symbol": "COINBASE:MANAUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "MAR",
@@ -8068,7 +8144,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "MASK-USD",
     "tradingview_symbol": "COINBASE:MASKUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "MBG.DE",
@@ -8578,7 +8656,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "NEAR-USD",
     "tradingview_symbol": "COINBASE:NEARUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "NEE",
@@ -8698,7 +8778,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "NKN-USD",
     "tradingview_symbol": "COINBASE:NKNUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "NLR",
@@ -9028,7 +9110,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "OP-USD",
     "tradingview_symbol": "COINBASE:OPUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "OR.PA",
@@ -9278,7 +9362,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "PEPE-USD",
     "tradingview_symbol": "COINBASE:PEPEUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 1e-8,
+    "quantity_increment": 1
   },
   {
     "symbol": "PFE",
@@ -9578,7 +9664,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "PYTH-USD",
     "tradingview_symbol": "COINBASE:PYTHUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "QCLN",
@@ -9688,7 +9776,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "RAY-USD",
     "tradingview_symbol": "COINBASE:RAYUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "RB=F",
@@ -9768,7 +9858,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "RENDER-USD",
     "tradingview_symbol": "COINBASE:RENDERUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "REP.MC",
@@ -9938,7 +10030,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ROSE-USD",
     "tradingview_symbol": "COINBASE:ROSEUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "ROST",
@@ -10108,7 +10202,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SAND-USD",
     "tradingview_symbol": "COINBASE:SANDUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "SAP",
@@ -10308,7 +10404,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SEI-USD",
     "tradingview_symbol": "COINBASE:SEIUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "SGE.L",
@@ -10368,7 +10466,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SHIB-USD",
     "tradingview_symbol": "COINBASE:SHIBUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 1e-8,
+    "quantity_increment": 1
   },
   {
     "symbol": "SHL.DE",
@@ -10618,7 +10718,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SNX-USD",
     "tradingview_symbol": "COINBASE:SNXUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "SO",
@@ -10648,7 +10750,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SOL-USD",
     "tradingview_symbol": "COINBASE:SOLUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "SOLV",
@@ -10938,7 +11042,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "STX-USD",
     "tradingview_symbol": "COINBASE:STXUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "STZ",
@@ -10978,7 +11084,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SUI-USD",
     "tradingview_symbol": "COINBASE:SUIUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.1
   },
   {
     "symbol": "SUNPHARMA.NS",
@@ -10998,7 +11106,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "SUSHI-USD",
     "tradingview_symbol": "COINBASE:SUSHIUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "SVT.L",
@@ -11288,7 +11398,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "TIA-USD",
     "tradingview_symbol": "COINBASE:TIAUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "TIP",
@@ -11378,7 +11490,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "TON-USD",
     "tradingview_symbol": "COINBASE:TONUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "TOU.TO",
@@ -11458,7 +11572,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "TRUMP-USD",
     "tradingview_symbol": "COINBASE:TRUMPUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.001
   },
   {
     "symbol": "TRV",
@@ -11688,7 +11804,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "UNI-USD",
     "tradingview_symbol": "COINBASE:UNIUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.000001
   },
   {
     "symbol": "UNP",
@@ -12218,7 +12336,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "VET-USD",
     "tradingview_symbol": "COINBASE:VETUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 1
   },
   {
     "symbol": "VFH",
@@ -12688,7 +12808,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "WIF-USD",
     "tradingview_symbol": "COINBASE:WIFUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.00001,
+    "quantity_increment": 0.01
   },
   {
     "symbol": "WIPRO.NS",
@@ -12908,7 +13030,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "XLM-USD",
     "tradingview_symbol": "COINBASE:XLMUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.000001,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "XLP",
@@ -13008,7 +13132,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "XRP-USD",
     "tradingview_symbol": "COINBASE:XRPUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.0001,
+    "quantity_increment": 0.000001
   },
   {
     "symbol": "XRT",
@@ -13128,7 +13254,9 @@ export const VERIFIED_MARKETS = [
     "provider_symbol": "ZEC-USD",
     "tradingview_symbol": "COINBASE:ZECUSD",
     "currency": "USD",
-    "currency_supported": true
+    "currency_supported": true,
+    "quote_increment": 0.01,
+    "quantity_increment": 1e-8
   },
   {
     "symbol": "ZF=F",

@@ -1,0 +1,13 @@
+import type { Market, Order, PaperAccount, Position } from '../../types';
+import type { getInstrument } from '../../../shared/trading-instruments.js';
+export type Instrument = NonNullable<ReturnType<typeof getInstrument>>;
+export type CatalogMarket = Pick<Market,'id'|'symbol'|'name'|'asset_class'> & {currency:string};
+export type Session = {open:boolean;label:string;timezone:string;next_transition_at:string|null;server_time:string;calendar_coverage?:string};
+export type Quote = {symbol:string;price:number;price_source:string;quote_updated_at:string;quote_stale:boolean;quote_currency:string;quote_to_usd:number;quote_tradable:boolean;change_24h:number|null;high_24h:number|null;low_24h:number|null;volume:number|null;instrument:Instrument;session:Session};
+export type TerminalPosition = Position & {version:number;initial_quantity:number;contract_multiplier:number;quote_currency:string;quote_to_usd:number;valuation_version:number;trailing_percent:number|null;fees_paid:number;quote_stale:boolean};
+export type TerminalOrder = Order & {version:number;client_order_id:string;time_in_force:string;expires_at:string|null;intent:string;reject_reason:string|null;received_at:string;filled_at:string|null;triggered_at:string|null};
+export type Fill = {id:number;symbol:string;side:string;quantity:number;price:number;fill_type:string;quote_source:string;quote_updated_at:string;filled_at:string};
+export type PriceAlert = {id:string;symbol:string;direction:string;target:number;status:string;triggered_price:number|null;triggered_at:string|null};
+export type Snapshot = {account:PaperAccount & {stale_positions?:number};positions:TerminalPosition[];orders:TerminalOrder[];fills:Fill[];alerts:PriceAlert[];preferences:{commission_bps:number};server_time:string;execution_model:string};
+export type Bar = {time:number;open:number;high:number;low:number;close:number;volume:number};
+export type Journal = {positions:(TerminalPosition & {notes:string;tags:string})[];statistics:{closed_trades:number;win_rate:number|null;average_win:number|null;average_loss:number|null;profit_factor:number|null;expectancy:number|null;net_realized:number}};

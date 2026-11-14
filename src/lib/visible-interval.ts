@@ -4,12 +4,14 @@ export function startVisibleInterval(
 ): () => void {
   let interval: number | undefined;
   let inFlight = false;
+  let stopped = false;
+  let wasVisible = document.visibilityState === 'visible';
 
   const tick = () => {
-    if (inFlight) return;
+    if (inFlight || stopped) return;
     inFlight = true;
     void Promise.resolve()
-      .then(callback)
+      .then(() => { if (!stopped) return callback(); })
       .finally(() => {
         inFlight = false;
       });
@@ -17,18 +19,21 @@ export function startVisibleInterval(
 
   const syncVisibility = () => {
     if (document.visibilityState === 'visible') {
+      if (!wasVisible) tick();
       if (interval === undefined) interval = window.setInterval(tick, delay);
     } else if (interval !== undefined) {
       window.clearInterval(interval);
       interval = undefined;
     }
+    wasVisible = document.visibilityState === 'visible';
   };
 
-  tick();
+  if (wasVisible) tick();
   document.addEventListener('visibilitychange', syncVisibility);
   syncVisibility();
 
   return () => {
+    stopped = true;
     document.removeEventListener('visibilitychange', syncVisibility);
     if (interval !== undefined) window.clearInterval(interval);
   };

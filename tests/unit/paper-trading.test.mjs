@@ -41,6 +41,7 @@ class D1TestDatabase {
         price REAL, change_24h REAL, volume REAL, high_24h REAL, low_24h REAL);
     `);
     this.sqlite.exec(readFileSync(new URL('../../d1-migrations/0017_paper_trading_ledger.sql', import.meta.url), 'utf8'));
+    this.sqlite.exec(readFileSync(new URL('../../d1-migrations/0023_advanced_paper_trading.sql', import.meta.url), 'utf8'));
   }
 
   prepare(sql) {
@@ -96,7 +97,7 @@ const request = (path, userId, method = 'GET', body) => new Request(`https://app
     cookie: `apex_session=${sessionTokens.get(userId)}`,
     ...(body ? { 'content-type': 'application/json' } : {}),
   },
-  ...(body ? { body: JSON.stringify(body) } : {}),
+  ...(body ? { body: JSON.stringify({ client_order_id: crypto.randomUUID(), client_request_id: crypto.randomUUID(), ...body }) } : {}),
 });
 
 try {

@@ -89,7 +89,7 @@ export async function apiSend<T>(path: string, method: string, body?: unknown): 
       signal,
     });
     const data = (await readBody(res)) as { error?: string };
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), {status:res.status});
     return data as T;
   });
 }

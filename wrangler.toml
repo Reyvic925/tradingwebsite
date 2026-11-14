@@ -3,6 +3,14 @@ main = "worker/index.js"
 compatibility_date = "2026-09-22"
 compatibility_flags = ["nodejs_compat"]
 
+[[durable_objects.bindings]]
+name = "TRADING_ENGINE"
+class_name = "TradingEngine"
+
+[[migrations]]
+tag = "v1-trading-engine"
+new_sqlite_classes = ["TradingEngine"]
+
 [triggers]
 crons = ["* * * * *"]
 
@@ -43,6 +51,10 @@ name = "apex-prime-staging-worker"
 
 [env.staging.vars]
 PUBLIC_API_DATABASE = "staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "TRADING_ENGINE"
+class_name = "TradingEngine"
 
 [[env.staging.d1_databases]]
 binding = "DB"

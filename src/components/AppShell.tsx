@@ -22,7 +22,7 @@ import { signOut as signOutAuth } from '../lib/auth';
 import { apiGet, apiSend } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import { startVisibleInterval } from '../lib/visible-interval';
-import type { Notice, Wallet as WalletT } from '../types';
+import type { Notice, Wallet as WalletT, PaperAccount } from '../types';
 
 const nav = [
   { to: '/app', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -37,7 +37,8 @@ const nav = [
   { to: '/app/profile', label: 'Settings', icon: UserRound },
 ];
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, paperAccount }: { children: React.ReactNode; paperAccount?:PaperAccount|null }) {
+  const isPaper=paperAccount!==undefined;
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -48,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const load = useCallback(async () => {
     try {
       const [w, n] = await Promise.all([
-        apiGet<WalletT>('/api/wallet').catch(() => null),
+        isPaper?Promise.resolve(null):apiGet<WalletT>('/api/wallet').catch(() => null),
         apiGet<Notice[]>('/api/notifications').catch(() => []),
       ]);
       if (w) setWallet(w);
@@ -56,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     } catch {
       /* session may still be warming */
     }
-  }, []);
+  }, [isPaper]);
 
   useEffect(() => {
     const stopPolling = startVisibleInterval(load, 30000);
@@ -110,8 +111,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="absolute inset-x-0 bottom-0 border-t border-white/5 p-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">Available</div>
-          <div className="mt-1 font-mono text-lg text-amber-200">{formatMoney(Number(wallet?.available || 0))}</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{isPaper?'Paper available':'Available'}</div>
+          <div className="mt-1 font-mono text-lg text-amber-200">{isPaper&&!paperAccount?'—':formatMoney(Number(isPaper?paperAccount?.available_cash:wallet?.available||0))}</div>
           <button onClick={signOut} className="mt-3 flex items-center gap-2 text-xs text-stone-500 hover:text-rose-300">
             <LogOut size={14} /> Sign out
           </button>
@@ -126,8 +127,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="ml-auto flex items-center gap-4">
             <div className="hidden text-right sm:block">
-              <div className="text-[10px] uppercase tracking-widest text-stone-500">Equity</div>
-              <div className="font-mono text-sm text-stone-100">{formatMoney(Number(wallet?.equity ?? wallet?.available ?? 0))}</div>
+              <div className="text-[10px] uppercase tracking-widest text-stone-500">{isPaper?'Paper equity':'Equity'}</div>
+              <div className="font-mono text-sm text-stone-100">{isPaper&&!paperAccount?'—':formatMoney(Number(isPaper?paperAccount?.equity:wallet?.equity??wallet?.available??0))}</div>
             </div>
             <div className="relative">
               <button

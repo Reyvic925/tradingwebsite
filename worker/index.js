@@ -1,4 +1,5 @@
 import { quoteMarkets } from './market-quotes.js';
+export { TradingEngine } from './trading-engine.js';
 import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
 import { handleAdminCryptoRequest } from './admin-crypto-api.js';
