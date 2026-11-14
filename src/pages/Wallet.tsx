@@ -340,6 +340,29 @@ export default function Wallet() {
                placeholder="0x... or bc1..."
                className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm outline-none"
              />
+
+             <div className="mt-5 rounded-sm border border-amber-400/20 bg-amber-400/5 p-4 text-xs text-stone-300">
+               <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200">Withdrawal billing details</div>
+               <dl className="mt-3 space-y-3">
+                 <div>
+                   <dt className="font-semibold text-stone-200">Capital Gains Tax (CGT)</dt>
+                   <dd className="mt-1 text-stone-400">
+                     Rates vary by jurisdiction and holding period. Illustrative rates include 0% in some jurisdictions, 15%-20% for some U.S. long-term gains, and up to 37% for some U.S. short-term gains. CGT is based on taxable gains, not automatically on the withdrawal amount; this platform does not calculate or withhold it.
+                   </dd>
+                 </div>
+                 <div>
+                   <dt className="font-semibold text-stone-200">Network fee</dt>
+                   <dd className="mt-1 text-stone-400">Any blockchain/network fee depends on the selected asset and network and is not estimated here.</dd>
+                 </div>
+                 <div>
+                   <dt className="font-semibold text-stone-200">Other taxes and trading costs</dt>
+                   <dd className="mt-1 text-stone-400">Transaction taxes, stamp duties, commissions, spreads, and currency conversion costs depend on the market and trade. They are not calculated as withdrawal charges here.</dd>
+                 </div>
+               </dl>
+               <p className="mt-3 border-t border-white/10 pt-3 text-stone-500">
+                 No tax or fee total is calculated or deducted by this form. Applicable amounts depend on your circumstances and any external network charges. This information is general and not tax advice.
+               </p>
+             </div>
            </>
          )}
 
