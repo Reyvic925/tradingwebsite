@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import OverviewPortfolio from '../components/trading/OverviewPortfolio';
+import OverviewCloseDialog from '../components/trading/OverviewCloseDialog';
+import { getInstrument } from '../../shared/trading-instruments.js';
+import { marketSession } from '../../shared/trading-sessions.js';
 import { apiGet, apiList, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
 import { startVisibleInterval } from '../lib/visible-interval';
@@ -8,6 +12,9 @@ import type { Snapshot, TerminalPosition } from '../components/trading/types';
 import type { Investment, Market, PaperAccount, Profile, Txn } from '../types';
 
 export default function Dashboard() {
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [closing, setClosing] = useState<TerminalPosition | null>(null);
+  const [notice, setNotice] = useState('');
   const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [positions, setPositions] = useState<TerminalPosition[]>([]);
@@ -33,6 +40,7 @@ export default function Dashboard() {
         apiList<Investment>('/api/investments'),
       ]);
       if (profileData?.profile) setProfile(profileData.profile);
+      setSnapshot(trading);
       setPaperAccount(trading.account);
       setPositions(asList(trading.positions));
       setMarkets(asList(mkt));
@@ -61,7 +69,7 @@ export default function Dashboard() {
   }, { totalPnl: 0, active: 0, completed: 0 });
 
   return (
-    <AppShell>
+    <AppShell paperAccount={paperAccount}>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-[0.24em] text-amber-300/70">Overview</div>
@@ -86,6 +94,7 @@ export default function Dashboard() {
       )}
       {error && <div className="mt-6 rounded-sm border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>}
 
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-stone-500"><span>{snapshot?`Account snapshot: ${new Date(snapshot.server_time).toLocaleString()}`:'Loading account snapshot...'}</span><button type="button" className="terminal-button" onClick={()=>void load()}>Refresh overview</button>{notice&&<span role="status" className="text-emerald-300">{notice}</span>}{positions.some(position=>position.quote_stale)&&<span className="text-amber-300">Some marks are stale. P&amp;L uses the last available mark.</span>}</div>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Desk equity', value: formatMoney(Number(paperAccount?.equity ?? paperAccount?.initial_cash ?? 0)) },
@@ -100,8 +109,9 @@ export default function Dashboard() {
         ))}
       </div>
 
+      <OverviewPortfolio snapshot={snapshot}/>
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-md border border-white/5">
+        <div className="min-w-0 lg:col-span-2 rounded-md border border-white/5">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
             <div>
               <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">Paper positions | server-calculated unrealized P&amp;L | refreshes every 30 seconds</p>
@@ -118,22 +128,26 @@ export default function Dashboard() {
                   <th className="px-3 py-2 font-medium">Entry</th>
                   <th className="px-3 py-2 font-medium">Mark / quote time</th>
                   <th className="px-5 py-2 font-medium">P&L</th>
+                  <th className="px-3 py-2 font-medium">Protection / session</th>
+                  <th className="px-3 py-2 font-medium">Manage</th>
                 </tr>
               </thead>
               <tbody>
                 {positions.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-stone-500">No open risk. Open a ticket on the desk.</td>
+                    <td colSpan={8} className="px-5 py-8 text-center text-stone-500">No open risk. Open a ticket on the desk.</td>
                   </tr>
                 )}
                 {positions.map((p) => (
                   <tr key={p.id} className="border-t border-white/5">
-                    <td className="px-5 py-3 font-mono">{p.symbol}</td>
+                    <td className="px-5 py-3 font-mono"><Link className="text-amber-300" to={`/app/trade/${encodeURIComponent(p.symbol)}`}>{p.symbol}</Link><div className="mt-1 text-[10px] text-stone-500">Opened {p.opened_at?new Date(p.opened_at).toLocaleString():'time unavailable'}</div></td>
                     <td className={`px-3 py-3 uppercase ${p.side === 'long' || p.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}`}>{p.side}</td>
                     <td className="px-3 py-3 font-mono">{p.quantity}</td>
                     <td className="px-3 py-3 font-mono">{formatPrice(Number(p.entry_price))}</td>
                     <td className="px-3 py-3 font-mono">{formatPrice(Number(p.current_price))}<div className={`mt-1 text-[10px] ${p.quote_stale ? 'text-amber-300' : 'text-stone-500'}`}>{p.quote_updated_at && Number.isFinite(Date.parse(p.quote_updated_at)) ? new Date(p.quote_updated_at).toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', timeZoneName:'short'}) : 'Quote time unavailable'}{p.quote_stale ? ' | stale' : ''}</div></td>
                     <td className={`px-5 py-3 font-mono ${Number(p.unrealized_pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(p.unrealized_pnl))}</td>
+                    <td className="px-3 py-3 text-[10px] text-stone-500"><div>SL {p.stop_loss==null?'None':formatPrice(Number(p.stop_loss))} / TP {p.take_profit==null?'None':formatPrice(Number(p.take_profit))}</div><div className="mt-1">{marketSession(getInstrument(p.symbol)).label}</div></td>
+                    <td className="px-3 py-3"><button type="button" className="terminal-button whitespace-nowrap" aria-label={`Close ${p.symbol} position`} onClick={()=>setClosing(p)}>Close / reduce</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +176,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-sm">{m.price == null ? 'Unavailable' : formatPrice(Number(m.price))}{m.quote_currency ? ` ${m.quote_currency}` : ''}</div><div className="text-[10px] text-stone-500">{m.price_source}{m.quote_stale ? ' | stale' : ''}</div>
-                  <div className={`text-[11px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '?' : formatPct(Number(m.change_24h))}</div>
+                  <div className={`text-[11px] ${Number(m.change_24h) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.change_24h == null ? '24h change unavailable' : formatPct(Number(m.change_24h))}</div>
                 </div>
               </Link>
             ))}
@@ -187,6 +201,7 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+      {closing&&<OverviewCloseDialog position={closing} commissionBps={Number(snapshot?.preferences.commission_bps||0)} onDismiss={()=>setClosing(null)} onDone={async()=>{setNotice('Position close confirmed.');try{const trading=await apiGet<Snapshot>('/api/paper/snapshot');setSnapshot(trading);setPaperAccount(trading.account);setPositions(trading.positions);}catch{setError('Close succeeded; refresh the overview to update account values.');}}}/>}
     </AppShell>
   );
 }
