@@ -5,7 +5,7 @@ import { ChevronDown, Mail, MapPin } from 'lucide-react';
 const questions = [
   ['What is The Prime Markets?', 'The Prime Markets is a multi-asset trading platform offering market access, account tools, investment products, and social copy trading.'],
   ['Which markets can I access?', 'Available instruments may include equities, FX, indices, commodities, and digital assets. Availability depends on the account, market conditions, and applicable restrictions.'],
-  ['Is copy trading guaranteed to make a profit?', 'No. Copy trading carries risk and past or simulated performance does not guarantee future results. Review each trader, allocation, multiplier, and risk setting carefully.'],
+  ['Is copy trading guaranteed to make a profit?', 'No. Copy trading carries risk and past or modelled performance does not guarantee future results. Review each trader, allocation, multiplier, and risk setting carefully.'],
   ['How long do deposits take?', 'Deposit timing depends on the payment method and any compliance review. A deposit is available for trading only after it has been credited to your account.'],
   ['How do withdrawals work?', 'Submit a withdrawal from your account after completing any required identity checks. Requests are reviewed against your available balance and security controls.'],
   ['How does the referral program work?', 'A referrer earns 10% of each confirmed deposit made by an eligible referred client. The reward is credited after the deposit is approved, not at signup.'],

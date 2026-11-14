@@ -355,7 +355,7 @@ export default function Wallet() {
          <p className="mt-3 text-[11px] text-stone-600">
            {type === 'deposit'
              ? 'Only send the selected currency on the displayed network. Never submit a transaction hash before the transfer is confirmed on-chain.'
-             : 'Withdrawals are processed after manual review (simulated).'}
+             : 'Withdrawals are processed after manual review (test processing).'}
          </p>
         </form>
 

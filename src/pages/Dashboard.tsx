@@ -114,7 +114,7 @@ export default function Dashboard() {
         <div className="min-w-0 lg:col-span-2 rounded-md border border-white/5">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
             <div>
-              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">Paper positions | server-calculated unrealized P&amp;L | refreshes every 30 seconds</p>
+              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">Positions | server-calculated unrealized P&amp;L | refreshes every 30 seconds</p>
             </div>
             <Link to="/app/trade" className="text-xs text-amber-300">Desk →</Link>
           </div>

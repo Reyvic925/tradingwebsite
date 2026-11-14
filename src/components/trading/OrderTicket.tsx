@@ -43,7 +43,7 @@ export default function OrderTicket({ticket,setTicket,quote,snapshot,timezone,bu
       `${ticket.side.toUpperCase()} ${quantity} ${quote.symbol} · ${ticket.type.replace('_','-')} · ${ticket.tif}${expires?` · expires ${expires}`:''}`);
   };
   return <form onSubmit={submit} className="terminal-panel p-4">
-    <div className="flex items-center justify-between text-[10px] uppercase tracking-widest"><span className="text-stone-400">Paper order ticket</span><span className="text-amber-200">{quote?.symbol||'Select market'}</span></div>
+    <div className="flex items-center justify-between text-[10px] uppercase tracking-widest"><span className="text-stone-400">Order ticket</span><span className="text-amber-200">{quote?.symbol||'Select market'}</span></div>
     <div className="mt-3 grid grid-cols-2 gap-1 rounded bg-black/40 p-1">{(['buy','sell']as const).map(side=><button key={side} type="button" disabled={ticket.reduceOnly} onClick={()=>update({side})} className={`rounded py-2 text-xs uppercase tracking-wider ${ticket.side===side?(side==='buy'?'bg-emerald-400 text-black':'bg-rose-400 text-black'):'text-stone-500'}`}>{side==='buy'?'Buy / Long':'Sell / Short'}</button>)}</div>
     <div className="mt-3 grid grid-cols-4 gap-1">{(['market','limit','stop','stop_limit']as const).map(type=><button key={type} type="button" onClick={()=>update({type})} className={`rounded border px-1 py-2 text-[9px] uppercase ${ticket.type===type?'border-amber-300/50 text-amber-200':'border-white/10 text-stone-500'}`}>{type==='stop_limit'?'Stop-limit':type}</button>)}</div>
     <label className="mt-4 flex items-center gap-2 text-xs text-stone-400"><input type="checkbox" checked={ticket.reduceOnly} onChange={e=>{const p=positions[0];update({reduceOnly:e.target.checked,positionId:p?String(p.id):'',side:p?(p.side==='long'?'sell':'buy'):ticket.side,quantity:p?String(p.quantity):ticket.quantity,sizing:'quantity',sl:'',tp:'',trailing:''});}}/> Reduce only</label>
@@ -62,7 +62,7 @@ export default function OrderTicket({ticket,setTicket,quote,snapshot,timezone,bu
     <div className="mt-4 space-y-2 rounded border border-white/5 bg-black/30 p-3 text-[11px]">
       <div className="flex justify-between"><span className="text-stone-500">Estimated entry</span><span>{entry>0?formatPrice(entry):'—'} {quote?.quote_currency}</span></div>
       <div className="flex justify-between"><span className="text-stone-500">Notional / collateral</span><span>{preview?formatMoney(preview.collateral):'—'}</span></div>
-      <div className="flex justify-between"><span className="text-stone-500">Simulated entry fee</span><span>{preview?formatMoney(preview.entry_fee):'—'}</span></div>
+      <div className="flex justify-between"><span className="text-stone-500">Estimated entry fee</span><span>{preview?formatMoney(preview.entry_fee):'—'}</span></div>
       <div className="flex justify-between"><span className="text-stone-500">Loss at stop*</span><span className="text-rose-300">{preview?.risk_at_stop!=null?formatMoney(preview.risk_at_stop):'Set a valid stop'}</span></div>
       <div className="flex justify-between"><span className="text-stone-500">Potential profit*</span><span className="text-emerald-300">{preview?.potential_profit!=null?formatMoney(preview.potential_profit):'Set a valid target'}</span></div>
       <div className="flex justify-between"><span className="text-stone-500">Reward / risk</span><span>{preview?.reward_to_risk!=null?`${preview.reward_to_risk.toFixed(2)} : 1`:'—'}</span></div>

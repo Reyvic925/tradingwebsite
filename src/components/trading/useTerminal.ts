@@ -25,7 +25,7 @@ export function useTerminal(symbol?:string) {
     const changed=data.orders.find(order=>lastOrders.current&&lastOrders.current.get(String(order.id))!==order.status&&['rejected','cancelled'].includes(order.status)&&order.reject_reason);
     const text=fresh[0]?`${fresh[0].side.toUpperCase()} ${fresh[0].quantity} ${fresh[0].symbol} filled at ${fresh[0].price}`
       :alerts[0]?`${alerts[0].symbol} price alert triggered at ${alerts[0].triggered_price}`:changed?`${changed.symbol} order ${changed.status}: ${changed.reject_reason}`:'';
-    if(text){setMessage(text);if(notifications.current&&'Notification'in window&&Notification.permission==='granted')new Notification('Prime Markets paper trading',{body:text});}
+    if(text){setMessage(text);if(notifications.current&&'Notification'in window&&Notification.permission==='granted')new Notification('Prime Markets trading',{body:text});}
     lastFills.current=new Set(data.fills.map(fill=>fill.id));lastAlerts.current=new Set(data.alerts.filter(a=>a.status==='triggered').map(a=>a.id));
     lastOrders.current=new Map(data.orders.map(order=>[String(order.id),order.status]));
   },[]);

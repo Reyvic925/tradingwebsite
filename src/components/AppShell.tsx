@@ -111,7 +111,7 @@ export default function AppShell({ children, paperAccount }: { children: React.R
           ))}
         </nav>
         <div className="absolute inset-x-0 bottom-0 border-t border-white/5 p-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{isPaper?'Paper available':'Available'}</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-stone-500">{isPaper?'Available to trade':'Available'}</div>
           <div className="mt-1 font-mono text-lg text-amber-200">{isPaper&&!paperAccount?'—':formatMoney(Number(isPaper?paperAccount?.available_cash:wallet?.available||0))}</div>
           <button onClick={signOut} className="mt-3 flex items-center gap-2 text-xs text-stone-500 hover:text-rose-300">
             <LogOut size={14} /> Sign out
@@ -127,7 +127,7 @@ export default function AppShell({ children, paperAccount }: { children: React.R
           </div>
           <div className="ml-auto flex items-center gap-4">
             <div className="hidden text-right sm:block">
-              <div className="text-[10px] uppercase tracking-widest text-stone-500">{isPaper?'Paper equity':'Equity'}</div>
+              <div className="text-[10px] uppercase tracking-widest text-stone-500">{isPaper?'Trading equity':'Equity'}</div>
               <div className="font-mono text-sm text-stone-100">{isPaper&&!paperAccount?'—':formatMoney(Number(isPaper?paperAccount?.equity:wallet?.equity??wallet?.available??0))}</div>
             </div>
             <div className="relative">

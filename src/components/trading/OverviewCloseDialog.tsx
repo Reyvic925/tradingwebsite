@@ -28,7 +28,7 @@ export default function OverviewCloseDialog({position,commissionBps,onDone,onDis
     finally{inFlight.current=false;setBusy(false);}
   };
   return <dialog ref={dialog} aria-modal="true" aria-labelledby="overview-close-title" className="fixed inset-0 z-[100] m-auto w-[min(94vw,460px)] rounded-lg border border-white/15 bg-[#101217] p-6 text-stone-100 shadow-2xl backdrop:bg-black/70" onCancel={event=>{event.preventDefault();if(!busy&&!uncertain)onDismiss();}}>
-    <h2 id="overview-close-title" className="text-xl">Close paper position</h2>
+    <h2 id="overview-close-title" className="text-xl">Close position</h2>
     <p className="mt-2 text-sm text-stone-400">{position.symbol} / {position.side} / {position.quantity} remaining</p>
     <label className="mt-5 block text-xs text-stone-400">Quantity to close<input autoFocus aria-label="Quantity to close" type="number" step={step} min={step} max={position.quantity} value={quantity} disabled={busy||uncertain} onChange={e=>setQuantity(e.target.value)} className="terminal-input mt-2 w-full"/></label>
     <div className="mt-2 flex gap-2">{[25,50,100].map(percent=><button key={percent} type="button" className="terminal-button" disabled={busy||uncertain} onClick={()=>setQuantity(String(percent===100?position.quantity:Number((Math.floor(Number(position.quantity)*percent/100/step+1e-8)*step).toPrecision(12))))}>{percent}%</button>)}</div>

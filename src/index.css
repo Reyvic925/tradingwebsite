@@ -91,7 +91,7 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Advanced paper-trading workspace */
+/* Advanced trading workspace */
 .terminal-panel { border: 1px solid rgb(255 255 255 / .07); border-radius: .5rem; background: #080b11; }
 .terminal-input { border: 1px solid rgb(255 255 255 / .11); border-radius: .25rem; background: #05080d; padding: .5rem .65rem; color: #e7e5e4; font: 12px ui-monospace, monospace; outline: none; }
 .terminal-input:focus { border-color: rgb(252 211 77 / .55); box-shadow: 0 0 0 2px rgb(252 211 77 / .06); }
