@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { handleCopyRequest, runCopyTradingTick, applyCopyEvent } from '../../worker/copy-trading.js';
+import { handleCopyRequest, runCopyTradingTick as runMarketTick, applyCopyEvent } from '../../worker/copy-trading.js';
 import { valueCopy, validateCopyRisk } from '../../shared/copy-risk.js';
+import { loadCopyQuotes } from '../../worker/copy-quotes.js';
 import { compareHistory } from '../../shared/trader-comparison.js';
 
+const runCopyTradingTick = (env, now) => runMarketTick(env, now, {
+  quoteProvider: async market => ({ price: market.symbol === 'BTCUSD' ? 96000 : 200,
+    price_source: 'Fixture feed', quote_updated_at: now.toISOString(), quote_stale: false }),
+});
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
+for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 class Statement {
   constructor(sql) { this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
@@ -105,5 +110,40 @@ assert(Math.abs(stopEvent.trade_pnl - netChanges) < 0.02, 'realized trade reconc
 sqlite.prepare('INSERT INTO auth_sessions(id,user_id,expires_at) VALUES (?,?,?)').run(createHash('sha256').update('other-token').digest('base64url'), 'other', '2099-01-01');
 const otherActivity = await handleCopyRequest(new Request(`https://example.test/api/copy-activity?followId=${id}`, { headers: { cookie: 'apex_session=other-token' } }), env);
 assert.deepEqual(await otherActivity.json(), [], 'another user cannot read a copy ledger');
+const marketTrade = sqlite.prepare("SELECT * FROM trader_trades WHERE price_basis='market' LIMIT 1").get();
+assert(marketTrade);
+assert.equal(marketTrade.entry_price_source, 'Fixture feed');
+assert(marketTrade.entry_quote_at);
+const mappedSymbols = [];
+const mappedQuotes = await loadCopyQuotes(['BTC-USD', 'SPX500', 'DAX40', 'WTI'], async market => {
+  mappedSymbols.push(market.symbol);
+  return { price: 10, price_source: 'Fixture feed', quote_updated_at: date.toISOString(), quote_stale: false };
+});
+assert.deepEqual(mappedSymbols.sort(), ['BTCUSD', 'GER40', 'US500']);
+assert.equal(mappedQuotes['BTC-USD'].price, 10);
+assert.equal(mappedQuotes.WTI, undefined, 'unsupported spot oil must not become a futures price');
+const tickBefore = sqlite.prepare('SELECT max(last_tick) tick FROM copy_simulation_state').get().tick;
+const noQuotes = await runMarketTick(env, new Date(+date + 100 * 300000), {
+  quoteProvider: async () => ({ price: 1, quote_stale: true }),
+});
+assert(noQuotes.quote_unavailable > 0);
+assert.equal(sqlite.prepare('SELECT max(last_tick) tick FROM copy_simulation_state').get().tick, tickBefore);
+// Old open positions must not jump to a different price scale on the first market tick.
+const legacyRecord = sqlite.prepare('SELECT * FROM copy_simulation_state WHERE trader_id=21').get();
+const legacyState = JSON.parse(legacyRecord.state);
+legacyState.priceBasis = 'synthetic';
+legacyState.prices = { 'BTC-USD': 43200 };
+legacyState.position = { symbol: 'BTC-USD', side: 'BUY', quantity: 0.1, entry_price: 43200,
+  entry_fee: 0, equity_at_entry: legacyState.equity, age: 100, event_id: 'legacy-open',
+  status: 'OPEN', traded_at: date.toISOString() };
+sqlite.prepare('UPDATE copy_simulation_state SET state=? WHERE trader_id=21').run(JSON.stringify(legacyState));
+await runCopyTradingTick(env, new Date(+date + 101 * 300000));
+const legacyClose = sqlite.prepare("SELECT * FROM trader_trades WHERE event_id='legacy-open'").get();
+assert.equal(legacyClose.price_basis, 'synthetic');
+assert(Math.abs(legacyClose.exit_price - 43200) < 4320, 'legacy exit remains on its original scale');
+await runCopyTradingTick(env, new Date(+date + 102 * 300000));
+const migratedState = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=21').get().state);
+assert.equal(migratedState.priceBasis, 'market');
+assert.equal(migratedState.prices['BTC-USD'], 96000);
 sqlite.close();
 console.log('D1_COPY_TRADING_TESTS_PASSED');

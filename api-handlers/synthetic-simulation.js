@@ -125,14 +125,15 @@ export function deriveMetrics({ startingEquity, equity, trades = [], history = [
   };
 }
 
-export function simulateTick({ traderId, tickId, timestamp, config, state }) {
+export function simulateTick({ traderId, tickId, timestamp, config, state, marketQuotes }) {
   const normalizedConfig = normalizeSyntheticConfig(config);
   const random = seededRandom(`${traderId}:${tickId}:${normalizedConfig.strategyType}`);
   const profile = STRATEGY_PROFILES[normalizedConfig.strategyType];
   // Market shocks are shared across traders; strategy decisions use a separate seed.
   const regime = seededRandom(`regime:${Math.floor(tickId / 24)}`)();
   const stress = regime < 0.12 ? 2.5 : regime > 0.85 ? 0.55 : 1;
-  const previousPrices = state.prices || {};
+  const marketBacked = marketQuotes !== undefined;
+  const previousPrices = marketBacked && state.priceBasis !== 'market' ? {} : state.prices || {};
   const date = new Date(timestamp);
   const hour = date.getUTCHours();
   const weekday = date.getUTCDay() !== 0 && date.getUTCDay() !== 6;
@@ -141,6 +142,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
     tokyo: hour < 9, london: hour >= 8 && hour < 17, nyc: hour >= 13 && hour < 22,
   })[normalizedConfig.session]);
   const assetOpen = asset => {
+    if (marketBacked && !marketQuotes[asset]) return false;
     const group = getAssetSpec(asset).correlation;
     return group === 'crypto' || (weekday && (group !== 'equities' || hour >= 13 && hour < 22));
   };
@@ -148,11 +150,27 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   const marketMoves = {};
   for (const asset of normalizedConfig.assets) {
     const spec = getAssetSpec(asset);
+    if (marketBacked) {
+      const quote = marketQuotes[asset];
+      if (!quote) continue;
+      const quoteAt = Date.parse(quote.quote_updated_at);
+      const age = Date.parse(timestamp) - quoteAt;
+      if (!Number.isFinite(quote.price) || quote.price <= 0 || !Number.isFinite(age) || age < -60000 || age > 20 * 60000 || quote.quote_stale || !quote.price_source) {
+        throw new Error(`Invalid execution quote for ${asset}`);
+      }
+      nextPrices[asset] = quote.price;
+      const previous = Number(previousPrices[asset]);
+      marketMoves[asset] = previous > 0 ? quote.price / previous - 1 : 0;
+      continue;
+    }
     const factor = seededRandom(`market:${tickId}:${spec.correlation}`)() * 2 - 1;
     const noise = seededRandom(`asset:${tickId}:${asset}`)() * 2 - 1;
     const move = assetOpen(asset) ? spec.drift + (factor * 0.7 + noise * 0.3) * spec.volatility * stress : 0;
     nextPrices[asset] = Number(((Number(previousPrices[asset]) || spec.basePrice) * Math.max(0.01, 1 + move)).toFixed(8));
     marketMoves[asset] = move;
+  }
+  if (marketBacked && state.position && !nextPrices[state.position.symbol]) {
+    throw new Error(`Missing position quote for ${state.position.symbol}`);
   }
   const spreadBps = Math.min(100, Math.max(0, Number(config.spreadBps ?? 2)));
   const slippageBps = Math.min(100, Math.max(0, Number(config.slippageBps ?? 1)));
@@ -176,7 +194,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
       equity += direction * (exit - price) * position.quantity - exitFee;
       const fees = position.entry_fee + exitFee;
       const pnl = direction * (exit - position.entry_price) * position.quantity - fees;
-      trade = { ...position, exit_price: exit, fees: Number(fees.toFixed(2)), pnl: Number(pnl.toFixed(2)),
+      trade = { ...position, exit_price_source: marketQuotes?.[position.symbol]?.price_source, exit_quote_at: marketQuotes?.[position.symbol]?.quote_updated_at, exit_price: exit, fees: Number(fees.toFixed(2)), pnl: Number(pnl.toFixed(2)),
         pnl_percent: pnl / position.equity_at_entry * 100, status: 'CLOSED', closed_at: timestamp,
         close_reason: tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : 'strategy_exit' };
       lossStreak = pnl < 0 ? lossStreak + 1 : 0;
@@ -198,7 +216,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
     const exposure = Math.min(normalizedConfig.maxExposureFraction, normalizedConfig.riskFraction * martingale / getAssetSpec(asset).volatility);
     const quantity = Math.min(equity, riskBase) * exposure / entry;
     const entryFee = entry * quantity * feeBps / 10000;
-    position = { event_id: `${traderId}:${tickId}`, trader_id: traderId, symbol: asset, side,
+    position = { price_basis: marketBacked ? 'market' : 'synthetic', entry_price_source: marketQuotes?.[asset]?.price_source, entry_quote_at: marketQuotes?.[asset]?.quote_updated_at, event_id: `${traderId}:${tickId}`, trader_id: traderId, symbol: asset, side,
       quantity, entry_price: entry, entry_fee: entryFee, equity_at_entry: equity,
       margin: quantity * entry, leverage: 1, notional: quantity * entry, age: 0,
       status: 'OPEN', traded_at: timestamp };
@@ -207,7 +225,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state }) {
   }
   const peakEquity = Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity);
   const maxDrawdown = Math.max(Number(state.maxDrawdown || 0), peakEquity > 0 ? (peakEquity - Math.max(0, equity)) / peakEquity * 100 : 0);
-  const nextState = { ...state, maxDrawdown, prices: nextPrices, signals: marketMoves, position,
+  const nextState = { ...state, priceBasis: marketBacked ? 'market' : 'synthetic', maxDrawdown, prices: nextPrices, signals: marketMoves, position,
     equity: Math.max(0, equity), peakEquity: Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity),
     tickIndex: tickId, lossStreak, lastProcessedAt: timestamp };
   return { config: normalizedConfig, state: nextState, trade, openedTrade, marketMoves };

@@ -55,3 +55,36 @@ assert(closed.every(trade => trade.fees > 0));
 assert(closed.every(trade => Date.parse(trade.closed_at) > Date.parse(trade.traded_at)), 'positions must persist between ticks');
 
 console.log('SYNTHETIC SIMULATION OK');
+
+// Market execution must use timestamped quotes without synthetic price drift.
+const quotedConfig = { ...config, session: 'crypto', spreadBps: 0, slippageBps: 0, feeBps: 0 };
+const quoteTime = '2026-11-14T12:00:00.000Z';
+const quote = { price: 96321.45, quote_updated_at: quoteTime, price_source: 'Fixture exchange', quote_stale: false };
+let marketState = { ...initialState, prices: { 'BTC-USD': 43200 } };
+let marketEntry;
+for (let tick = 1; tick <= 20 && !marketEntry; tick++) {
+  const result = simulateTick({ traderId: 7, tickId: tick, timestamp: quoteTime,
+    config: quotedConfig, state: marketState, marketQuotes: { 'BTC-USD': quote } });
+  assert.equal(result.state.prices['BTC-USD'], quote.price);
+  marketState = result.state;
+  marketEntry = result.openedTrade;
+}
+assert(marketEntry, 'strategy opens from a provider quote');
+assert.equal(marketEntry.entry_price, quote.price);
+assert.equal(marketEntry.price_basis, 'market');
+assert.equal(marketEntry.entry_quote_at, quoteTime);
+assert.equal(marketEntry.entry_price_source, 'Fixture exchange');
+const closeQuote = { ...quote, price: 97000 };
+const marketClose = simulateTick({ traderId: 7, tickId: 30, timestamp: quoteTime, config: quotedConfig,
+  state: marketState, marketQuotes: { 'BTC-USD': closeQuote } });
+assert.equal(marketClose.trade.exit_price, closeQuote.price);
+assert.equal(marketClose.trade.exit_quote_at, quoteTime);
+assert.equal(marketClose.trade.exit_price_source, 'Fixture exchange');
+assert.throws(() => simulateTick({ traderId: 7, tickId: 31, timestamp: quoteTime, config: quotedConfig,
+  state: marketState, marketQuotes: {} }), /Missing position quote/);
+for (const invalid of [{ ...quote, quote_stale: true }, { ...quote, price: 0 },
+  { ...quote, quote_updated_at: '2020-01-01T00:00:00Z' }, { ...quote, quote_updated_at: '2030-01-01T00:00:00Z' }]) {
+  assert.throws(() => simulateTick({ traderId: 7, tickId: 32, timestamp: quoteTime,
+    config: quotedConfig, state: initialState, marketQuotes: { 'BTC-USD': invalid } }), /Invalid execution quote/);
+}
+console.log('MARKET_PRICE_EXECUTION_TESTS_PASSED');

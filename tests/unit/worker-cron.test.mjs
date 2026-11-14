@@ -6,7 +6,7 @@ import { runRoiTick } from '../../worker/roi-cron.js';
 import worker from '../../worker/index.js';
 
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql','0003_user_activity.sql','0008_investment_ledger.sql','0018_traders.sql','0020_copy_trading.sql','0021_roi_cron.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
+for (const file of ['0001_d1_foundation.sql','0003_user_activity.sql','0008_investment_ledger.sql','0018_traders.sql','0020_copy_trading.sql','0021_roi_cron.sql','0025_copy_trade_quote_provenance.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 let failBatch = false;
 class Statement {
   constructor(sql) { this.sql = sql; this.values = []; }
@@ -80,9 +80,12 @@ const status = await worker.fetch(request('status', { authorization: `Bearer ${e
 assert.equal(status.status, 200);
 assert.equal((await status.json()).jobs[0].last_status, 'success');
 assert.equal((await worker.fetch(request('roi?cron_secret=test-only-secret&dry_run=1'), env)).status, 200);
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async () => { throw new Error('Fixture provider unavailable'); };
 const httpCopy = await worker.fetch(request('copy-trading', { 'x-cron-secret': env.CRON_SECRET }, 'POST'), env);
 assert.equal(httpCopy.status, 200, await httpCopy.clone().text());
 assert.equal((await httpCopy.json()).job, 'copy-trading');
+globalThis.fetch = originalFetch;
 assert.equal((await worker.fetch(request('roi', { 'x-cron-secret': env.CRON_SECRET }), env)).status, 200);
 sqlite.close();
 console.log('WORKER_CRON_TESTS_PASSED');

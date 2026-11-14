@@ -14,9 +14,15 @@ import {
   Plus
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatMoney } from '../lib/format';
+import { formatMoney, formatPrice } from '../lib/format';
 import { getMarketStatus, getSessionLabel } from '../lib/session-utils';
 import type { Trader, TradeLog } from '../types';
+
+function formatTradeDate(value: string) {
+  const timestamp = /Z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`;
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, { timeZoneName: 'short' }) : 'Unavailable';
+}
 
 /**
  * Trader Profile Page Component
@@ -280,8 +286,15 @@ export default function TraderProfile() {
                         {Number(trade.quantity).toFixed(4)} {trade.symbol}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Entry: ${Number(trade.entry_price).toFixed(4)} 
-                        {trade.exit_price && ` → Exit: $${Number(trade.exit_price).toFixed(4)}`}
+                        Entry {formatPrice(Number(trade.entry_price))}
+                        {trade.exit_price && ` → Exit ${formatPrice(Number(trade.exit_price))}`}
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-400">
+                        Opened {formatTradeDate(trade.traded_at)}
+                        {trade.closed_at && ` ? Closed ${formatTradeDate(trade.closed_at)}`}
+                      </div>
+                      <div className="mt-1 text-[11px] text-amber-200/70">
+                        {trade.price_basis === 'market' ? `Market-priced simulation ? ${trade.entry_price_source || 'Provider quote'}` : 'Historical simulation ? generated prices'}
                       </div>
                     </div>
                   </div>
@@ -325,13 +338,20 @@ export default function TraderProfile() {
               </div>
               <button type="button" onClick={() => setSelectedTrade(null)} className="text-sm text-gray-400 hover:text-white">Close</button>
             </div>
+            <div className="mt-4 space-y-1 text-xs text-gray-400">
+              <p>Opened {formatTradeDate(selectedTrade.traded_at)}</p>
+              {selectedTrade.closed_at && <p>Closed {formatTradeDate(selectedTrade.closed_at)}</p>}
+              <p>{selectedTrade.price_basis === 'market' ? 'Market-priced simulation. Execution includes spread and slippage.' : 'Historical simulation using generated prices.'}</p>
+              {selectedTrade.entry_quote_at && <p>Entry quote {selectedTrade.entry_price_source} ? {formatTradeDate(selectedTrade.entry_quote_at)}</p>}
+              {selectedTrade.exit_quote_at && <p>Exit quote {selectedTrade.exit_price_source} ? {formatTradeDate(selectedTrade.exit_quote_at)}</p>}
+            </div>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Fees</div><div className="mt-1 font-mono text-white">{formatMoney(Number(selectedTrade.fees || 0))}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit reason</div><div className="mt-1 text-white">{selectedTrade.close_reason?.replaceAll('_', ' ') || (selectedTrade.status === 'OPEN' ? 'Position remains open' : 'Not recorded')}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Side</div><div className="mt-1 font-semibold text-white">{selectedTrade.side}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-semibold text-white">{selectedTrade.status}</div></div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{formatMoney(selectedTrade.entry_price)}</div></div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit price</div><div className="mt-1 font-mono text-white">{selectedTrade.exit_price ? formatMoney(selectedTrade.exit_price) : 'Open'}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{formatPrice(Number(selectedTrade.entry_price))}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit price</div><div className="mt-1 font-mono text-white">{selectedTrade.exit_price ? formatPrice(Number(selectedTrade.exit_price)) : 'Open'}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Quantity</div><div className="mt-1 font-mono text-white">{Number(selectedTrade.quantity).toFixed(4)}</div></div>
               <div className={`rounded-lg border p-3 ${(selectedTrade.pnl || 0) >= 0 ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-xs text-gray-500">Profit / loss</div><div className="mt-1 font-mono text-white">{(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{formatMoney(selectedTrade.pnl || 0)} ({(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{Number(selectedTrade.pnl_percent || 0).toFixed(2)}%)</div></div>
             </div>

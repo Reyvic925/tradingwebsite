@@ -204,7 +204,7 @@ async function listTraderActivity(env, url, table) {
   if (!traderId) return json({ error: 'A valid traderId is required' }, 400);
   const limitValue = Number(url.searchParams.get('limit') || 100);
   const limit = Number.isSafeInteger(limitValue) ? Math.min(Math.max(limitValue, 1), 200) : 100;
-  const order = table === 'trader_history' ? 'snapshot_date DESC' : 'traded_at DESC';
+  const order = table === 'trader_history' ? 'snapshot_date DESC' : 'COALESCE(closed_at, traded_at) DESC, id DESC';
   const result = await env.DB.prepare(`
     SELECT * FROM ${table}
     WHERE trader_id = ?

@@ -220,6 +220,11 @@ export type UserFollow = {
 };
 
 export type TradeLog = {
+  price_basis?: 'market' | 'synthetic';
+  entry_price_source?: string;
+  entry_quote_at?: string;
+  exit_price_source?: string;
+  exit_quote_at?: string;
   fees?: number;
   close_reason?: string;
   id: string;
