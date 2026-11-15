@@ -64,6 +64,10 @@ const profileTrades = await handleTraderRequest(get('/api/trader-trades?traderId
 assert.deepEqual(await profileTrades.json(), []);
 const invalidHistory = await handleTraderRequest(get('/api/trader-history?traderId=bad'), env);
 assert.equal(invalidHistory.status, 400);
+const assets = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XAU-USD', 'EUR-USD', 'GBP-USD', 'SPX500', 'NVDA'];
+db.traders[0].asset_focus = JSON.stringify(assets);
+const expanded = await handleTraderRequest(get('/api/traders?id=21'), env);
+assert.deepEqual((await expanded.json())[0].asset_focus, assets, 'public profiles must expose the full persisted strategy asset list');
 
 const unauthorizedCreate = await handleTraderRequest(new Request('https://example.test/api/traders', {
   method: 'POST',

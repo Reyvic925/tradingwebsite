@@ -19,6 +19,8 @@ assert.equal(valid.is_active, true);
 
 const deduped = normalizeAssetFocus(['GBP', 'EUR', 'GBP', '1']);
 assert.deepEqual(deduped, ['GBP-USD', 'EUR-USD']);
+const multiAsset = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XAU-USD', 'EUR-USD', 'GBP-USD', 'SPX500', 'NVDA'];
+assert.deepEqual(normalizeAssetFocus(multiAsset), multiAsset, 'multi-asset coverage must remain complete and preserve instrument symbols');
 
 assert.throws(() => sanitizeTraderRecord({
   name: 'Extreme Synthetic',

@@ -1,4 +1,7 @@
+import { getCatalogMarket } from '../shared/market-catalog.js';
+
 const DEFAULT_CRYPTO_ASSETS = ['BTC-USD', 'ETH-USD', 'SOL-USD'];
+const LEGACY_INDEX_SYMBOLS = new Set(['SPX500', 'NASDAQ', 'DAX40', 'CAC40']);
 const DEFAULT_FX_ASSETS = ['EUR-USD', 'GBP-USD', 'USD-JPY'];
 const SUSPICIOUS_PLACEHOLDERS = new Set(['', 'N/A', 'NA', 'NULL', 'NONE', '+1', '1', '0']);
 const CRYPTO_TOKENS = new Set(['BTC', 'ETH', 'SOL', 'AVAX', 'BNB', 'MATIC', 'ADA', 'XRP', 'DOGE']);
@@ -20,18 +23,18 @@ export function normalizeAssetFocus(assetFocus = [], fallback = DEFAULT_CRYPTO_A
   for (const item of rawItems) {
     const token = normalizeToken(item);
     if (!token) continue;
-    const canonical = token.includes('-') ? token : `${token}-USD`;
+    const market = getCatalogMarket(token);
+    const listedInstrument = market && !['crypto', 'forex'].includes(market.asset_class);
+    const canonical = token.includes('-') || listedInstrument || LEGACY_INDEX_SYMBOLS.has(token) ? token : `${token}-USD`;
     if (!seen.has(canonical)) {
       seen.add(canonical);
       cleaned.push(canonical);
     }
-    if (cleaned.length >= 6) break;
   }
 
   if (!cleaned.length) return [...fallback];
 
-  const deduped = [...new Set(cleaned)];
-  return deduped.slice(0, 3);
+  return cleaned;
 }
 
 export function validateTraderRecord(trader = {}) {
