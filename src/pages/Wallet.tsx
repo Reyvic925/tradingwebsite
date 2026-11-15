@@ -109,7 +109,7 @@ export default function Wallet() {
           tx_hash: depositTxHash.trim(),
           method: 'manual_crypto',
         });
-        setMsg(`Deposit submitted for manual review. Your wallet is credited only after an administrator verifies the transaction.`);
+        setMsg(`Your deposit has been submitted for verification. Your USD wallet will be credited once the transaction is verified.`);
         setDepositTxHash('');
         await load();
         return;
@@ -265,7 +265,7 @@ export default function Wallet() {
                            </button>
                          </div>
 
-                         <div className="mt-3 text-xs text-stone-500">Network: {selectedNetwork}. Submit the transaction hash after sending; an administrator will verify it before crediting your USD balance.</div>
+                         <div className="mt-3 text-xs text-stone-500">Network: {selectedNetwork}. After sending your deposit, submit the transaction hash for verification. Your USD wallet will be credited once the transaction is verified.</div>
                        </div>
                      );
                    })()
