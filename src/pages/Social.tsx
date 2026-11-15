@@ -537,7 +537,7 @@ export default function Social() {
       if (sortBy === 'drawdown') return Number(first.max_drawdown) - Number(second.max_drawdown);
       if (sortBy === 'return') return Number(second.total_return) - Number(first.total_return);
       if (sortBy === 'winRate') return Number(second.win_rate_trades) - Number(first.win_rate_trades);
-      return Number(second.followers || 0) - Number(first.followers || 0);
+      return Number(second.copiers_current || 0) - Number(first.copiers_current || 0);
     });
   }, [query, sortBy, traders, maxRisk, minTrades, savedOnly, watchlist.ids]);
 

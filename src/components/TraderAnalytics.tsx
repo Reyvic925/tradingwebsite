@@ -27,7 +27,6 @@ export default function TraderAnalytics({ trader, trades, loading, error }: {
     ['Copier profit', metric(trader.profit_for_copiers, formatMoney)],
     ['Performance fee', metric(trader.profit_sharing_fee, percent)],
     ['Lifetime copiers', metric(trader.copiers_all_time, count)],
-    ['Followers', metric(trader.followers, count)],
     ['Risk score', metric(trader.risk_score, value => `${value} / 10`)],
   ];
   const sampleStats = [
@@ -52,6 +51,7 @@ export default function TraderAnalytics({ trader, trades, loading, error }: {
           </div>
         ))}
       </dl>
+      <p className="px-5 pt-4 text-xs text-gray-400 sm:px-6">Current copiers counts users with active or paused allocations. Lifetime copiers counts each recorded user once, including stopped copies.</p>
       <div className="px-5 py-5 sm:px-6">
         <h3 className="text-sm font-medium text-white">Recent trade analytics</h3>
         <p className="mt-1 text-xs text-gray-400">Calculated from the loaded closed trades. P&L uses the recorded trade values.</p>

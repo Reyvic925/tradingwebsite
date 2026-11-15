@@ -9,8 +9,7 @@ const TRADER_FIELDS = [
   'name', 'country', 'avatar_url', 'bio', 'specialty', 'asset_focus',
   'session_type', 'current_equity', 'total_return', 'daily_return',
   'monthly_return', 'total_trades', 'win_rate_trades', 'max_drawdown',
-  'volatility', 'drift', 'risk_score', 'risk_level', 'badge', 'followers',
-  'copiers_current', 'copiers_all_time', 'under_management',
+  'volatility', 'drift', 'risk_score', 'risk_level', 'badge',
   'profit_for_copiers', 'profit_sharing_fee', 'is_active', 'session_start',
   'session_end',
 ];
