@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AppShell from '../components/AppShell';
+import WithdrawalCertificates from '../components/WithdrawalCertificates';
 import OrderDetailModal from '../components/OrderDetailModal';
 import { apiList, asList } from '../lib/api';
 import { formatMoney, formatPrice, timeAgo } from '../lib/format';
@@ -80,6 +81,8 @@ export default function History() {
           </table>
         </div>
       )}
+
+      {tab === 'ledger' && <WithdrawalCertificates refreshKey={txns.filter(t=>t.type==='withdrawal').map(t=>`${t.id}:${t.status}`).join(',')} />}
 
       {tab === 'orders' && (
         <div className="mt-6 overflow-x-auto rounded-md border border-white/5">

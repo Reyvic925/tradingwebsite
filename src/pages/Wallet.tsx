@@ -1,6 +1,7 @@
 ﻿import { useEffect, useEffectEvent, useState, type FormEvent } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import AppShell from '../components/AppShell';
+import WithdrawalCertificates from '../components/WithdrawalCertificates';
 import { apiGet, apiList, apiSend, asList } from '../lib/api';
 import { formatMoney } from '../lib/format';
 import type { Txn, Wallet as WalletT, Profile as ProfileT } from '../types';
@@ -430,6 +431,7 @@ export default function Wallet() {
           </div>
         </div>
       )}
+      <WithdrawalCertificates refreshKey={txns.filter(t=>t.type==='withdrawal').map(t=>`${t.id}:${t.status}`).join(',')} />
     </AppShell>
   );
 }

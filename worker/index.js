@@ -3,6 +3,7 @@ export { TradingEngine } from './trading-engine.js';
 import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
 import { handleAdminUsersRequest } from './admin-users-api.js';
+import { handleWithdrawalCertificates } from './withdrawal-certificates.js';
 import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
@@ -63,6 +64,10 @@ export default {
 
     if (url.pathname.startsWith('/api/auth/')) {
       return handleAuthRequest(request, env);
+    }
+
+    if (url.pathname === '/api/withdrawal-certificates') {
+      return handleWithdrawalCertificates(request, env);
     }
 
     if (url.pathname.startsWith('/api/cron/')) {

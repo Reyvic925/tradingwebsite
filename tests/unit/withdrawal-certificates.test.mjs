@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
+import worker from '../../worker/index.js';
+import {withdrawalCertificateSvg,certificateDate,certificateStatus} from '../../shared/withdrawal-certificate.js';
+const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');
+for(const name of ['0001_d1_foundation.sql','0011_roi_withdrawals.sql'])sql.exec(readFileSync(new URL('../../d1-migrations/'+name,import.meta.url),'utf8'));
+sql.exec('ALTER TABLE transactions ADD COLUMN reviewed_at TEXT');
+const db={prepare(query){return {params:[],bind(...params){this.params=params;return this},async first(){return sql.prepare(query).get(...this.params)||null},async all(){return {results:sql.prepare(query).all(...this.params)}}}}};
+const sessions={};for(const id of ['one','two']){sql.prepare("INSERT INTO auth_users(id,email,password_hash,email_verified_at) VALUES(?,?,'hash',CURRENT_TIMESTAMP)").run(id,id+'@example.test');sql.prepare('INSERT INTO profiles(user_id,full_name) VALUES(?,?)').run(id,id==='one'?'Private Client':'Other Private Client');const token='session-'+id;sessions[id]=token;const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))).toString('base64url');sql.prepare("INSERT INTO auth_sessions(id,user_id,expires_at) VALUES(?,?,'2099-01-01')").run(hash,id);}
+sql.exec("INSERT INTO transactions(user_id,type,amount,currency,status,reference) VALUES('one','withdrawal',1250,'ETH','pending','CRYPTO-REF'),('two','withdrawal',9000,'BTC','approved','PRIVATE-OTHER'),('one','deposit',200,'USD','approved','NOT-A-WITHDRAWAL'); INSERT INTO withdrawals(operation_id,user_id,type,amount,currency,status) VALUES('ROI-REF','one','roi',300,'USD','approved'),('OTHER-REF','two','regular',400,'USD','pending');");
+async function call(params='',id='one',method='GET'){return worker.fetch(new Request('https://app.test/api/withdrawal-certificates'+params,{method,headers:{cookie:id?'apex_session='+sessions[id]:''}}),{DB:db});}
+assert.equal((await call('',null)).status,401);assert.equal((await call('','one','POST')).status,405);
+const response=await call();assert.equal(response.status,200);const page=await response.json();assert.equal(page.items.length,2);assert.equal(page.has_more,false);assert.equal(JSON.stringify(page).includes('PRIVATE-OTHER'),false);assert.equal(JSON.stringify(page).includes('user_id'),false);
+assert.equal((await call('?id=transaction-2')).status,404);assert.equal((await call('?id=request-2')).status,404);assert.equal((await call('?id=transaction-3')).status,404);assert.equal((await call('?id=garbage')).status,400);
+const pending=await(await call('?id=transaction-1')).json();assert.equal(pending.amount,1250);assert.equal(pending.amount_currency,'USD');assert.equal(pending.requested_currency,'ETH');assert.equal(certificateStatus(pending).label,'PENDING REVIEW');
+const svg=withdrawalCertificateSvg(pending);assert.ok(svg.includes('$1,250.00'));assert.ok(svg.includes('PENDING REVIEW'));assert.ok(svg.includes('does not confirm a payment'));assert.equal(svg.includes('Private Client'),false);assert.ok(withdrawalCertificateSvg(pending,true).includes('Private Client'));
+const escaped=withdrawalCertificateSvg({...pending,account_name:'<script>alert("x")</script>',reference:'<svg onload="bad">'},true);assert.equal(escaped.includes('<script>'),false);assert.ok(escaped.includes('&lt;script&gt;'));assert.equal(escaped.includes('<svg onload'),false);
+assert.equal(certificateDate('2026-11-15 11:30:00'),certificateDate('2026-11-15T11:30:00Z'));assert.equal(certificateDate('bad'),'Not recorded');
+const roi=await(await call('?id=request-1')).json();assert.ok(certificateStatus(roi).description.includes('internal account movement'));assert.ok(certificateStatus({...pending,status:'approved'}).description.includes('does not confirm external settlement'));assert.ok(certificateStatus({...pending,status:'completed'}).description.includes('not independently verified'));assert.equal(certificateStatus({...pending,status:'rejected'}).label,'REJECTED');
+sql.exec("UPDATE transactions SET status='rejected' WHERE id=1");assert.equal((await(await call('?id=transaction-1')).json()).status,'rejected','exports refresh the current server record');
+const insert=sql.prepare("INSERT INTO transactions(user_id,type,amount,currency,status) VALUES('one','withdrawal',100,'USD','pending')");for(let n=0;n<52;n++)insert.run();
+const first=await(await call()).json();assert.equal(first.items.length,50);assert.equal(first.has_more,true);const second=await(await call('?offset='+first.next_offset)).json();assert.equal(second.items.length,4);assert.equal(new Set([...first.items,...second.items].map(r=>r.id)).size,54);
+assert.equal(sql.prepare('SELECT sum(amount) amount FROM transactions').get().amount,15650,'certificate reads cannot change ledger amounts');
+sql.close();console.log('WITHDRAWAL_CERTIFICATE_TESTS_PASSED');
