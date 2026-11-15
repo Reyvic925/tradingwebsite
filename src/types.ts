@@ -53,6 +53,7 @@ export type Profile = {
 };
 
 export type Position = {
+  is_test?: boolean;
   id: number | string;
   user_id: string;
   market_id: number;
@@ -76,6 +77,7 @@ export type Position = {
 };
 
 export type Order = {
+  is_test?: boolean;
   id: number | string;
   user_id: string;
   market_id: number;
@@ -220,7 +222,8 @@ export type UserFollow = {
 };
 
 export type TradeLog = {
-  price_basis?: 'market' | 'synthetic';
+  price_basis?: 'market' | 'synthetic' | 'historical_reference';
+  price_review_status?: 'verified' | 'reconstructed' | 'awaiting_history' | 'pending';
   entry_price_source?: string;
   entry_quote_at?: string;
   exit_price_source?: string;
@@ -232,10 +235,10 @@ export type TradeLog = {
   symbol: string;
   side: 'BUY' | 'SELL';
   quantity: number;
-  entry_price: number;
-  exit_price?: number;
-  pnl?: number;
-  pnl_percent?: number;
+  entry_price: number | null;
+  exit_price?: number | null;
+  pnl?: number | null;
+  pnl_percent?: number | null;
   status: 'OPEN' | 'CLOSED';
   traded_at: string;
   closed_at?: string;

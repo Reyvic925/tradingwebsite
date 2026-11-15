@@ -213,7 +213,12 @@ async function listTraderActivity(env, url, table) {
     ORDER BY ${order}
     LIMIT ?
   `).bind(traderId, limit).all();
-  return json(result.results || []);
+  return json((result.results || []).map(row => {
+    if (table === 'trader_trades' && ['pending', 'awaiting_history'].includes(row.price_review_status)) {
+      return { ...row, entry_price: null, exit_price: null, pnl: null, pnl_percent: null };
+    }
+    return row;
+  }));
 }
 
 export async function handleTraderRequest(request, env) {

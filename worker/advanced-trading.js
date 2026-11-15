@@ -4,6 +4,7 @@ import { getCatalogMarket } from '../shared/market-catalog.js';
 import { getInstrument, validPrice, validQuantity, positionPnl, orderPreview } from '../shared/trading-instruments.js';
 import { marketSession, dayExpiry } from '../shared/trading-sessions.js';
 import { tradingCatalog, marketDepth, marketBars } from './trading-market-tools.js';
+import { assertExecutionQuote } from '../shared/execution-quote.js';
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{httpStatus:status});};
@@ -40,6 +41,7 @@ export async function terminalQuote(symbol,{execution=false}={}) {
   if(execution&&!session.open)fail(session.label,409);
   if(execution&&quote.quote_stale)fail('The execution quote is stale. Orders wait for a fresh quote.',503);
   if(execution&&valuationError)fail(valuationError,503);
+  if(execution)assertExecutionQuote(quote,Date.now(),{maxAgeMs:market.asset_class==='crypto'?90000:undefined});
   return result;
 }
 
@@ -104,6 +106,8 @@ async function createOrder(db,userId,body,receivedAt=iso()) {
 }
 
 async function fillOrder(db,userId,order,quote,commissionBps) {
+  const filledAt=iso();
+  assertExecutionQuote(quote,filledAt,{maxAgeMs:quote.instrument.asset_class==='crypto'?90000:undefined});
   const instrument=quote.instrument;
   if(order.intent==='reduce') {
     const position=await db.prepare("SELECT * FROM paper_positions WHERE id = ? AND user_id = ? AND status = 'open'").bind(order.reduce_position_id,userId).first();
@@ -124,15 +128,15 @@ async function fillOrder(db,userId,order,quote,commissionBps) {
       .bind(cash,fee,fee,userId,cash+fee,order.id,userId,order.version,userId),
     db.prepare(`UPDATE paper_orders SET status='filled',filled_price=?,quote_source=?,quote_updated_at=?,filled_at=?,updated_at=CURRENT_TIMESTAMP,version=version+1
       WHERE id=? AND user_id=? AND status IN ('pending','triggered') AND version=? AND changes()=1`)
-      .bind(quote.price,quote.price_source,quote.quote_updated_at,iso(),order.id,userId,order.version),
+      .bind(quote.price,quote.price_source,quote.quote_updated_at,filledAt,order.id,userId,order.version),
     db.prepare(`INSERT INTO paper_positions
       (user_id,market_id,entry_order_id,symbol,side,quantity,initial_quantity,entry_price,current_price,reserved_cash,stop_loss,take_profit,
-       price_source,quote_updated_at,contract_multiplier,quote_currency,quote_to_usd,valuation_version,trailing_percent,trail_reference,fees_paid,realized_pnl)
+       price_source,quote_updated_at,contract_multiplier,quote_currency,quote_to_usd,valuation_version,trailing_percent,trail_reference,fees_paid,realized_pnl,opened_at)
       SELECT user_id,market_id,id,symbol,CASE WHEN side='buy' THEN 'long' ELSE 'short' END,quantity,quantity,?,?,?,stop_loss,take_profit,
-        quote_source,quote_updated_at,?,?,?,2,trailing_percent,?,?,? FROM paper_orders WHERE id=? AND changes()=1`)
-      .bind(quote.price,quote.price,cash,instrument.multiplier,instrument.currency,quote.quote_to_usd,quote.price,fee,-fee,order.id),
-    db.prepare(`INSERT INTO paper_fills (user_id,order_id,position_id,market_id,symbol,fill_type,side,quantity,price,quote_source,quote_updated_at)
-      SELECT o.user_id,o.id,p.id,o.market_id,o.symbol,'entry',o.side,o.quantity,o.filled_price,o.quote_source,o.quote_updated_at
+        quote_source,quote_updated_at,?,?,?,2,trailing_percent,?,?,?,? FROM paper_orders WHERE id=? AND changes()=1`)
+      .bind(quote.price,quote.price,cash,instrument.multiplier,instrument.currency,quote.quote_to_usd,quote.price,fee,-fee,filledAt,order.id),
+    db.prepare(`INSERT INTO paper_fills (user_id,order_id,position_id,market_id,symbol,fill_type,side,quantity,price,quote_source,quote_updated_at,filled_at)
+      SELECT o.user_id,o.id,p.id,o.market_id,o.symbol,'entry',o.side,o.quantity,o.filled_price,o.quote_source,o.quote_updated_at,o.filled_at
       FROM paper_orders o JOIN paper_positions p ON p.entry_order_id=o.id WHERE o.id=? AND changes()=1`).bind(order.id),
   ]);
   if(!batches[0]?.meta?.changes) {
@@ -169,6 +173,8 @@ async function processOrders(db,userId,focusOrderId=null) {
 }
 
 async function reducePosition(db,userId,position,quote,quantity,clientId,commissionBps,order=null) {
+  const filledAt=iso();
+  assertExecutionQuote(quote,filledAt,{maxAgeMs:quote.instrument.asset_class==='crypto'?90000:undefined});
   if(!positive(quantity)||quantity>position.quantity)fail('Close quantity exceeds the remaining position.');
   if(position.valuation_version>=2&&!validQuantity(quantity,getInstrument(position.symbol)))fail('Close quantity does not match the instrument increment.');
   const rate=Number(position.valuation_version)>=2?quote.quote_to_usd:1;
@@ -181,21 +187,21 @@ async function reducePosition(db,userId,position,quote,quantity,clientId,commiss
     db.prepare(`INSERT OR IGNORE INTO paper_reductions(id,user_id,position_id,client_request_id,quantity,released_cash,gross_pnl,fee,net_pnl,created_at)
       SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM paper_positions WHERE id=? AND user_id=? AND status='open' AND version=? AND quantity>=?)
       ${order?"AND EXISTS(SELECT 1 FROM paper_orders WHERE id=? AND status IN ('pending','triggered') AND version=?)":''}`)
-      .bind(id,userId,position.id,clientId,quantity,released,gross,fee,net,iso(),position.id,userId,position.version,quantity,...(order?[order.id,order.version]:[])),
+      .bind(id,userId,position.id,clientId,quantity,released,gross,fee,net,filledAt,position.id,userId,position.version,quantity,...(order?[order.id,order.version]:[])),
     db.prepare(`UPDATE paper_positions SET quantity=?,status=?,current_price=?,unrealized_pnl=?,realized_pnl=COALESCE(realized_pnl,0)+?,
       reserved_cash=MAX(0,reserved_cash-?),fees_paid=fees_paid+?,price_source=?,quote_updated_at=?,quote_to_usd=?,
       closed_at=?,version=version+1 WHERE id=? AND user_id=? AND changes()=1`)
       .bind(remaining>1e-10?remaining:position.quantity,remaining>1e-10?'open':'closed',quote.price,
-        remaining>1e-10?positionPnl({...position,quantity:remaining},quote.price,rate):0,net,released,fee,quote.price_source,quote.quote_updated_at,rate,remaining>1e-10?null:iso(),position.id,userId),
+        remaining>1e-10?positionPnl({...position,quantity:remaining},quote.price,rate):0,net,released,fee,quote.price_source,quote.quote_updated_at,rate,remaining>1e-10?null:filledAt,position.id,userId),
     db.prepare(`UPDATE paper_accounts SET cash_balance=cash_balance+?,reserved_cash=MAX(0,reserved_cash-?),realized_pnl=realized_pnl+?,updated_at=CURRENT_TIMESTAMP
       WHERE user_id=? AND changes()=1`).bind(net,released,net,userId),
   ];
   if(order)statements.push(db.prepare(`UPDATE paper_orders SET status='filled',filled_price=?,quote_source=?,quote_updated_at=?,filled_at=?,version=version+1
-    WHERE id=? AND changes()=1`).bind(quote.price,quote.price_source,quote.quote_updated_at,iso(),order.id));
+    WHERE id=? AND changes()=1`).bind(quote.price,quote.price_source,quote.quote_updated_at,filledAt,order.id));
   else statements.push(db.prepare(`INSERT INTO paper_orders (user_id,market_id,operation_id,symbol,side,type,quantity,status,filled_price,quote_source,quote_updated_at,filled_at,intent)
-    SELECT ?,?,?,?,?,'close',?,'filled',?,?,?,?,'reduce' WHERE changes()=1`).bind(userId,position.market_id,operation,position.symbol,closeSide,quantity,quote.price,quote.price_source,quote.quote_updated_at,iso()));
-  statements.push(db.prepare(`INSERT INTO paper_fills (user_id,order_id,position_id,market_id,symbol,fill_type,side,quantity,price,quote_source,quote_updated_at)
-    SELECT ?,o.id,?,?,?,'close',?, ?,o.filled_price,o.quote_source,o.quote_updated_at FROM paper_orders o WHERE ${order?'o.id=?':'o.operation_id=?'} AND changes()=1`)
+    SELECT ?,?,?,?,?,'close',?,'filled',?,?,?,?,'reduce' WHERE changes()=1`).bind(userId,position.market_id,operation,position.symbol,closeSide,quantity,quote.price,quote.price_source,quote.quote_updated_at,filledAt));
+  statements.push(db.prepare(`INSERT INTO paper_fills (user_id,order_id,position_id,market_id,symbol,fill_type,side,quantity,price,quote_source,quote_updated_at,filled_at)
+    SELECT ?,o.id,?,?,?,'close',?, ?,o.filled_price,o.quote_source,o.quote_updated_at,o.filled_at FROM paper_orders o WHERE ${order?'o.id=?':'o.operation_id=?'} AND changes()=1`)
     .bind(userId,position.id,position.market_id,position.symbol,closeSide,quantity,order?order.id:operation));
   statements.push(db.prepare(`UPDATE paper_orders SET status='cancelled',reject_reason='Linked position is closed.',version=version+1
     WHERE user_id=? AND reduce_position_id=? AND status IN ('pending','triggered')

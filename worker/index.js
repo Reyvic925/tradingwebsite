@@ -14,6 +14,7 @@ import { handleWithdrawalRequest } from './withdrawal-api.js';
 import { handleTraderRequest } from './traders-api.js';
 import { handleCopyRequest } from './copy-trading.js';
 import { handleCronRequest, runCronJob } from './cron.js';
+import { capturePendingHistoricalData } from './historical-capture.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -27,6 +28,7 @@ const pendingMarketResponses = new Map();
 
 export default {
   async scheduled(controller, env, context) {
+    context.waitUntil(capturePendingHistoricalData(env).catch(error => console.warn('[historical-capture]', error.message)));
     context.waitUntil(runPaperTradingTick(env));
     const now = new Date(controller.scheduledTime || Date.now());
     context.waitUntil(runCronJob('copy-trading', env, now));

@@ -135,7 +135,7 @@ export async function handleCopyRequest(request, env) {
   }
 }
 
-export async function runCopyTradingTick(env, now = new Date(), { quoteProvider } = {}) {
+export async function runCopyTradingTick(env, now = new Date(), { quoteProvider, executionClock = () => new Date() } = {}) {
   const db = env.DB;
   const tick = Math.floor(now.getTime() / 300000);
   const at = now.toISOString();
@@ -153,8 +153,9 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider 
     if (simulation.last_tick < tick) {
       const before = JSON.parse(simulation.state);
       const config = JSON.parse(simulation.config);
-      // Finish positions opened on the old synthetic basis before switching price scales.
+      // Historical positions require an audited price repair before market valuation.
       const legacyPosition = before.position && before.priceBasis !== 'market';
+      if (legacyPosition) { summary.quote_unavailable++; continue; }
       let marketQuotes;
       if (!legacyPosition) {
         const assets = [...new Set([...config.assets, ...(before.position ? [before.position.symbol] : [])])];
@@ -167,7 +168,15 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider 
           continue;
         }
       }
-      const result = simulateTick({ marketQuotes, traderId: trader.id, tickId: tick, timestamp: at, config: { ...config, tradingEnabled: Boolean(trader.is_active) && !legacyPosition }, state: before });
+      const executionAt = executionClock().toISOString();
+      let result;
+      try {
+        result = simulateTick({ marketQuotes, traderId: trader.id, tickId: tick, timestamp: executionAt, config: { ...config, tradingEnabled: Boolean(trader.is_active) }, state: before });
+      } catch (error) {
+        if (!/execution quote|position quote/.test(error.message)) throw error;
+        summary.quote_unavailable++;
+        continue;
+      }
       const change = before.equity > 0 ? (result.state.equity - before.equity) / before.equity : 0;
       const guard = 'EXISTS (SELECT 1 FROM copy_simulation_state WHERE trader_id=? AND last_tick=?)';
       const guardArgs = [trader.id, simulation.last_tick];
@@ -178,12 +187,13 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider 
       const markedTrade = position ? { ...position, pnl: openPnl, pnl_percent: openPnl / position.equity_at_entry * 100, fees: position.entry_fee } : null;
       for (const trade of [result.trade || markedTrade].filter(Boolean)) {
         batch.push(statement(db, `INSERT INTO trader_trades
-          (trader_id,event_id,symbol,side,quantity,entry_price,exit_price,pnl,pnl_percent,status,traded_at,closed_at,fees,close_reason,price_basis,entry_price_source,entry_quote_at,exit_price_source,exit_quote_at)
-          SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard}
+          (trader_id,event_id,symbol,side,quantity,entry_price,exit_price,pnl,pnl_percent,status,traded_at,closed_at,fees,close_reason,price_basis,entry_price_source,entry_quote_at,exit_price_source,exit_quote_at,price_review_status)
+          SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard}
           ON CONFLICT(event_id) WHERE event_id IS NOT NULL DO UPDATE SET exit_price=excluded.exit_price,pnl=excluded.pnl,
-            pnl_percent=excluded.pnl_percent,status=excluded.status,closed_at=excluded.closed_at,fees=excluded.fees,close_reason=excluded.close_reason,exit_price_source=excluded.exit_price_source,exit_quote_at=excluded.exit_quote_at`,
+            pnl_percent=excluded.pnl_percent,status=excluded.status,closed_at=excluded.closed_at,fees=excluded.fees,close_reason=excluded.close_reason,exit_price_source=excluded.exit_price_source,exit_quote_at=excluded.exit_quote_at,price_review_status=excluded.price_review_status`,
           trader.id, trade.event_id, trade.symbol, trade.side, trade.quantity, trade.entry_price, trade.exit_price ?? null,
-          trade.pnl ?? 0, trade.pnl_percent ?? 0, trade.status, trade.traded_at, trade.closed_at ?? null, trade.fees || 0, trade.close_reason || null, trade.price_basis || 'synthetic', trade.entry_price_source || null, trade.entry_quote_at || null, trade.exit_price_source || null, trade.exit_quote_at || null, ...guardArgs));
+          trade.pnl ?? 0, trade.pnl_percent ?? 0, trade.status, trade.traded_at, trade.closed_at ?? null, trade.fees || 0, trade.close_reason || null, trade.price_basis || 'synthetic', trade.entry_price_source || null, trade.entry_quote_at || null, trade.exit_price_source || null, trade.exit_quote_at || null,
+          trade.price_basis === 'market' ? 'verified' : trade.price_basis === 'historical_reference' ? 'reconstructed' : 'pending', ...guardArgs));
       }
       batch.push(statement(db, `INSERT INTO trader_history (trader_id,snapshot_date,equity,daily_return)
         SELECT ?,?,?,? WHERE ${guard} ON CONFLICT(trader_id,snapshot_date) DO UPDATE SET equity=excluded.equity,daily_return=excluded.daily_return`,

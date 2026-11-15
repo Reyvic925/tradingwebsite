@@ -218,6 +218,7 @@ async function listPositions(request, db, userId) {
     const { quote_asset_class: _quoteAssetClass, ...row } = position;
     return {
       ...row,
+      is_test: /^PAPERQA\d+$/.test(position.symbol),
       current_price: price,
       pnl,
       price_source: quote?.price_source || 'Last position mark',
@@ -235,7 +236,7 @@ async function listOrders(db, userId) {
     ORDER BY id DESC
     LIMIT 100
   `).bind(userId).all();
-  return json(result.results || []);
+  return json((result.results || []).map(order => ({ ...order, is_test: /^PAPERQA\d+$/.test(order.symbol) })));
 }
 
 function nullablePositiveNumber(value, field) {

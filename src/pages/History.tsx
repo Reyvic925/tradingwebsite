@@ -5,6 +5,13 @@ import { apiList, asList } from '../lib/api';
 import { formatMoney, formatPrice, timeAgo } from '../lib/format';
 import type { Order, Position, Txn } from '../types';
 
+function recordedTime(value?: string) {
+  if (!value) return 'Unavailable';
+  const normalized = /Z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`;
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, { timeZoneName: 'short' }) : 'Unavailable';
+}
+
 export default function History() {
   const [tab, setTab] = useState<'ledger' | 'orders' | 'closed'>('ledger');
   const [txns, setTxns] = useState<Txn[]>([]);
@@ -48,7 +55,7 @@ export default function History() {
       {error && <div className="mt-4 text-sm text-rose-300">{error}</div>}
 
       {tab === 'ledger' && (
-        <div className="mt-6 overflow-hidden rounded-md border border-white/5">
+        <div className="mt-6 overflow-x-auto rounded-md border border-white/5">
           <table className="w-full text-left text-sm">
             <thead className="text-[10px] uppercase tracking-widest text-stone-500">
               <tr>
@@ -75,7 +82,7 @@ export default function History() {
       )}
 
       {tab === 'orders' && (
-        <div className="mt-6 overflow-hidden rounded-md border border-white/5">
+        <div className="mt-6 overflow-x-auto rounded-md border border-white/5">
           <table className="w-full text-left text-sm">
             <thead className="text-[10px] uppercase tracking-widest text-stone-500">
               <tr>
@@ -84,16 +91,18 @@ export default function History() {
                 <th className="px-3 py-3">Qty</th>
                 <th className="px-3 py-3">Price</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Recorded at</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="border-t border-white/5 hover:bg-white/2 cursor-pointer" onClick={() => setSelectedOrder(o.id)}>
-                  <td className="px-5 py-3 font-mono">{o.symbol}</td>
+                  <td className="px-5 py-3 font-mono">{o.symbol}{o.is_test && <span className="mt-1 block text-[10px] text-amber-200">Test instrument</span>}</td>
                   <td className="px-3 py-3 uppercase">{o.side}</td>
                   <td className="px-3 py-3 font-mono">{o.quantity}</td>
                   <td className="px-3 py-3 font-mono">{formatPrice(Number(o.filled_price || o.price))}</td>
                   <td className="px-5 py-3 capitalize">{o.status}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-xs text-stone-400">{recordedTime(o.created_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -102,7 +111,7 @@ export default function History() {
       )}
 
       {tab === 'closed' && (
-        <div className="mt-6 overflow-hidden rounded-md border border-white/5">
+        <div className="mt-6 overflow-x-auto rounded-md border border-white/5">
           <table className="w-full text-left text-sm">
             <thead className="text-[10px] uppercase tracking-widest text-stone-500">
               <tr>
@@ -110,15 +119,17 @@ export default function History() {
                 <th className="px-3 py-3">Side</th>
                 <th className="px-3 py-3">Entry / Exit</th>
                 <th className="px-5 py-3">P&L</th>
+                <th className="px-5 py-3">Opened / closed</th>
               </tr>
             </thead>
             <tbody>
               {closed.map((p) => (
                 <tr key={p.id} className="border-t border-white/5">
-                  <td className="px-5 py-3 font-mono">{p.symbol}</td>
+                  <td className="px-5 py-3 font-mono">{p.symbol}{p.is_test && <span className="mt-1 block text-[10px] text-amber-200">Test instrument</span>}</td>
                   <td className="px-3 py-3 uppercase">{p.side}</td>
                   <td className="px-3 py-3 font-mono text-xs">{formatPrice(Number(p.entry_price))} → {formatPrice(Number(p.current_price))}</td>
                   <td className={`px-5 py-3 font-mono ${Number(p.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(Number(p.pnl))}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-xs text-stone-400">{recordedTime(p.opened_at || p.created_at)}<br />{recordedTime(p.closed_at)}</td>
                 </tr>
               ))}
             </tbody>

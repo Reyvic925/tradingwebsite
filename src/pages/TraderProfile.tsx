@@ -21,10 +21,18 @@ import { formatMoney, formatPrice } from '../lib/format';
 import { getMarketStatus, getSessionLabel } from '../lib/session-utils';
 import type { Trader, TradeLog } from '../types';
 
+function recordedPrice(value: number | null | undefined) {
+  return value == null ? 'Unavailable' : formatPrice(Number(value));
+}
+
 function formatTradeDate(value: string) {
   const timestamp = /Z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`;
   const date = new Date(timestamp);
   return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, { timeZoneName: 'short' }) : 'Unavailable';
+}
+
+function formatPriceReference(value: string, source?: string) {
+  return source?.includes('daily close reference') ? `${value.slice(0, 10)} (daily reference, UTC date)` : formatTradeDate(value);
 }
 
 /**
@@ -295,25 +303,25 @@ export default function TraderProfile() {
                         {Number(trade.quantity).toFixed(4)} {trade.symbol}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Entry {formatPrice(Number(trade.entry_price))}
-                        {trade.exit_price && ` → Exit ${formatPrice(Number(trade.exit_price))}`}
+                        Entry {recordedPrice(trade.entry_price)}
+                        {trade.exit_price && ` → Exit ${recordedPrice(trade.exit_price)}`}
                       </div>
                       <div className="mt-1 text-[11px] text-gray-400">
                         Opened {formatTradeDate(trade.traded_at)}
-                        {trade.closed_at && ` ? Closed ${formatTradeDate(trade.closed_at)}`}
+                        {trade.closed_at && ` | Closed ${formatTradeDate(trade.closed_at)}`}
                       </div>
                       <div className="mt-1 text-[11px] text-amber-200/70">
-                        {trade.price_basis === 'market' ? `Market-priced simulation ? ${trade.entry_price_source || 'Provider quote'}` : 'Historical simulation ? generated prices'}
+                        {trade.price_review_status === 'pending' || trade.price_review_status === 'awaiting_history' ? 'Historical price verification pending' : trade.price_basis === 'historical_reference' ? `Historical market reference | ${trade.entry_price_source}` : `Market-priced simulation | ${trade.entry_price_source || 'Provider quote'}`}
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <div className={`text-sm font-bold ${isProfitable ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {isProfitable ? '+' : ''}{formatMoney(trade.pnl || 0)}
+                      {trade.pnl == null ? 'Unavailable' : `${isProfitable ? '+' : ''}${formatMoney(trade.pnl)}`}
                     </div>
                     <div className={`text-xs ${isProfitable ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {isProfitable ? '+' : ''}{Number(trade.pnl_percent || 0).toFixed(2)}%
+                      {trade.pnl_percent == null ? 'Unavailable' : `${isProfitable ? '+' : ''}${Number(trade.pnl_percent).toFixed(2)}%`}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {trade.status === 'CLOSED' ? 'Closed' : 'Open'}
@@ -350,19 +358,19 @@ export default function TraderProfile() {
             <div className="mt-4 space-y-1 text-xs text-gray-400">
               <p>Opened {formatTradeDate(selectedTrade.traded_at)}</p>
               {selectedTrade.closed_at && <p>Closed {formatTradeDate(selectedTrade.closed_at)}</p>}
-              <p>{selectedTrade.price_basis === 'market' ? 'Market-priced simulation. Execution includes spread and slippage.' : 'Historical simulation using generated prices.'}</p>
-              {selectedTrade.entry_quote_at && <p>Entry quote {selectedTrade.entry_price_source} ? {formatTradeDate(selectedTrade.entry_quote_at)}</p>}
-              {selectedTrade.exit_quote_at && <p>Exit quote {selectedTrade.exit_price_source} ? {formatTradeDate(selectedTrade.exit_quote_at)}</p>}
+              <p>{['pending', 'awaiting_history'].includes(selectedTrade.price_review_status || '') ? 'Dated historical prices are awaiting verification.' : selectedTrade.price_basis === 'historical_reference' ? 'Historical reference reconstructed from dated provider candles.' : 'Market-priced simulation. Execution includes spread and slippage.'}</p>
+              {selectedTrade.entry_quote_at && <p>Entry reference {selectedTrade.entry_price_source} | {formatPriceReference(selectedTrade.entry_quote_at, selectedTrade.entry_price_source)}</p>}
+              {selectedTrade.exit_quote_at && <p>Exit reference {selectedTrade.exit_price_source} | {formatPriceReference(selectedTrade.exit_quote_at, selectedTrade.exit_price_source)}</p>}
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Fees</div><div className="mt-1 font-mono text-white">{formatMoney(Number(selectedTrade.fees || 0))}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit reason</div><div className="mt-1 text-white">{selectedTrade.close_reason?.replaceAll('_', ' ') || (selectedTrade.status === 'OPEN' ? 'Position remains open' : 'Not recorded')}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Side</div><div className="mt-1 font-semibold text-white">{selectedTrade.side}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Status</div><div className="mt-1 font-semibold text-white">{selectedTrade.status}</div></div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{formatPrice(Number(selectedTrade.entry_price))}</div></div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit price</div><div className="mt-1 font-mono text-white">{selectedTrade.exit_price ? formatPrice(Number(selectedTrade.exit_price)) : 'Open'}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Entry price</div><div className="mt-1 font-mono text-white">{recordedPrice(selectedTrade.entry_price)}</div></div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Exit price</div><div className="mt-1 font-mono text-white">{selectedTrade.exit_price != null ? recordedPrice(selectedTrade.exit_price) : selectedTrade.status === 'CLOSED' ? 'Unavailable' : 'Open'}</div></div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3"><div className="text-xs text-gray-500">Quantity</div><div className="mt-1 font-mono text-white">{Number(selectedTrade.quantity).toFixed(4)}</div></div>
-              <div className={`rounded-lg border p-3 ${(selectedTrade.pnl || 0) >= 0 ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-xs text-gray-500">Profit / loss</div><div className="mt-1 font-mono text-white">{(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{formatMoney(selectedTrade.pnl || 0)} ({(selectedTrade.pnl || 0) >= 0 ? '+' : ''}{Number(selectedTrade.pnl_percent || 0).toFixed(2)}%)</div></div>
+              <div className={`rounded-lg border p-3 ${(selectedTrade.pnl || 0) >= 0 ? 'border-emerald-400/20 bg-emerald-400/5' : 'border-rose-400/20 bg-rose-400/5'}`}><div className="text-xs text-gray-500">Profit / loss</div><div className="mt-1 font-mono text-white">{selectedTrade.pnl == null ? 'Unavailable' : `${selectedTrade.pnl >= 0 ? '+' : ''}${formatMoney(selectedTrade.pnl)} (${Number(selectedTrade.pnl_percent || 0).toFixed(2)}%)`}</div></div>
             </div>
           </div>
         </div>

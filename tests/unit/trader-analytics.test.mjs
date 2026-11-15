@@ -49,7 +49,7 @@ assert.equal(preview.fee, 40);
 assert.equal(preview.value, 1160);
 
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql', '0026_trader_watchlists.sql']) {
+for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql', '0026_trader_watchlists.sql']) {
   sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 }
 class Statement {

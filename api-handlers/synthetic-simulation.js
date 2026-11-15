@@ -1,3 +1,5 @@
+import { assertExecutionQuote } from '../shared/execution-quote.js';
+
 const ASSET_SPECS = {
   'BTC-USD': { basePrice: 43200, volatility: 0.012, drift: 0.0008, correlation: 'crypto' },
   'ETH-USD': { basePrice: 2280, volatility: 0.014, drift: 0.0007, correlation: 'crypto' },
@@ -153,11 +155,8 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     if (marketBacked) {
       const quote = marketQuotes[asset];
       if (!quote) continue;
-      const quoteAt = Date.parse(quote.quote_updated_at);
-      const age = Date.parse(timestamp) - quoteAt;
-      if (!Number.isFinite(quote.price) || quote.price <= 0 || !Number.isFinite(age) || age < -60000 || age > 20 * 60000 || quote.quote_stale || !quote.price_source) {
-        throw new Error(`Invalid execution quote for ${asset}`);
-      }
+      try { assertExecutionQuote(quote, timestamp, { maxAgeMs: spec.correlation === 'crypto' ? 90000 : undefined }); }
+      catch { throw new Error(`Invalid execution quote for ${asset}`); }
       nextPrices[asset] = quote.price;
       const previous = Number(previousPrices[asset]);
       marketMoves[asset] = previous > 0 ? quote.price / previous - 1 : 0;

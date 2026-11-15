@@ -1,4 +1,5 @@
 import { getCatalogMarket } from '../shared/market-catalog.js';
+import { assertExecutionQuote } from '../shared/execution-quote.js';
 // Keyless public feeds. Never blend provider prices with seeded or random values.
 const cache = new Map();
 const pending = new Map();
@@ -124,6 +125,7 @@ export async function getMarketQuote(market, { forTrading = false, maxCacheMs } 
   }
   const quote = entry.value ? validate(entry.value) : null;
   if (forTrading && (!quote || quote.quote_stale)) throw new Error(`A fresh provider quote is unavailable for ${symbol}.`);
+  if (forTrading) assertExecutionQuote(quote, Date.now(), { maxAgeMs: assetClass === 'crypto' ? 90000 : undefined });
   if (forTrading && quote.quote_tradable === false) throw new Error(`Quotes for ${symbol} are in ${quote.quote_currency}; USD settlement is not supported.`);
   return quote;
 }
