@@ -2,6 +2,7 @@ import { quoteMarkets } from './market-quotes.js';
 export { TradingEngine } from './trading-engine.js';
 import { handleAuthRequest } from './auth.js';
 import { handleAccountRequest } from './account-api.js';
+import { handleAdminUsersRequest } from './admin-users-api.js';
 import { handleAdminCryptoRequest } from './admin-crypto-api.js';
 import { handleDepositRequest } from './deposit-api.js';
 import { handleKycRequest } from './kyc-api.js';
@@ -66,6 +67,10 @@ export default {
 
     if (url.pathname.startsWith('/api/cron/')) {
       return handleCronRequest(request, env);
+    }
+
+    if (url.pathname === '/api/admin/users' || url.pathname.startsWith('/api/admin/users/')) {
+      return handleAdminUsersRequest(request, env);
     }
 
     if (['/api/copy-trades', '/api/copy-summary', '/api/copy-activity'].includes(url.pathname)) {

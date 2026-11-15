@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, FileText, ShieldCheck, Wallet, Search } from 'lucide-react';
 import AdminShell from '../components/AdminShell';
 import { authHeaders } from '../lib/api';
@@ -42,6 +42,8 @@ export default function AdminUsers() {
   const [balanceAmount, setBalanceAmount] = useState('');
   const [balanceReason, setBalanceReason] = useState('');
   const [balanceBusy, setBalanceBusy] = useState(false);
+  const [balances, setBalances] = useState<{currency:string;available:number;reserved:number;locked_balance:number}[]>([]);
+  const adjustment = useRef<{fingerprint:string;id:string}|null>(null);
 
   async function fetchUsers() {
     setLoading(true);
@@ -78,13 +80,16 @@ export default function AdminUsers() {
     try {
       const headers = await authHeaders();
       headers['Content-Type'] = 'application/json';
+      const fingerprint = JSON.stringify([selectedUser.user_id,balanceAction,amount,balanceReason]);
+      if (adjustment.current?.fingerprint !== fingerprint) adjustment.current = {fingerprint,id:crypto.randomUUID()};
       const res = await fetch(`/api/admin/users/${selectedUser.user_id}/balance`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ action: balanceAction, amount, currency: 'USD', reason: balanceReason }),
+        body: JSON.stringify({ action: balanceAction, amount, currency: 'USD', reason: balanceReason, request_id: adjustment.current.id }),
       });
       const data = await readJsonOrText(res);
       if (!res.ok) throw new Error(data?.error || 'Balance adjustment failed');
+      adjustment.current = null;
       setBalanceAmount('');
       setBalanceReason('');
       await loadUserDetails(selectedUser.user_id);
@@ -98,6 +103,9 @@ export default function AdminUsers() {
 
   async function loadUserDetails(userId: string) {
     setSelectedUserId(userId);
+    setBalances([]);
+    setWallets([]);
+    setKycDocs([]);
     const row = rows.find((r) => r.user_id === userId) || null;
     setSelectedUser(row);
 
@@ -105,7 +113,7 @@ export default function AdminUsers() {
       const headers = await authHeaders();
       const [kycRes, walletsRes] = await Promise.all([
         fetch(`/api/admin/users/${userId}/kyc`, { headers }),
-        fetch(`/api/wallets/admin/${userId}`, { headers }),
+        fetch(`/api/admin/users/${userId}/wallets`, { headers }),
       ]);
       const kycData = await readJsonOrText(kycRes);
       const walletData = await readJsonOrText(walletsRes);
@@ -117,17 +125,19 @@ export default function AdminUsers() {
         currency: value?.currency || key,
         network: value?.network || '—',
         address: value?.address || '—',
-        hasPrivateKey: Boolean(value?.privateKey),
-        hasMnemonic: Boolean(value?.mnemonic),
+        hasPrivateKey: Boolean(value?.hasPrivateKey ?? value?.privateKey),
+        hasMnemonic: Boolean(value?.hasMnemonic ?? value?.mnemonic),
         privateKey: value?.privateKey || null,
         mnemonic: value?.mnemonic || null,
         error: value?.error || null,
       }));
       setWallets(flatWallets);
+      setBalances(walletData?.balances || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load user details');
       setKycDocs([]);
       setWallets([]);
+      setBalances([]);
     }
   }
 
@@ -271,6 +281,7 @@ export default function AdminUsers() {
                 </button>
               </div>
 
+              <div className="space-y-2">{balances.map(balance => <div key={balance.currency} className="rounded-sm border border-white/10 p-3 text-xs text-stone-300"><div>{balance.currency} wallet</div><div className="mt-1 font-mono">Available: {Number(balance.available).toFixed(2)}</div><div className="mt-1 text-stone-500">Reserved: {Number(balance.reserved).toFixed(2)} / Locked: {Number(balance.locked_balance).toFixed(2)}</div></div>)}</div>
               <div>
                 <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-stone-500">KYC submissions</div>
                 {kycDocs.length ? (
