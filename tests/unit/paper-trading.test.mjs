@@ -1,3 +1,4 @@
+import { tradingSnapshot } from '../../worker/advanced-trading.js';
 import { clearQuoteCache } from '../../worker/market-quotes.js';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -37,11 +38,14 @@ class D1TestDatabase {
     this.sqlite.exec(`
       CREATE TABLE auth_users (id TEXT PRIMARY KEY, email TEXT, created_at TEXT, email_verified_at TEXT);
       CREATE TABLE auth_sessions (id TEXT PRIMARY KEY, user_id TEXT, expires_at TEXT);
+      CREATE TABLE wallets(user_id TEXT,currency TEXT DEFAULT 'USD',available REAL DEFAULT 0,reserved REAL DEFAULT 0,locked_balance REAL DEFAULT 0,UNIQUE(user_id,currency));
       CREATE TABLE markets (id INTEGER PRIMARY KEY, symbol TEXT, name TEXT, asset_class TEXT,
         price REAL, change_24h REAL, volume REAL, high_24h REAL, low_24h REAL);
     `);
     this.sqlite.exec(readFileSync(new URL('../../d1-migrations/0017_paper_trading_ledger.sql', import.meta.url), 'utf8'));
     this.sqlite.exec(readFileSync(new URL('../../d1-migrations/0023_advanced_paper_trading.sql', import.meta.url), 'utf8'));
+    this.sqlite.exec("INSERT INTO auth_users(id,email) VALUES('legacy-demo','legacy@example.test'); INSERT INTO paper_accounts(user_id,cash_balance,realized_pnl) VALUES('legacy-demo',99480.94,-519.06);");
+    this.sqlite.exec(readFileSync(new URL('../../d1-migrations/0030_wallet_funded_trading.sql', import.meta.url), 'utf8'));
   }
 
   prepare(sql) {
@@ -101,10 +105,19 @@ const request = (path, userId, method = 'GET', body) => new Request(`https://app
 });
 
 try {
+  const legacy=await tradingSnapshot(db,'legacy-demo');
+  assert.equal(legacy.account.available_cash,0,'legacy demo cash cannot fund the active account');
+  assert.equal(legacy.account.realized_pnl,0,'demo P&L cannot become funded P&L');
+  assert.equal(db.sqlite.prepare("SELECT cash_balance FROM paper_accounts WHERE user_id='legacy-demo'").get().cash_balance,99480.94,'original demo history is preserved');
+  assert.throws(()=>db.sqlite.exec("UPDATE paper_accounts SET cash_balance=100000 WHERE user_id='legacy-demo'"),/archived/);
+  assert.throws(()=>db.sqlite.exec("INSERT INTO paper_accounts(user_id) VALUES('paper-user-a')"),/disabled/);
   const accountA = await (await handlePaperTradingRequest(request('/api/paper/account', userIds[0]), env)).json();
   const accountB = await (await handlePaperTradingRequest(request('/api/paper/account', userIds[1]), env)).json();
-  assert.equal(accountA.initial_cash, 100000);
-  assert.equal(accountB.initial_cash, 100000);
+  assert.equal(accountA.initial_cash, 0);
+  assert.equal(accountA.available_cash, 0, 'new accounts receive no demo credit');
+  assert.equal((await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {market_id:1,side:'buy',type:'market',quantity:1}),env)).status,400,'unfunded wallets cannot trade');
+  for(const id of userIds)db.sqlite.prepare("INSERT INTO wallets(user_id,currency,available) VALUES (?,'USD',100000) ON CONFLICT(user_id,currency) DO UPDATE SET available=100000").run(id);
+  assert.equal(accountB.initial_cash, 0);
 
   const marketBuy = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
     market_id: 1, side: 'buy', type: 'market', quantity: 1,
@@ -148,7 +161,7 @@ try {
   await runPaperTradingTick(env);
   const limitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(limitOrders.find((order) => order.type === 'limit').status, 'filled');
-  const limitPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
+  const limitPosition = db.sqlite.prepare("SELECT * FROM funded_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
   await handlePaperTradingRequest(request('/api/paper/positions', userIds[0], 'DELETE', { id: limitPosition.id }), env);
 
   const stop = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
@@ -159,7 +172,7 @@ try {
   await runPaperTradingTick(env);
   const stopOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopOrders.find((order) => order.type === 'stop').status, 'filled');
-  const stopPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
+  const stopPosition = db.sqlite.prepare("SELECT * FROM funded_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
   await handlePaperTradingRequest(request('/api/paper/positions', userIds[0], 'DELETE', { id: stopPosition.id }), env);
 
   setMarketPrice(100);
@@ -175,7 +188,7 @@ try {
   await runPaperTradingTick(env);
   const stopLimitOrders = await (await handlePaperTradingRequest(request('/api/paper/orders', userIds[0]), env)).json();
   assert.equal(stopLimitOrders.find((order) => order.type === 'stop_limit').status, 'filled');
-  const stopLimitPosition = db.sqlite.prepare("SELECT * FROM paper_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
+  const stopLimitPosition = db.sqlite.prepare("SELECT * FROM funded_positions WHERE user_id = ? AND status = 'open'").get(userIds[0]);
   await handlePaperTradingRequest(request('/api/paper/positions', userIds[0], 'DELETE', { id: stopLimitPosition.id }), env);
 
   const protectedOrder = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
@@ -186,7 +199,7 @@ try {
   await runPaperTradingTick(env);
   const afterTakeProfit = await (await handlePaperTradingRequest(request('/api/paper/positions', userIds[0]), env)).json();
   assert.equal(afterTakeProfit.length, 0);
-  const autoClosed = db.sqlite.prepare("SELECT status, realized_pnl FROM paper_positions WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(userIds[0]);
+  const autoClosed = db.sqlite.prepare("SELECT status, realized_pnl FROM funded_positions WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(userIds[0]);
   assert.equal(autoClosed.status, 'closed');
   assert.equal(autoClosed.realized_pnl, 1);
 
@@ -196,13 +209,13 @@ try {
   assert.equal((await scheduledLimit.json()).status, 'pending');
   setMarketPrice(94);
   await runPaperTradingTick(env);
-  const scheduledOrders = await db.prepare('SELECT status FROM paper_orders WHERE user_id = ? AND type = ?')
+  const scheduledOrders = await db.prepare('SELECT status FROM funded_orders WHERE user_id = ? AND type = ?')
     .bind(userIds[1], 'limit').all();
   assert.equal(scheduledOrders.results[0].status, 'filled');
 
   assert.ok(externalFetchCalls > 0, 'paper trading must fetch provider prices');
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[0]).count, 10);
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_fills WHERE user_id = ?').get(userIds[1]).count, 1);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM funded_fills WHERE user_id = ?').get(userIds[0]).count, 10);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM funded_fills WHERE user_id = ?').get(userIds[1]).count, 1);
   clearQuoteCache();
   db.sqlite.prepare('INSERT INTO markets (id, symbol, name, asset_class, price) VALUES (2, ?, ?, ?, ?)')
     .run('FLT12', 'FLT12 Holdings', 'stock', 1);
@@ -217,12 +230,12 @@ try {
   }), env);
   assert.equal(nativeCurrency.status, 400, 'quotes-only markets cannot create unsettled USD orders');
   globalThis.fetch = async () => new Response('', { status: 429 });
-  const beforeOutage = db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_orders').get().count;
+  const beforeOutage = db.sqlite.prepare('SELECT COUNT(*) AS count FROM funded_orders').get().count;
   const unavailable = await handlePaperTradingRequest(request('/api/paper/orders', userIds[0], 'POST', {
     market_id: 1, side: 'buy', type: 'market', quantity: 1,
   }), env);
   assert.equal(unavailable.status, 503);
-  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM paper_orders').get().count, beforeOutage,
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS count FROM funded_orders').get().count, beforeOutage,
     'provider outage must not place an order or use the seeded D1 price');
   console.log('PAPER_TRADING_TESTS_PASSED');
 } finally {

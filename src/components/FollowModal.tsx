@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { formatMoney, formatPct } from '../lib/format';
 import type { Trader } from '../types';
@@ -74,7 +75,7 @@ export default function FollowModal({ trader, isOpen, availableBalance, onClose,
         </div>
 
         <div className="mb-6 p-4 rounded-lg bg-white/5 border border-white/10">
-          <div className="text-sm text-gray-400 mb-1">Available balance</div>
+          <div className="text-sm text-gray-400 mb-1">Available USD balance</div>
           <div className="text-2xl font-bold text-emerald-400">
             {formatMoney(availableBalance)}
           </div>
@@ -85,6 +86,7 @@ export default function FollowModal({ trader, isOpen, availableBalance, onClose,
           </div>
         </div>
 
+        {availableBalance < 100 && <p role="status" className="mb-4 text-sm text-amber-200">A minimum of $100 in your USD wallet is required. <Link to="/app/wallet" onClick={onClose} className="underline">Deposit funds</Link></p>}
         <div className="space-y-4">
           <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-100">
             Copying stays active until you stop it or a risk limit closes it. There is no fixed term or maturity date.
@@ -96,16 +98,17 @@ export default function FollowModal({ trader, isOpen, availableBalance, onClose,
             </label>
             <input
               type="range"
-              min="100"
+              min={availableBalance < 100 ? 0 : 100}
+              disabled={availableBalance < 100}
               max={Math.max(100, availableBalance)}
               step="0.01"
               value={allocation}
               onChange={(e) => setAllocation(Number(e.target.value))}
               className="w-full"
             />
-            <input aria-label="Allocation amount" type="number" min="100" max={availableBalance} step="0.01" value={allocation} onChange={event => setAllocation(Number(event.target.value))} className="mt-2 w-full rounded border border-white/10 bg-black/30 p-2 text-sm" />
+            <input aria-label="Allocation amount" type="number" disabled={availableBalance < 100} min="100" max={availableBalance} step="0.01" value={allocation} onChange={event => setAllocation(Number(event.target.value))} className="mt-2 w-full rounded border border-white/10 bg-black/30 p-2 text-sm" />
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>$100</span>
+              <span>Minimum: $100</span>
               <span>{formatMoney(availableBalance)}</span>
             </div>
           </div>
