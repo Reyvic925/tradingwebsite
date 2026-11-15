@@ -57,7 +57,7 @@ assert(closed.every(trade => Date.parse(trade.closed_at) > Date.parse(trade.trad
 console.log('SYNTHETIC SIMULATION OK');
 
 // Market execution must use timestamped quotes without synthetic price drift.
-const quotedConfig = { ...config, session: 'crypto', spreadBps: 0, slippageBps: 0, feeBps: 0 };
+const quotedConfig = { ...config, minimumSignalBps: 0, session: 'crypto', spreadBps: 0, slippageBps: 0, feeBps: 0 };
 const quoteTime = '2026-11-14T12:00:00.000Z';
 const quote = { price: 96321.45, quote_updated_at: quoteTime, price_source: 'Fixture exchange', quote_stale: false };
 let marketState = { ...initialState, prices: { 'BTC-USD': 43200 } };
@@ -88,3 +88,29 @@ for (const invalid of [{ ...quote, quote_stale: true }, { ...quote, price: 0 },
     config: quotedConfig, state: initialState, marketQuotes: { 'BTC-USD': invalid } }), /Invalid execution quote/);
 }
 console.log('MARKET_PRICE_EXECUTION_TESTS_PASSED');
+
+let noSignalState = { ...initialState, priceBasis: 'market', prices: { 'BTC-USD': quote.price }, signals: { 'BTC-USD': 0 } };
+for (let tick = 1; tick <= 20; tick++) {
+  const result = simulateTick({ traderId: 7, tickId: tick, timestamp: quoteTime,
+    config: { ...quotedConfig, minimumSignalBps: 6 }, state: noSignalState, marketQuotes: { 'BTC-USD': quote } });
+  assert.equal(result.openedTrade, null, 'flat price signals must not create cost-driven random entries');
+  noSignalState = result.state;
+}
+const lossQuote = { ...quote, price: quote.price * 0.97 };
+const lossResult = simulateTick({ traderId: 7, tickId: 50, timestamp: quoteTime, config: quotedConfig,
+  state: { ...marketState, tradingDay: quoteTime.slice(0, 10), dailyOpeningEquity: 100000 }, marketQuotes: { 'BTC-USD': lossQuote } });
+assert.equal(lossResult.trade.close_reason, 'daily_loss_limit');
+assert.equal(lossResult.state.dailyLossPaused, true);
+let pausedState = lossResult.state;
+for (let tick = 51; tick <= 70; tick++) {
+  const result = simulateTick({ traderId: 7, tickId: tick, timestamp: quoteTime, config: quotedConfig,
+    state: pausedState, marketQuotes: { 'BTC-USD': lossQuote } });
+  assert.equal(result.openedTrade, null, 'daily loss pause must stop new entries for the rest of the UTC day');
+  pausedState = result.state;
+}
+const nextDay = '2026-11-15T12:00:00Z';
+const resumed = simulateTick({ traderId: 7, tickId: 71, timestamp: nextDay, config: quotedConfig,
+  state: pausedState, marketQuotes: { 'BTC-USD': { ...lossQuote, quote_updated_at: nextDay } } });
+assert.equal(resumed.state.dailyLossPaused, false);
+assert.equal(resumed.state.dailyOpeningEquity, pausedState.equity);
+console.log('SIGNAL_COST_AND_DAILY_LOSS_CONTROLS_PASSED');

@@ -6,7 +6,7 @@ import { runRoiTick } from '../../worker/roi-cron.js';
 import worker from '../../worker/index.js';
 
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql','0003_user_activity.sql','0008_investment_ledger.sql','0018_traders.sql','0020_copy_trading.sql','0021_roi_cron.sql','0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
+for (const file of ['0001_d1_foundation.sql','0003_user_activity.sql','0008_investment_ledger.sql','0018_traders.sql','0020_copy_trading.sql','0021_roi_cron.sql','0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql','0029_recorded_performance_baselines.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 let failBatch = false;
 class Statement {
   constructor(sql) { this.sql = sql; this.values = []; }

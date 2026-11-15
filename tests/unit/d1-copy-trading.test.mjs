@@ -9,11 +9,11 @@ import { compareHistory } from '../../shared/trader-comparison.js';
 
 const runCopyTradingTick = (env, now) => runMarketTick(env, now, {
   executionClock: () => now,
-  quoteProvider: async market => ({ price: market.symbol === 'BTCUSD' ? 96000 : 200,
+  quoteProvider: async market => ({ price: (market.symbol === 'BTCUSD' ? 96000 : 200) * (1 + (now.getTime() - Date.parse('2026-11-13T15:00:00Z')) / 300000 * 0.001),
     price_source: 'Fixture feed', quote_updated_at: now.toISOString(), quote_stale: false }),
 });
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
+for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql','0029_recorded_performance_baselines.sql']) sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 class Statement {
   constructor(sql) { this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }

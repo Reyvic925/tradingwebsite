@@ -228,7 +228,7 @@ function TraderCard({ trader, availableBalance, onFollow, saved, watchPending, o
             <div className="text-gray-500">Total return</div>
           </div>
           <div>
-            <div className="font-mono font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(0)}%</div>
+            <div className="font-mono font-bold text-white">{trader.total_trades > 0 ? `${Number(trader.win_rate_trades ?? 0).toFixed(0)}%` : 'No closed trades'}</div>
             <div className="text-gray-500">Win Rate</div>
             <div className="mt-2 text-gray-400">Drawdown {Number(trader.max_drawdown).toFixed(1)}% / {trader.total_trades} trades</div>
           </div>

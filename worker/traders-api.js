@@ -3,6 +3,7 @@ import { normalizeAssetFocus, validateTraderRecord } from '../api-handlers/trade
 import { compareHistory } from '../shared/trader-comparison.js';
 import { calculateTraderAnalytics, calculateTraderExposure } from '../shared/trader-analytics.js';
 import { getAuthenticatedUser } from './auth.js';
+import { loadCopyQuotes } from './copy-quotes.js';
 
 const TRADER_FIELDS = [
   'name', 'country', 'avatar_url', 'bio', 'specialty', 'asset_focus',
@@ -31,6 +32,9 @@ function parseTrader(row) {
   }
   return {
     ...row,
+    ...(row.performance_started_at ? {
+      monthly_return: row.performance_started_at.slice(0, 10) > `${new Date().toISOString().slice(0, 7)}-01` ? null : row.monthly_return,
+    } : {}),
     asset_focus: normalizeAssetFocus(assetFocus),
     is_active: row.is_active === true || row.is_active === 1,
   };
@@ -224,6 +228,16 @@ async function listTraderActivity(env, url, table) {
 export async function handleTraderRequest(request, env) {
   const url = new URL(request.url);
   try {
+    if (url.pathname === '/api/trader-quotes' && request.method === 'GET') {
+      const id = parseId(url.searchParams.get('traderId'));
+      if (!id) return json({ error: 'A valid trader ID is required.' }, 400);
+      const trader = await env.DB.prepare('SELECT * FROM traders WHERE id=? AND is_active=1').bind(id).first();
+      if (!trader) return json({ error: 'Strategy is unavailable.' }, 404);
+      const assets = parseTrader(trader).asset_focus;
+      const quotes = await loadCopyQuotes(assets);
+      return json(assets.map(asset => ({ asset, price: quotes[asset]?.price ?? null,
+        source: quotes[asset]?.price_source || 'Unavailable', at: quotes[asset]?.quote_updated_at || null })));
+    }
     if (url.pathname === '/api/trader-watchlist') {
       const user = await getAuthenticatedUser(request, env);
       if (!user) return json({ error: 'Sign in to save strategies.' }, 401);

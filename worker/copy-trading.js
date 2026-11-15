@@ -145,7 +145,7 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
   for (const trader of traders || []) {
     summary.traders++;
     const strategies = ['momentum', 'mean_reversion', 'scalper', 'swing', 'conservative'];
-    const config = normalizeSyntheticConfig({ assets: JSON.parse(trader.asset_focus), session: trader.session_type, startingEquity: trader.current_equity / Math.max(0.0001, 1 + trader.total_return / 100),
+    const config = normalizeSyntheticConfig({ assets: JSON.parse(trader.asset_focus), session: trader.session_type, startingEquity: trader.recorded_starting_equity || trader.current_equity,
       strategyType: strategies[trader.id % strategies.length], riskProfile: trader.risk_score });
     await statement(db, `INSERT OR IGNORE INTO copy_simulation_state (trader_id,config,state) VALUES (?,?,?)`,
       trader.id, JSON.stringify(config), JSON.stringify({ equity: trader.current_equity, peakEquity: trader.current_equity, prices: {} })).run();
@@ -198,9 +198,11 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
       batch.push(statement(db, `INSERT INTO trader_history (trader_id,snapshot_date,equity,daily_return)
         SELECT ?,?,?,? WHERE ${guard} ON CONFLICT(trader_id,snapshot_date) DO UPDATE SET equity=excluded.equity,daily_return=excluded.daily_return`,
         trader.id, at.slice(0, 10), result.state.equity, change * 100, ...guardArgs));
-      batch.push(statement(db, `UPDATE traders SET current_equity=?,total_return=?,max_drawdown=max(max_drawdown,?),updated_at=?
+      batch.push(statement(db, `UPDATE traders SET current_equity=?,total_return=?,max_drawdown=max(max_drawdown,?),
+        recorded_starting_equity=coalesce(recorded_starting_equity,?),performance_started_at=coalesce(performance_started_at,?),
+        monthly_return=coalesce((?/(SELECT equity FROM trader_history WHERE trader_id=? AND snapshot_date<date(?,'start of month') ORDER BY snapshot_date DESC LIMIT 1)-1)*100,0),updated_at=?
         WHERE id=? AND ${guard}`, result.state.equity, (result.state.equity / config.startingEquity - 1) * 100,
-        result.state.maxDrawdown, at, trader.id, ...guardArgs));
+        result.state.maxDrawdown, config.startingEquity, executionAt, result.state.equity, trader.id, executionAt, executionAt, trader.id, ...guardArgs));
       batch.push(statement(db, `UPDATE copy_simulation_state SET last_tick=?,state=? WHERE trader_id=? AND last_tick=?`, tick, JSON.stringify(result.state), ...guardArgs));
       const applied = await db.batch(batch);
       if (applied.at(-1).meta?.changes) summary.updated++;

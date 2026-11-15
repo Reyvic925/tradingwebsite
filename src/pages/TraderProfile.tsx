@@ -1,4 +1,5 @@
 import TraderAnalytics from '../components/TraderAnalytics';
+import TraderLivePrices from '../components/TraderLivePrices';
 import TraderResearch from '../components/TraderResearch';
 import TraderWatchButton from '../components/TraderWatchButton';
 import { useTraderWatchlist } from '../lib/trader-watchlist';
@@ -188,7 +189,7 @@ export default function TraderProfile() {
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Win Rate</div>
-          <div className="text-2xl font-bold text-white">{Number(trader.win_rate_trades ?? 0).toFixed(1)}%</div>
+          <div className="text-2xl font-bold text-white">{trader.total_trades > 0 ? `${Number(trader.win_rate_trades ?? 0).toFixed(1)}%` : 'No closed trades'}</div>
           <div className="text-xs text-gray-500 mt-1">{trader.total_trades || 0} total trades</div>
         </div>
 
@@ -258,6 +259,7 @@ export default function TraderProfile() {
       )}
 
       {/* Trading activity */}
+      <TraderLivePrices key={trader.id} traderId={trader.id} />
       <div className="mb-8">
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>

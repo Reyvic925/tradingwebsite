@@ -167,7 +167,9 @@ export type Trader = {
   copiers_current?: number;
   copiers_all_time?: number;
   under_management?: number;
-  monthly_return?: number;
+  monthly_return?: number | null;
+  recorded_starting_equity?: number;
+  performance_started_at?: string;
   bio: string;
   risk_level?: string;
   specialty?: string;

@@ -86,6 +86,8 @@ export function normalizeSyntheticConfig(config = {}) {
     tradeFrequency: config.tradeFrequency || strategyType,
     riskProfile: Math.min(10, Math.max(1, Math.trunc(Number(config.riskProfile) || 5))),
     compounding: config.compounding !== false,
+    minimumSignalBps: Math.max(0, Number(config.minimumSignalBps ?? 6)),
+    dailyLossLimitPercent: Math.min(100, Math.max(0.1, Number(config.dailyLossLimitPercent ?? 1))),
     riskFraction: Math.max(0.001, Number(config.riskFraction) || profile.riskFraction * targetScale),
     maxExposureFraction: Math.max(0.05, Number(config.maxExposureFraction) || profile.maxExposureFraction),
     metricBaseline: config.metricBaseline,
@@ -176,6 +178,14 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
   const feeBps = Math.min(100, Math.max(0, Number(config.feeBps ?? 1)));
   const friction = (spreadBps / 2 + slippageBps * stress) / 10000;
   let equity = Number(state.equity ?? normalizedConfig.startingEquity);
+  const tradingDay = timestamp.slice(0, 10);
+  const dailyOpeningEquity = state.tradingDay === tradingDay ? Number(state.dailyOpeningEquity ?? equity) : equity;
+  const dailyFloor = dailyOpeningEquity * (1 - normalizedConfig.dailyLossLimitPercent / 100);
+  let dailyLossReached = marketBacked && equity <= dailyFloor;
+  const candidateAsset = normalizedConfig.assets[tickId % normalizedConfig.assets.length];
+  const previousSignal = Number(state.signals?.[candidateAsset] || 0);
+  const minimumMove = Math.max(normalizedConfig.minimumSignalBps / 10000, 2 * friction + 2 * feeBps / 10000);
+  const signalReady = !marketBacked || normalizedConfig.minimumSignalBps === 0 || Math.abs(previousSignal) >= minimumMove;
   let position = state.position ? { ...state.position } : null;
   let trade = null;
   let openedTrade = null;
@@ -185,9 +195,10 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     const mark = Number(previousPrices[position.symbol]) || position.entry_price;
     const direction = position.side === 'BUY' ? 1 : -1;
     equity += direction * (price - mark) * position.quantity;
+    dailyLossReached = marketBacked && equity <= dailyFloor;
     if (assetOpen(position.symbol)) position.age += 1;
     const tradeLoss = direction * (price - position.entry_price) / position.entry_price;
-    if (assetOpen(position.symbol) && (position.age >= profile.holdingTicks || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
+    if (assetOpen(position.symbol) && (dailyLossReached || position.age >= profile.holdingTicks || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
       const exit = price * (1 - direction * friction);
       const exitFee = exit * position.quantity * feeBps / 10000;
       equity += direction * (exit - price) * position.quantity - exitFee;
@@ -195,17 +206,17 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
       const pnl = direction * (exit - position.entry_price) * position.quantity - fees;
       trade = { ...position, exit_price_source: marketQuotes?.[position.symbol]?.price_source, exit_quote_at: marketQuotes?.[position.symbol]?.quote_updated_at, exit_price: exit, fees: Number(fees.toFixed(2)), pnl: Number(pnl.toFixed(2)),
         pnl_percent: pnl / position.equity_at_entry * 100, status: 'CLOSED', closed_at: timestamp,
-        close_reason: tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : 'strategy_exit' };
+        close_reason: dailyLossReached ? 'daily_loss_limit' : tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : 'strategy_exit' };
       lossStreak = pnl < 0 ? lossStreak + 1 : 0;
       position = null;
     }
-  } else if (config.tradingEnabled !== false && sessionOpen && equity > 1 && random() < profile.tradeProbability && assetOpen(normalizedConfig.assets[tickId % normalizedConfig.assets.length])) {
-    const asset = normalizedConfig.assets[tickId % normalizedConfig.assets.length];
+  } else if (config.tradingEnabled !== false && !dailyLossReached && signalReady && sessionOpen && equity > 1 && random() < profile.tradeProbability && assetOpen(candidateAsset)) {
+    const asset = candidateAsset;
     // Decisions use only the previous tick's signal, never the move being traded.
     const signal = Number(state.signals?.[asset] || 0);
     let bullish = signal >= 0;
     if (normalizedConfig.strategyType === 'mean_reversion') bullish = !bullish;
-    if (normalizedConfig.strategyType === 'scalper' || Math.abs(signal) < 0.0001) bullish = random() < profile.directionBias;
+    if (!marketBacked && (normalizedConfig.strategyType === 'scalper' || Math.abs(signal) < 0.0001)) bullish = random() < profile.directionBias;
     const side = bullish ? 'BUY' : 'SELL';
     const direction = bullish ? 1 : -1;
     const mark = nextPrices[asset];
@@ -224,7 +235,8 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
   }
   const peakEquity = Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity);
   const maxDrawdown = Math.max(Number(state.maxDrawdown || 0), peakEquity > 0 ? (peakEquity - Math.max(0, equity)) / peakEquity * 100 : 0);
-  const nextState = { ...state, priceBasis: marketBacked ? 'market' : 'synthetic', maxDrawdown, prices: nextPrices, signals: marketMoves, position,
+  const nextState = { ...state, tradingDay, dailyOpeningEquity, dailyLossPaused: marketBacked && equity <= dailyFloor,
+    priceBasis: marketBacked ? 'market' : 'synthetic', maxDrawdown, prices: nextPrices, signals: marketMoves, position,
     equity: Math.max(0, equity), peakEquity: Math.max(Number(state.peakEquity || normalizedConfig.startingEquity), equity),
     tickIndex: tickId, lossStreak, lastProcessedAt: timestamp };
   return { config: normalizedConfig, state: nextState, trade, openedTrade, marketMoves };
