@@ -56,7 +56,7 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
           ['Effective leverage', data.exposure.effective_leverage === null ? 'Unavailable' : `${data.exposure.effective_leverage.toFixed(2)}x`]].map(([label, value]) =>
           <div key={label}><dt className="text-xs text-gray-400">{label}</dt><dd className="mt-2 text-xl tabular-nums text-white">{value}</dd></div>)}
       </dl>
-      <p className="text-xs leading-relaxed text-gray-400">Ratios use {data.return_observations} recorded session returns, annualized over {data.annualization} sessions with a 0% risk-free rate and downside target. At least 30 observations are required. Zero variance or zero downside leaves the corresponding ratio unavailable. Figures describe simulated strategy equity.</p>
+      <p className="text-xs leading-relaxed text-gray-400">Ratios use {data.return_observations} recorded session returns, annualized over {data.annualization} sessions with a 0% risk-free rate and downside target. At least 30 observations are required. Zero variance or zero downside leaves the corresponding ratio unavailable. Figures describe model strategy equity, not a verified individual trader?s brokerage account.</p>
       <div>
         <h3 className="mb-3 text-sm font-medium text-white">Monthly performance</h3>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">

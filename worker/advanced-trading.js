@@ -418,7 +418,7 @@ export async function handleAdvancedTradingRequest(request,env) {
       if(!result)fail('Position changed concurrently.',409);await notifyEngine(env,user.id);return json(result);
     }
     if(path==='/api/paper/preferences'&&method==='PUT') {
-      const body=await request.json(),bps=Number(body.commission_bps);if(!Number.isFinite(bps)||bps<0||bps>1000)fail('Simulated commission must be 0–1000 basis points.');
+      const body=await request.json(),bps=Number(body.commission_bps);if(!Number.isFinite(bps)||bps<0||bps>1000)fail('Commission must be 0–1000 basis points.');
       await db.prepare('INSERT INTO funded_preferences(user_id,commission_bps) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET commission_bps=excluded.commission_bps,updated_at=CURRENT_TIMESTAMP').bind(user.id,bps).run();return json({commission_bps:bps});
     }
     if(path==='/api/paper/journal'&&method==='GET')return json(await journal(db,user.id));
