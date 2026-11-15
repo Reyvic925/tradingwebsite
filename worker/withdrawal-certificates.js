@@ -21,7 +21,7 @@ export async function handleWithdrawalCertificates(request, env) {
     if (id && !rows.results?.length) return json({ error: 'Withdrawal record not found' }, 404);
     const profile = await env.DB.prepare('SELECT full_name FROM profiles WHERE user_id=?').bind(user.id).first();
     const items = (rows.results || []).slice(0,50).map(row => ({
-      id: row.id, certificate_number: `PM-WD-${row.id.startsWith('transaction-') ? 'T' : 'R'}${row.id.split('-')[1].padStart(8,'0')}`,
+      id: row.id, certificate_number: `PM-WD-${row.id.startsWith('transaction-') ? 'T' : 'R'}${874012n + BigInt(row.id.split('-')[1])}`,
       amount: Number(row.amount), amount_currency: 'USD', requested_currency: row.requested_currency,
       status: row.status, reference: row.reference || row.id, created_at: row.created_at, reviewed_at: row.reviewed_at,
       kind: row.kind, account_name: profile?.full_name || null,
