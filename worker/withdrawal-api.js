@@ -58,7 +58,7 @@ async function createWithdrawal(request, env, user) {
 
   const transaction = results[1]?.results?.[0];
   if (!transaction) return json({ error: 'Insufficient available balance.' }, 400);
-  await notifyUser(env, user.id, 'Crypto withdrawal requested', `Your withdrawal of ${amount} ${currency} was submitted for review.`, 'worker/withdrawal-api');
+  await notifyUser(env, user.id, 'Crypto withdrawal requested', `We received your withdrawal request for ${amount} ${currency}.\n\nYour request is awaiting review. This email confirms receipt of the request. You can track its status in your account.`, 'worker/withdrawal-api');
   return json({ ok: true, tx: transaction }, 201);
 }
 
@@ -141,8 +141,8 @@ async function reviewWithdrawal(request, env, admin) {
   await notifyUser(env, withdrawal.user_id,
     action === 'approve' ? 'Crypto withdrawal approved' : 'Crypto withdrawal rejected',
     action === 'approve'
-      ? `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} was approved.`
-      : `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} was rejected.${notes ? ` Note: ${notes}` : ''}`,
+      ? `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} has been approved.\n\nApproval confirms the review decision. Check your account for the latest payment status and any available transaction reference.`
+      : `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} was not approved. The reserved amount has been returned to your available balance.${notes ? `\n\nReview notes\n${notes}` : ''}\n\nPlease review the request in your account or contact support for assistance.`,
     'worker/withdrawal-api');
   return json({ withdrawal });
 }

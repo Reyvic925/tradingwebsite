@@ -153,7 +153,7 @@ export default async function handler(req, res) {
           await createNotification(supabase, {
             user_id: user.id,
             title: 'Welcome to The Prime Markets',
-            body: 'Your account is ready. Complete KYC and deposit to start trading.',
+            body: 'Welcome to The Prime Markets. Your account is ready.\n\nSign in to review your profile, complete identity verification, and explore the platform. Before funding your account, review the applicable terms and product risks.',
             read: false,
           });
 

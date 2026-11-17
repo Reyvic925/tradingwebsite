@@ -59,7 +59,7 @@ export async function creditReferralDeposit(supabase, deposit) {
   await createNotification(supabase, {
     user_id: referrer.user_id,
     title: 'Referral deposit reward credited',
-    body: `${reward.toFixed(2)} USD (10% of the referred deposit) has been added to your wallet.`,
+    body: `A referral reward of ${reward.toFixed(2)} USD has been credited to your wallet. The reward represents 10% of the qualifying referred deposit.\n\nSign in to review the credit and your referral activity.`,
     read: false,
   });
 

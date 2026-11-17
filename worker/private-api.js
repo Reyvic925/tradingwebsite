@@ -157,8 +157,8 @@ async function createInvestment(request, env, userId) {
       INSERT INTO notifications (user_id, title, body, read)
       SELECT user_id, ?, ?, 0 FROM investments WHERE operation_id = ?
     `).bind(
-      `Investment created in ${name}`,
-      `Invested $${amount} for ${durationDays} days.`,
+      `Investment confirmation for ${name}`,
+      `Your investment in ${name} has been created.\n\nAmount allocated\n${Number(amount).toFixed(2)} USD\n\nInvestment term\n${durationDays} days\n\nSign in to review the investment details, applicable terms, and current status.`,
       operationId,
     ),
   ]);
@@ -169,8 +169,8 @@ async function createInvestment(request, env, userId) {
   const investment = results[1]?.results?.[0];
   if (!investment) throw new Error('Investment debit succeeded but no investment row was created.');
   await sendUserEmail(env, userId, {
-    subject: `Investment created in ${name}`,
-    text: `Invested $${amount} for ${durationDays} days.`,
+    subject: `Investment confirmation for ${name}`,
+    text: `Your investment in ${name} has been created.\n\nAmount allocated\n${Number(amount).toFixed(2)} USD\n\nInvestment term\n${durationDays} days\n\nSign in to review the investment details, applicable terms, and current status.`,
   }, 'worker/private-api');
   return json({ ...investment, plan: isTier ? null : product, tier_details: isTier ? product : null }, 201);
 }
@@ -372,8 +372,8 @@ async function createOrder(request, env, userId) {
       ORDER BY id ASC LIMIT 1
     `).bind(userId, marketId).first();
     await sendUserEmail(env, userId, {
-      subject: `Filled ${side.toUpperCase()} ${market.symbol}`,
-      text: `${quantity} ${market.symbol} filled at ${price}. The order used 10% initial margin.`,
+      subject: `Order filled for ${market.symbol}`,
+      text: `Your ${side.toUpperCase()} order for ${quantity} ${market.symbol} has been filled at ${price}. The position uses 10% initial margin.\n\nPlease review the execution details, fees, and position protection in your trading account.`,
     }, 'worker/private-api');
     return json({ order, position, price_source: quote.price_source, quote_updated_at: quote.quote_updated_at }, 201);
   } catch (error) {
@@ -480,8 +480,8 @@ async function closePosition(request, env, userId) {
     const closed = await db.prepare('SELECT * FROM positions WHERE id = ? AND user_id = ?')
       .bind(id, userId).first();
     await sendUserEmail(env, userId, {
-      subject: `Closed ${position.symbol} position`,
-      text: `Your ${position.symbol} position closed at ${closePrice}. Realized P&L: ${pnl.toFixed(2)} USD.`,
+      subject: `Position closed for ${position.symbol}`,
+      text: `Your ${position.symbol} position has been closed at ${closePrice}.\n\nRecorded realized profit or loss\n${pnl.toFixed(2)} USD\n\nSign in to review the full closing details and any associated fees.`,
     }, 'worker/private-api');
     return json(closed);
   } catch (error) {

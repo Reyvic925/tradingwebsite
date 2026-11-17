@@ -132,8 +132,8 @@ export default async function handler(req, res) {
         if (pErr) throw pErr;
         await createNotification(supabase, {
           user_id: user.id,
-          title: `Filled ${side.toUpperCase()} ${market.symbol}`,
-          body: `${qty} @ ${fillPrice} — position increased`,
+          title: `Order filled for ${market.symbol}`,
+          body: `Your ${side.toUpperCase()} order for ${qty} ${market.symbol} has been filled at ${fillPrice}, increasing the existing position.\n\nReview the updated quantity and risk settings in your account.`,
           read: false,
         });
         return res.status(201).json({ order: filledOrder, position: first(pos) });
@@ -205,8 +205,8 @@ export default async function handler(req, res) {
 
         await createNotification(supabase, {
           user_id: user.id,
-          title: `Closed ${existing.side} ${market.symbol}`,
-          body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD`,
+          title: `Position reduced or closed for ${market.symbol}`,
+          body: `Your order for ${market.symbol} has reduced or closed the existing position.\n\nRecorded realized profit or loss\n${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD\n\nReview the execution details and remaining position, if any, in your account.`,
           read: false,
         });
         return res.status(201).json({ order: filledOrder, realized_pnl: pnl, position: newPos });
@@ -233,8 +233,8 @@ export default async function handler(req, res) {
 
       await createNotification(supabase, {
         user_id: user.id,
-        title: `Opened ${side === 'buy' ? 'LONG' : 'SHORT'} ${market.symbol}`,
-        body: `${qty} @ ${fillPrice} · margin ${margin.toFixed(2)} USD`,
+        title: `Position opened for ${market.symbol}`,
+        body: `A ${side === 'buy' ? 'long' : 'short'} position in ${market.symbol} has been opened for ${qty} units at ${fillPrice}. Margin allocated is ${margin.toFixed(2)} USD.\n\nReview the position and its protection settings in your account.`,
         read: false,
       });
 

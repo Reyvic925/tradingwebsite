@@ -60,7 +60,7 @@ async function sendResendDepositEmail(userId, title, body) {
 
     const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
     const dashboardUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/app` : '';
-    const { renderPrimeMarketsEmail } = await import('../shared/email-template.js');
+    const { renderPrimeMarketsEmail, renderPrimeMarketsText } = await import('../shared/email-template.js');
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -68,7 +68,7 @@ async function sendResendDepositEmail(userId, title, body) {
         from,
         to: [to],
         subject: title,
-        text: `${title}\n\n${body}${dashboardUrl ? `\n\nView your account: ${dashboardUrl}` : ''}`,
+        text: renderPrimeMarketsText({ title, body, actionUrl: dashboardUrl }),
         html: renderPrimeMarketsEmail({ title, body, actionUrl: dashboardUrl, actionLabel: 'View your account' }),
       }),
     });
@@ -205,7 +205,7 @@ async function creditDeposit({ user_id, amount, currency = 'ETH', tx_hash, times
     const notif = {
       user_id,
       title: 'Deposit received',
-      body: `Deposit of ${amount} ${currency} received (tx ${tx_hash})`,
+      body: `A deposit of ${amount} ${currency} has been detected.\n\nTransaction reference\n${tx_hash}\n\nSign in to check the confirmation status and available balance.`,
       created_at: new Date().toISOString(),
       read: false
     };

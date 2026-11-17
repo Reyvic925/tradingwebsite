@@ -209,7 +209,7 @@ const signup = await handleAuthRequest(request('/api/auth/signup', {
 assert.equal(signup.status, 202);
 assert.equal((await signup.json()).verification_required, true);
 assert.equal(signup.headers.get('set-cookie'), null);
-assert.equal(sentEmails.at(-1).payload.subject, 'Verify your Prime Markets email');
+assert.equal(sentEmails.at(-1).payload.subject, 'Verify your email address | The Prime Markets');
 const verificationLink = new URL(sentEmails.at(-1).payload.text.match(/https:\/\/\S+/)[0]);
 assert.equal(verificationLink.pathname, '/auth/confirm');
 assert.match(sentEmails.at(-1).payload.html, /Confirm Email Address/);
@@ -322,7 +322,7 @@ const changedPasswordLogin = await handleAuthRequest(request('/api/auth/login', 
   body: JSON.stringify({ email: 'trader@example.com', password: 'another secure password' }),
 }), env);
 assert.equal(changedPasswordLogin.status, 200);
-assert.equal(sentEmails.at(-1).payload.subject, 'Your Prime Markets password was changed');
+assert.equal(sentEmails.at(-1).payload.subject, 'Your password has changed | The Prime Markets');
 
 const wrongCurrentPassword = await handleAuthRequest(request('/api/auth/password', {
   method: 'POST',
@@ -338,7 +338,7 @@ const resetRequested = await handleAuthRequest(request('/api/auth/password-reset
 }), env);
 assert.equal(resetRequested.status, 200);
 assert.deepEqual(await resetRequested.json(), { ok: true });
-assert.equal(sentEmails.at(-1).payload.subject, 'Reset your Prime Markets password');
+assert.equal(sentEmails.at(-1).payload.subject, 'Reset your password | The Prime Markets');
 assert.match(sentEmails.at(-1).payload.html, /Reset Password/);
 assert.match(sentEmails.at(-1).payload.html, /expires in 60 minutes/);
 const emailCountAfterResetRequest = sentEmails.length;

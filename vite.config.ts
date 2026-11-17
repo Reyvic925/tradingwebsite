@@ -1,8 +1,8 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { pathToFileURL } from 'node:url'
-import path from 'node:path'
+// @ts-expect-error The shared Vercel API entry point has no TypeScript declarations.
+import apiHandler from './api/index.js'
 import type { Connect, Plugin, ViteDevServer } from 'vite'
 
 // Serves the Vercel-style API functions (api/index.js router) inside the Vite
@@ -23,18 +23,10 @@ function localApiPlugin(): Plugin {
         };
       }
 
-      const handlerPath = path.join(process.cwd(), 'api', 'index.js');
-      import(pathToFileURL(handlerPath).href).then((m) => {
-        const handler = m?.default || m?.handler || m;
-        if (typeof handler !== 'function') {
-          res.statusCode = 500;
-          return res.end('API handler is not a function');
-        }
-        Promise.resolve(handler(req, res)).catch((err) => {
-          console.error('[api]', err);
-          if (!res.writableEnded) { res.statusCode = 500; res.end('Internal Server Error'); }
-        });
-      }).catch(next);
+      Promise.resolve().then(() => apiHandler(req, res)).catch((err) => {
+        console.error('[api]', err);
+        if (!res.writableEnded) { res.statusCode = 500; res.end('Internal Server Error'); }
+      });
     });
   };
 

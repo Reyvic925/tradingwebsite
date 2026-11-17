@@ -144,8 +144,8 @@ export default async function handler(req, res) {
       // Notification
       await createNotification(supabase, {
         user_id: user.id,
-        title: `Investment created in ${tier.name} tier`,
-        body: `Invested $${amt} for ${tier.duration_days} days with ${tier.percent_return}% target return.`,
+        title: `Investment confirmation for ${tier.name}`,
+        body: `Your investment in ${tier.name} has been created.\n\nAmount allocated\n${Number(amt).toFixed(2)} USD\n\nInvestment term\n${tier.duration_days} days\n\nTarget return\n${tier.percent_return}%\n\nPlease review the investment details, risks, and applicable terms in your account.`,
         read: false,
       });
 

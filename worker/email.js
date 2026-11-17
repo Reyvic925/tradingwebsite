@@ -1,4 +1,4 @@
-import { renderPrimeMarketsEmail } from '../shared/email-template.js';
+import { renderPrimeMarketsEmail, renderPrimeMarketsText } from '../shared/email-template.js';
 
 export async function sendEmail(env, { to, subject, text, html = null }, source = 'worker') {
   const apiKey = String(env.RESEND_API_KEY || '').trim();
@@ -8,6 +8,8 @@ export async function sendEmail(env, { to, subject, text, html = null }, source 
     return false;
   }
 
+  const accountUrl = `${String(env.APP_URL || 'https://www.theprimemarkets.com').replace(/\/+$/, '')}/app`;
+  const action = html ? {} : { actionUrl: accountUrl, actionLabel: 'View your account' };
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -19,8 +21,8 @@ export async function sendEmail(env, { to, subject, text, html = null }, source 
         from,
         to: Array.isArray(to) ? to : [to],
         subject,
-        text,
-        html: html || renderPrimeMarketsEmail({ title: subject, body: text }),
+        text: renderPrimeMarketsText({ title: subject, body: text, ...action }),
+        html: html || renderPrimeMarketsEmail({ title: subject, body: text, ...action }),
       }),
     });
     if (!response.ok) {

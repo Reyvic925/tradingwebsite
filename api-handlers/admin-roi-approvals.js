@@ -98,8 +98,8 @@ export default async function handler(req, res) {
         // Notification
         await createNotification(supabase, {
           user_id: withdrawal.user_id,
-          title: 'ROI withdrawal approved',
-          body: `Your withdrawal of $${withdrawal.amount} has been approved and credited to your available balance.`,
+          title: 'Investment earnings withdrawal approved',
+          body: `Your investment earnings withdrawal of ${Number(withdrawal.amount).toFixed(2)} USD has been approved and credited to your available balance.\n\nSign in to review your updated balance and withdrawal history.`,
           read: false,
         });
 
@@ -127,8 +127,8 @@ export default async function handler(req, res) {
 
         await createNotification(supabase, {
           user_id: withdrawal.user_id,
-          title: 'ROI withdrawal rejected',
-          body: `Your withdrawal of $${withdrawal.amount} was rejected. Funds returned to locked balance.`,
+          title: 'Investment earnings withdrawal not approved',
+          body: `Your investment earnings withdrawal of ${Number(withdrawal.amount).toFixed(2)} USD was not approved. The amount has been returned to your locked balance.\n\nPlease review the request in your account or contact support for assistance.`,
           read: false,
         });
 

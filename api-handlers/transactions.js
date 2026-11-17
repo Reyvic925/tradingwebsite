@@ -65,8 +65,8 @@ export default async function handler(req, res) {
 
       await createNotification(supabase, {
         user_id: user.id,
-        title: type === 'deposit' ? 'Deposit credited' : 'Withdrawal sent',
-        body: `${type === 'deposit' ? '+' : '-'}$${amt.toFixed(2)} via ${method || 'transfer'} · ${ref}`,
+        title: type === 'deposit' ? 'Deposit credited' : 'Withdrawal recorded',
+        body: `${type === 'deposit' ? 'A deposit' : 'A withdrawal'} of ${amt.toFixed(2)} USD has been recorded in your account.\n\nPayment method\n${method || 'Transfer'}\n\nReference\n${ref}\n\nSign in to review the transaction details and current status.`,
         read: false,
       });
 

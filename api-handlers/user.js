@@ -193,8 +193,8 @@ export default async function handler(req, res) {
 
       await createNotification(supabase, {
         user_id: user.id,
-        title: `Closed ${pos.symbol}`,
-        body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD at ${price}`,
+        title: `Position closed for ${pos.symbol}`,
+        body: `Your ${pos.symbol} position has been closed at ${price}.\n\nRecorded realized profit or loss\n${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD\n\nReview the full closing details and associated fees in your account.`,
         read: false,
       });
 

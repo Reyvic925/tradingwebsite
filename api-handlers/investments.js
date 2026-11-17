@@ -116,8 +116,8 @@ export default async function handler(req, res) {
 
       await createNotification(supabase, {
         user_id: user.id,
-        title: `Subscribed to ${plan.name}`,
-        body: `$${amt.toFixed(2)} allocated for ${plan.duration_days} days with a ${plan.total_return}% total-return target.`,
+        title: `Investment confirmation for ${plan.name}`,
+        body: `Your investment in ${plan.name} has been created.\n\nAmount allocated\n${amt.toFixed(2)} USD\n\nInvestment term\n${plan.duration_days} days\n\nTarget total return\n${plan.total_return}%\n\nPlease review the investment details, risks, and applicable terms in your account.`,
         read: false,
       });
 

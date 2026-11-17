@@ -19,16 +19,17 @@ export function renderPrimeMarketsEmail({
   verificationCode = '',
   codeExpiryNote = '',
 }) {
+  const actionHref = /^https?:\/\//i.test(String(actionUrl || '')) ? String(actionUrl) : '';
   const paragraphs = String(body)
     .split(/\n{2,}/)
     .filter(Boolean)
     .map((paragraph) => `<p style="margin:0 0 16px;font-size:15px;line-height:24px;color:#6b6358">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
     .join('');
-  const action = actionUrl
-    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"><tr><td align="center" bgcolor="#d4af37" style="border-radius:6px;background-color:#d4af37"><a href="${escapeHtml(actionUrl)}" target="_blank" style="display:inline-block;padding:14px 34px;font-size:15px;line-height:20px;font-weight:700;color:#0b0f1a;text-decoration:none;border-radius:6px;background-color:#d4af37">${escapeHtml(actionLabel)}</a></td></tr></table>${actionNote ? `<p style="margin:14px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">${escapeHtml(actionNote)}</p>` : ''}`
+  const action = actionHref
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center"><tr><td align="center" bgcolor="#d4af37" style="border-radius:6px;background-color:#d4af37"><a href="${escapeHtml(actionHref)}" target="_blank" style="display:inline-block;padding:14px 34px;font-size:15px;line-height:20px;font-weight:700;color:#0b0f1a;text-decoration:none;border-radius:6px;background-color:#d4af37">${escapeHtml(actionLabel)}</a></td></tr></table>${actionNote ? `<p style="margin:14px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">${escapeHtml(actionNote)}</p>` : ''}<p style="margin:16px 0 0;font-size:12px;line-height:19px;color:#8a8175;overflow-wrap:anywhere;word-break:break-all">If the button does not work, open this link in your browser<br><a href="${escapeHtml(actionHref)}" style="color:#6b5719">${escapeHtml(actionHref)}</a></p>`
     : '';
   const security = securityTip
-    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:28px"><tr><td style="padding:16px 18px;background-color:#faf8f5;border-left:3px solid #d4af37;border-radius:6px"><p style="margin:0;font-size:13px;line-height:21px;color:#6b6358"><strong style="color:#1a1612">Security tip:</strong> ${escapeHtml(securityTip)}</p></td></tr></table>`
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:28px"><tr><td style="padding:16px 18px;background-color:#faf8f5;border-left:3px solid #d4af37;border-radius:6px"><p style="margin:0;font-size:13px;line-height:21px;color:#6b6358"><strong style="color:#1a1612">Account security</strong><br> ${escapeHtml(securityTip)}</p></td></tr></table>`
     : '';
   const expiry = expiryNote
     ? `<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">${escapeHtml(expiryNote)}</p>`
@@ -49,7 +50,7 @@ export function renderPrimeMarketsEmail({
         <td width="10%" align="center" style="width:10%;padding:0 8px;font-size:12px;line-height:18px;color:#8a8175;text-transform:uppercase">OR</td>
         <td width="45%" style="width:45%;height:1px;background-color:#e8e0d6;font-size:1px;line-height:1px">&nbsp;</td>
       </tr></table>
-      <p style="margin:0 0 16px;text-align:center;font-size:14px;line-height:22px;color:#6b6358">Prefer to confirm automatically?</p>`
+      <p style="margin:0 0 16px;text-align:center;font-size:14px;line-height:22px;color:#6b6358">Or use the button below to confirm your email.</p>`
     : '';
 
   return `<!doctype html>
@@ -65,14 +66,20 @@ export function renderPrimeMarketsEmail({
       </tr></table></td></tr>
       <tr><td style="padding:40px 36px 32px">
         <h1 style="margin:0 0 10px;font-size:26px;line-height:34px;font-weight:700;color:#1a1612">${escapeHtml(title)}</h1>
+        <p style="margin:18px 0 16px;font-size:15px;line-height:24px;color:#6b6358">Hello,</p>
         ${paragraphs}
         ${verification}
         ${action ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin-top:${verification ? '0' : '12px'}"><tr><td align="center">${action}</td></tr></table>` : ''}
         ${security}
+        <p style="margin:28px 0 0;font-size:14px;line-height:22px;color:#6b6358">Kind regards,<br><strong>The Prime Markets team</strong></p>
       </td></tr>
-      <tr><td style="padding:20px 36px;background-color:#faf8f5;border-top:1px solid #eee8df;border-radius:0 0 12px 12px"><p style="margin:0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">This is an automated email from The Prime Markets.</p>${expiry}<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">If you did not request this, you can safely ignore this email.</p></td></tr>
+      <tr><td style="padding:20px 36px;background-color:#faf8f5;border-top:1px solid #eee8df;border-radius:0 0 12px 12px"><p style="margin:0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">This is an automated email from The Prime Markets.</p>${expiry}<p style="margin:5px 0 0;text-align:center;font-size:12px;line-height:19px;color:#8a8175">For help, contact <a href="mailto:support@theprimemarkets.com" style="color:#6b5719;text-decoration:underline">support@theprimemarkets.com</a>. Never share your password or verification code.</p></td></tr>
     </table>
     <p style="margin:18px 0 0;text-align:center;font-size:11px;line-height:18px;color:#9a9288">&copy; The Prime Markets. All rights reserved.</p>
   </td></tr></table>
 </body></html>`;
+}
+export function renderPrimeMarketsText({ title, body = '', actionUrl, actionLabel = 'View your account' }) {
+  const action = /^https?:\/\//i.test(String(actionUrl || '')) ? `\n\n${actionLabel}\n${actionUrl}` : '';
+  return `${title}\n\nHello,\n\n${body}${action}\n\nKind regards,\nThe Prime Markets team\n\nFor help, contact support@theprimemarkets.com. Never share your password or verification code.`;
 }

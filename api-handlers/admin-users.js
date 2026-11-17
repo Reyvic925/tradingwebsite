@@ -103,8 +103,8 @@ export default async function handler(req, res) {
       try {
         await createNotification(supabase, {
           user_id: userId,
-          title: action === 'add' ? 'Admin balance added' : 'Admin balance adjusted',
-          body: action === 'add' ? `Admin added $${delta.toFixed(2)} to your available balance.` : `Admin subtracted $${delta.toFixed(2)} from your available balance.${reason ? ` Reason: ${reason}` : ''}`,
+          title: action === 'add' ? 'Account balance credited' : 'Account balance adjusted',
+          body: action === 'add' ? `An account adjustment of ${delta.toFixed(2)} USD has been credited to your available balance.${reason ? `\n\nAdjustment details\n${reason}` : ''}\n\nSign in to review the adjustment in your account history.` : `An account adjustment of ${delta.toFixed(2)} USD has been deducted from your available balance.${reason ? `\n\nAdjustment details\n${reason}` : ''}\n\nSign in to review the adjustment. Contact support if you do not recognize this activity.`,
           read: false,
         });
       } catch (notificationErr) {

@@ -1,4 +1,4 @@
-import { renderPrimeMarketsEmail } from '../shared/email-template.js';
+import { renderPrimeMarketsEmail, renderPrimeMarketsText } from '../shared/email-template.js';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
@@ -42,7 +42,7 @@ async function sendEmail(supabase, { user_id, title, body }) {
         from,
         to: [to],
         subject: title,
-        text: `${title}\n\n${body}${dashboardUrl ? `\n\nView your account: ${dashboardUrl}` : ''}`,
+        text: renderPrimeMarketsText({ title, body, actionUrl: dashboardUrl }),
         html: renderPrimeMarketsEmail({ title, body, actionUrl: dashboardUrl, actionLabel: 'View your account' }),
       }),
     });

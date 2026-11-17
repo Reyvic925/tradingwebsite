@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { notifyUser } from '../../worker/notifications.js';
 import { sendEmail, sendUserEmail } from '../../worker/email.js';
-import { renderPrimeMarketsEmail } from '../../shared/email-template.js';
+import { renderPrimeMarketsEmail, renderPrimeMarketsText } from '../../shared/email-template.js';
 
 const originalFetch = globalThis.fetch;
 const calls = [];
@@ -26,13 +26,21 @@ assert.deepEqual({ ...workerEmail, html: undefined }, {
   from: 'The Prime Markets <alerts@example.com>',
   to: ['client@example.com'],
   subject: 'KYC update',
-  text: 'Review complete.',
+  text: renderPrimeMarketsText({ title: 'KYC update', body: 'Review complete.', actionUrl: 'https://www.theprimemarkets.com/app' }),
   html: undefined,
 });
 assert.match(workerEmail.html, /max-width:580px/);
 assert.match(workerEmail.html, /background-color:#f2efe9/);
 assert.match(workerEmail.html, /Review complete\./);
 assert.match(workerEmail.html, /The Prime Markets/);
+assert.match(workerEmail.html, /support@theprimemarkets.com/);
+assert.match(workerEmail.html, /If the button does not work/);
+assert.doesNotMatch(workerEmail.html, /safely ignore this email/);
+assert.match(workerEmail.text, /Kind regards,/);
+assert.match(workerEmail.text, /Never share your password or verification code/);
+const unsafeAction = renderPrimeMarketsEmail({ title: 'Account update', body: 'Review your account.', actionUrl: 'javascript:alert(1)' });
+assert.doesNotMatch(unsafeAction, /javascript:/);
+assert.doesNotMatch(renderPrimeMarketsText({ title: 'Account update', actionUrl: 'javascript:alert(1)' }), /javascript:/);
 
 const escapedEmail = renderPrimeMarketsEmail({
   title: '<img src=x>',

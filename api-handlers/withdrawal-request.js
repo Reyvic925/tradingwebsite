@@ -60,8 +60,8 @@ export default async function handler(req, res) {
 
         await createNotification(supabase, {
           user_id: user.id,
-          title: 'Withdrawal initiated',
-          body: `Withdrawal of ${amt} ${currency} initiated. Awaiting approval.`,
+          title: 'Withdrawal request received',
+          body: `We received your withdrawal request for ${amt} ${currency}. The request is awaiting review.\n\nSign in to check its status. This email confirms receipt of the request.`,
           read: false,
         });
 
@@ -106,8 +106,8 @@ export default async function handler(req, res) {
 
         await createNotification(supabase, {
           user_id: user.id,
-          title: 'ROI withdrawal initiated',
-          body: `ROI withdrawal of $${amt} initiated. Awaiting admin approval.`,
+          title: 'Investment earnings withdrawal requested',
+          body: `We received your investment earnings withdrawal request for ${Number(amt).toFixed(2)} USD. The request is awaiting review.\n\nYou can check the request status in your account.`,
           read: false,
         });
 

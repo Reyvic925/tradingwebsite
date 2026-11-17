@@ -275,12 +275,12 @@ async function sendVerificationEmail(env, userId, email) {
   const link = emailLink(env, '/auth/confirm', credentials.linkToken);
   const sent = await sendEmail(env, {
     to: email,
-    subject: 'Verify your Prime Markets email',
-    text: `You're almost there. Confirm your email address to complete your account setup.\n\nYour verification code: ${credentials.verificationCode}\nEnter this 8-digit code in the app. It expires in 10 minutes.\n\nOr confirm using this link: ${link}\nThis link expires in 10 minutes. Use either method, not both. If you did not create this account, you can ignore this message.`,
+    subject: 'Verify your email address | The Prime Markets',
+    text: `Thank you for creating an account with The Prime Markets. Please verify your email address to complete your account setup.\n\nYour verification code: ${credentials.verificationCode}\nEnter this 8-digit code on the email verification page. The code expires in 10 minutes.\n\nYou can also verify your email address using this link: ${link}\nThe confirmation link expires in 10 minutes. Complete verification using either the code or the link. If you did not create this account, you can disregard this email.`,
     html: renderPrimeMarketsEmail({
       title: 'Confirm your email',
       preheader: 'Confirm your email address to complete your account setup.',
-      body: "You're almost there. Confirm your email address to complete your account setup.",
+      body: "Thank you for creating an account with The Prime Markets. Please verify your email address to complete your account setup.",
       verificationCode: credentials.verificationCode,
       codeExpiryNote: 'This code expires in 10 minutes.',
       actionUrl: link,
@@ -304,14 +304,14 @@ async function sendPasswordResetEmail(env, userId, email) {
   const link = emailLink(env, '/login?mode=reset', token);
   return sendEmail(env, {
     to: email,
-    subject: 'Reset your Prime Markets password',
-    text: `Use this link to choose a new password:\n\n${link}\n\nThis link expires in 60 minutes. If you did not request a reset, you can ignore this message.`,
+    subject: 'Reset your password | The Prime Markets',
+    text: `We received a request to reset the password for your account with The Prime Markets. Open the secure link below to choose a new password:\n\n${link}\n\nThis link expires in 60 minutes. If you did not request a password reset, do not use the link. Your password will remain unchanged.`,
     html: renderPrimeMarketsEmail({
       title: 'Reset your password',
-      body: 'Use the secure link below to choose a new password for your account.',
+      body: 'We received a request to reset your account password. Use the secure link below to choose a new password.',
       actionUrl: link,
       actionLabel: 'Reset Password',
-      securityTip: 'If you did not request a password reset, do not use this link and ignore this email.',
+      securityTip: 'If you did not request this reset, do not use the link. Your password will remain unchanged. Contact support if you have concerns about your account.',
       expiryNote: 'This password reset link expires in 60 minutes.',
     }),
   }, 'worker/auth');
@@ -438,8 +438,8 @@ async function changePassword(request, env) {
   await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ? AND id != ?')
     .bind(user.id, currentSessionId).run();
   await sendUserEmail(env, user.id, {
-    subject: 'Your Prime Markets password was changed',
-    text: 'The password for your Prime Markets account was changed. If you did not make this change, contact support immediately.',
+    subject: 'Your password has changed | The Prime Markets',
+    text: 'The password for your account with The Prime Markets has been changed.\n\nIf you made this change, no further action is required. If you did not authorize it, reset your password through the sign-in page and contact support@theprimemarkets.com immediately.',
   }, 'worker/auth');
   return response({ ok: true });
 }
@@ -465,8 +465,8 @@ async function confirmPasswordReset(request, env) {
     .bind(await hashPassword(password), token.user_id).run();
   await env.DB.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(token.user_id).run();
   await sendUserEmail(env, token.user_id, {
-    subject: 'Your Prime Markets password was reset',
-    text: 'Your Prime Markets password was reset. If you did not make this change, contact support immediately.',
+    subject: 'Your password has been reset | The Prime Markets',
+    text: 'The password for your account with The Prime Markets has been reset. You can now sign in using your new password.\n\nIf you did not authorize this reset, reset your password through the sign-in page and contact support@theprimemarkets.com immediately.',
   }, 'worker/auth');
   return response({ ok: true });
 }

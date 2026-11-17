@@ -67,13 +67,13 @@ async function createWithdrawal(request, env, user) {
         INSERT INTO notifications (user_id, title, body, read)
         SELECT user_id, 'Withdrawal initiated', ?, 0
         FROM withdrawals WHERE operation_id = ?
-      `).bind(`Withdrawal of ${amount} ${currency} initiated. Awaiting approval.`, operationId),
+      `).bind(`We received your withdrawal request for ${amount} ${currency}. The request is awaiting review.\n\nPlease sign in to check its status. This email confirms your request was received.`, operationId),
     ]);
     const withdrawal = results[1]?.results?.[0];
     if (!withdrawal) return json({ error: 'Insufficient available balance.' }, 400);
     await sendUserEmail(env, user.id, {
-      subject: 'Withdrawal initiated',
-      text: `Withdrawal of ${amount} ${currency} initiated. Awaiting approval.`,
+      subject: 'Withdrawal request received',
+      text: `We received your withdrawal request for ${amount} ${currency}. The request is awaiting review.\n\nPlease sign in to check its status. This email confirms your request was received.`,
     }, 'worker/roi-withdrawal-api');
     return json(withdrawal, 201);
   }
@@ -121,13 +121,13 @@ async function createWithdrawal(request, env, user) {
       INSERT INTO notifications (user_id, title, body, read)
       SELECT user_id, 'ROI withdrawal initiated', ?, 0
       FROM withdrawals WHERE operation_id = ?
-    `).bind(`ROI withdrawal of $${amount} initiated. Awaiting admin approval.`, operationId),
+    `).bind(`We received your investment earnings withdrawal request for ${Number(amount).toFixed(2)} USD. The request is awaiting review.\n\nYou can check the request status in your account.`, operationId),
   ]);
   const withdrawal = results[2]?.results?.[0];
   if (!withdrawal) return json({ error: 'Insufficient locked balance.' }, 400);
   await sendUserEmail(env, user.id, {
-    subject: 'ROI withdrawal initiated',
-    text: `ROI withdrawal of $${amount} initiated. Awaiting admin approval.`,
+    subject: 'Investment earnings withdrawal requested',
+    text: `We received your investment earnings withdrawal request for ${Number(amount).toFixed(2)} USD. The request is awaiting review.\n\nYou can check the request status in your account.`,
   }, 'worker/roi-withdrawal-api');
   return json(withdrawal, 201);
 }
@@ -222,8 +222,8 @@ async function reviewRoiWithdrawal(request, env, admin) {
   `).bind(
     action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected',
     action === 'approve'
-      ? 'Your ROI withdrawal was approved and credited to your available balance.'
-      : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.',
+      ? 'Your investment earnings withdrawal has been approved and credited to your available balance. Sign in to review your updated balance and withdrawal history.'
+      : `Your investment earnings withdrawal was not approved. The amount has been returned to your locked balance.${notes ? `\n\nReview notes\n${notes}` : ''}\n\nYou can review the request in your account or contact support for assistance.`,
     id,
     status,
     admin.id,
@@ -241,10 +241,10 @@ async function reviewRoiWithdrawal(request, env, admin) {
   if (!withdrawal) return json({ error: 'ROI withdrawal not found or already reviewed.' }, 409);
   if (withdrawal.user_id) {
     await sendUserEmail(env, withdrawal.user_id, {
-      subject: action === 'approve' ? 'ROI withdrawal approved' : 'ROI withdrawal rejected',
+      subject: action === 'approve' ? 'Investment earnings withdrawal approved' : 'Investment earnings withdrawal not approved',
       text: action === 'approve'
-        ? 'Your ROI withdrawal was approved and credited to your available balance.'
-        : 'Your ROI withdrawal was rejected. Funds were returned to your locked balance.',
+        ? `Your investment earnings withdrawal of ${Number(withdrawal.amount).toFixed(2)} USD has been approved and credited to your available balance.\n\nSign in to review your updated balance and withdrawal history.`
+        : `Your investment earnings withdrawal of ${Number(withdrawal.amount).toFixed(2)} USD was not approved. The amount has been returned to your locked balance.${notes ? `\n\nReview notes\n${notes}` : ''}\n\nYou can review the request in your account or contact support for assistance.`,
     }, 'worker/roi-withdrawal-api');
   }
   return json(withdrawal);

@@ -118,8 +118,8 @@ export default async function handler(req, res) {
       await createNotification(supabase, {
         user_id: user.id,
         trader_id: traderId,
-        title: `Now copying ${trader.name}`,
-        message: `$${allocatedAmount.toFixed(2)} allocated to copy this trader's positions.`,
+        title: `Copy trading started with ${trader.name}`,
+        message: `Your copy-trading allocation for ${trader.name} is now active. ${allocatedAmount.toFixed(2)} USD has been allocated.\n\nSign in to review your copy settings, risk limits, and trading activity.`,
         type: 'info',
         read: false
       });
@@ -211,8 +211,8 @@ export default async function handler(req, res) {
         await createNotification(supabase, {
           user_id: user.id,
           trader_id: follow.trader_id,
-          title: `Stopped copying ${trader.name}`,
-          message: `Final PnL: ${follow.pnl_percent >= 0 ? '+' : ''}${follow.pnl_percent.toFixed(2)}%`,
+          title: `Copy trading stopped with ${trader.name}`,
+          message: `Copy trading with ${trader.name} has stopped.\n\nRecorded return at closure\n${follow.pnl_percent >= 0 ? '+' : ''}${follow.pnl_percent.toFixed(2)}%\n\nReview the closing activity and final account balance in your account.`,
           type: follow.pnl_percent >= 0 ? 'success' : 'error',
           read: false
         });

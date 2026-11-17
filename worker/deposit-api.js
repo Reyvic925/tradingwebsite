@@ -61,7 +61,7 @@ async function createDeposit(request, env, user) {
       VALUES (?, ?, ?, ?, ?, ?, 'manual_crypto')
       RETURNING *
     `).bind(user.id, amount, currency, network, address.address, txHash).first();
-    await notifyUser(env, user.id, 'Deposit submitted', `${amount} ${currency} deposit submitted on ${network}. It will be credited after approval.`, 'worker/deposit-api');
+    await notifyUser(env, user.id, 'Deposit submitted', `We received your deposit submission for ${amount} ${currency} on ${network}.\n\nThe submission is awaiting review. Your balance will be credited once the deposit is confirmed and approved. You can check its status in your account.`, 'worker/deposit-api');
     return json({ deposit: result }, 201);
   } catch (error) {
     if (/unique/i.test(String(error?.message || ''))) {
@@ -118,7 +118,7 @@ async function listAdminDeposits(request, env, admin) {
       RETURNING *
     `).bind(adminNotes, admin.id, depositId).first();
     if (!rejected) return json({ error: 'Deposit not found or already reviewed.' }, 409);
-    await notifyUser(env, rejected.user_id, 'Deposit rejected', `Your ${rejected.amount} ${rejected.currency} deposit was rejected.${adminNotes ? ` Note: ${adminNotes}` : ''}`, 'worker/deposit-api');
+    await notifyUser(env, rejected.user_id, 'Deposit rejected', `Your deposit submission for ${rejected.amount} ${rejected.currency} was not approved.${adminNotes ? `\n\nReview notes\n${adminNotes}` : ''}\n\nPlease review the deposit details in your account. Contact support if you need help with this decision.`, 'worker/deposit-api');
     return json({ deposit: rejected });
   }
 
@@ -133,7 +133,7 @@ async function listAdminDeposits(request, env, admin) {
     RETURNING *
   `).bind(creditedUsd, adminNotes, admin.id, depositId).first();
   if (!confirmed) return json({ error: 'Deposit not found or already reviewed.' }, 409);
-  await notifyUser(env, confirmed.user_id, 'Deposit confirmed', `Your deposit was approved and $${creditedUsd.toFixed(2)} USD was credited to your account.`, 'worker/deposit-api');
+  await notifyUser(env, confirmed.user_id, 'Deposit confirmed', `Your deposit has been confirmed and approved. ${creditedUsd.toFixed(2)} USD has been credited to your account.\n\nSign in to review your updated balance and transaction history.`, 'worker/deposit-api');
   return json({ deposit: confirmed });
 }
 

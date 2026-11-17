@@ -88,10 +88,10 @@ export default async function handler(req, res) {
       try {
         await createNotification(supabase, {
           user_id: existing.user_id,
-          title: approved ? 'Identity verified' : 'KYC application rejected',
+          title: approved ? 'Your identity verification is complete' : 'Action required for your identity verification',
           body: approved
-            ? 'Your identity verification is complete. Withdrawals are now enabled on your account.'
-            : `Your KYC application was rejected.${admin_notes ? ` Reason: ${admin_notes}` : ''} You can submit a new application from the KYC page.`,
+            ? 'Your identity verification has been approved. You can now submit withdrawal requests, subject to the available balance and applicable account requirements. Please sign in to review your account status.'
+            : `We were unable to approve your identity verification application.${admin_notes ? `\n\nReview notes\n${admin_notes}` : ''}\n\nPlease review your information and submit a new application from the identity verification page in your account.`,
           read: false,
         });
       } catch (e) {

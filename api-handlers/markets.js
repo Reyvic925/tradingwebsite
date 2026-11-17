@@ -537,8 +537,8 @@ async function fillPendingLimits(markets) {
 
     await createNotification(supabase, {
       user_id: order.user_id,
-      title: `Limit ${order.side.toUpperCase()} ${order.symbol} filled`,
-      body: `${qty} filled at ${fillPrice}`,
+      title: `Limit order filled for ${order.symbol}`,
+      body: `Your ${order.side.toUpperCase()} limit order for ${qty} ${order.symbol} has been filled at ${fillPrice}.\n\nReview the execution details, fees, and position protection in your trading account.`,
       read: false,
     });
   }

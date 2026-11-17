@@ -53,8 +53,8 @@ async function markToMarket(userId) {
         .eq('id', pos.id);
       await createNotification(supabase, {
         user_id: userId,
-        title: `${reason === 'stop-loss' ? 'Stop-loss' : 'Take-profit'} hit on ${pos.symbol}`,
-        body: `Position closed at ${price}. P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD`,
+        title: `${reason === 'stop-loss' ? 'Stop-loss' : 'Take-profit'} triggered for ${pos.symbol}`,
+        body: `Your ${pos.symbol} position was closed at ${price} after its ${reason === 'stop-loss' ? 'stop-loss' : 'take-profit'} trigger was reached.\n\nRecorded realized profit or loss\n${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD\n\nReview the full closing details and associated fees in your account.`,
         read: false,
       });
     } else {
@@ -158,8 +158,8 @@ export default async function handler(req, res) {
 
       await createNotification(supabase, {
         user_id: user.id,
-        title: `Closed ${pos.symbol}`,
-        body: `Realized P&L ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD at ${price}`,
+        title: `Position closed for ${pos.symbol}`,
+        body: `Your ${pos.symbol} position has been closed at ${price}.\n\nRecorded realized profit or loss\n${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USD\n\nReview the full closing details and associated fees in your account.`,
         read: false,
       });
 

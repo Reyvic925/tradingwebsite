@@ -230,15 +230,15 @@ async function submitKyc(request, env, user) {
       env.DB.prepare(`
         INSERT INTO notifications (user_id, title, body, read)
         SELECT ?, 'KYC application submitted',
-          'Your identity documents were received and are under review.', 0
+          'We have received your identity verification documents. Your application is now awaiting review.\n\nWe will notify you when the review is complete. You can check the status of your application on the identity verification page in your account.', 0
         WHERE changes() = 1
       `).bind(user.id),
     ]);
     const submission = results[0]?.results?.[0];
     if (!submission) throw new Error('KYC submission returned no row.');
     await sendUserEmail(env, user.id, {
-      subject: 'KYC application submitted',
-      text: 'Your identity documents were received and are under review.',
+      subject: 'Identity verification documents received',
+      text: 'We have received your identity verification documents. Your application is now awaiting review.\n\nWe will notify you when the review is complete. You can check the status of your application on the identity verification page in your account.',
     }, 'worker/kyc-api');
     return json({ submission: { ...submission, personal_data: validation.personal, documents: validation.documents } }, 201);
   } catch (error) {
@@ -310,8 +310,8 @@ async function reviewKyc(request, env, admin) {
       FROM kyc_submissions WHERE id = ? AND status = ? AND reviewer_id = ?
     `).bind(
       action === 'approve' ? 'Identity verified' : 'KYC application rejected',
-      action === 'approve' ? 'Your identity verification is complete. Withdrawals are now enabled.'
-        : `Your KYC application was rejected.${note ? ` Reason: ${note}` : ''} You can submit a new application.`,
+      action === 'approve' ? 'Your identity verification has been approved. You can now submit withdrawal requests, subject to the available balance and applicable account requirements.\n\nSign in to review your verification status and account settings.'
+        : `We were unable to approve your identity verification application.${note ? `\n\nReview notes\n${note}` : ''}\n\nPlease review your information and submit a new application from the identity verification page in your account. Contact support if you need assistance.`,
       id,
       status,
       admin.id,
@@ -327,10 +327,10 @@ async function reviewKyc(request, env, admin) {
   const targetUserId = submission.user_id || (await env.DB.prepare('SELECT user_id FROM kyc_submissions WHERE id = ?').bind(id).first())?.user_id;
   if (targetUserId) {
     await sendUserEmail(env, targetUserId, {
-      subject: action === 'approve' ? 'Identity verified' : 'KYC application rejected',
+      subject: action === 'approve' ? 'Your identity verification is complete' : 'Action required for your identity verification',
       text: action === 'approve'
-        ? 'Your identity verification is complete. Withdrawals are now enabled.'
-        : `Your KYC application was rejected.${note ? ` Reason: ${note}` : ''} You can submit a new application.`,
+        ? 'Your identity verification has been approved. You can now submit withdrawal requests, subject to the available balance and applicable account requirements.\n\nSign in to review your verification status and account settings.'
+        : `We were unable to approve your identity verification application.${note ? `\n\nReview notes\n${note}` : ''}\n\nPlease review your information and submit a new application from the identity verification page in your account. Contact support if you need assistance.`,
     }, 'worker/kyc-api');
   }
   return json({ submission: {

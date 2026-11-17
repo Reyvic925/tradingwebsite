@@ -151,8 +151,8 @@ export default async function handler(req, res) {
       try {
         await createNotification(supabase, {
           user_id: user.id,
-          title: 'KYC application submitted',
-          body: 'Your identity documents were received and are under review. You will be notified once a decision is made.',
+          title: 'Identity verification documents received',
+          body: 'We have received your identity verification documents. Your application is now awaiting review.\n\nWe will notify you when the review is complete. You can check its status on the identity verification page in your account.',
           read: false,
         });
       } catch (e) {
