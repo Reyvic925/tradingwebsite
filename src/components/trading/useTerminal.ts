@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiGet, apiSend } from '../../lib/api';
 import { startVisibleInterval } from '../../lib/visible-interval';
 import type { CatalogMarket, Quote, Snapshot } from './types';
+import { getInstrument } from '../../../shared/trading-instruments.js';
+import { markLivePositions } from '../../../shared/live-position-marks.js';
 
-export function useTerminal(symbol?:string) {
+export function useTerminal(symbol?:string, { loadCatalog = true } = {}) {
   const [catalog,setCatalog]=useState<CatalogMarket[]>([]);
   const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
   const [quote,setQuote]=useState<Quote|null>(null);
@@ -17,8 +19,9 @@ export function useTerminal(symbol?:string) {
   const lastOrders=useRef<Map<string,string>|null>(null);
   const notifications=useRef(false);
   const live=useRef(false),lastSync=useRef(0);
+  const syncRequest = useRef<Promise<Snapshot> | null>(null);
   const receive=useCallback((data:Snapshot)=>{
-    setSnapshot(data);
+    setSnapshot(previous => previous && Date.parse(previous.server_time) > Date.parse(data.server_time) ? previous : data);
     if(Number.isFinite(Date.parse(data.server_time)))setServerOffset(Date.parse(data.server_time)-Date.now());
     const fresh=data.fills.filter(fill=>lastFills.current&&!lastFills.current.has(fill.id));
     const alerts=data.alerts.filter(alert=>alert.status==='triggered'&&lastAlerts.current&&!lastAlerts.current.has(alert.id));
@@ -29,18 +32,26 @@ export function useTerminal(symbol?:string) {
     lastFills.current=new Set(data.fills.map(fill=>fill.id));lastAlerts.current=new Set(data.alerts.filter(a=>a.status==='triggered').map(a=>a.id));
     lastOrders.current=new Map(data.orders.map(order=>[String(order.id),order.status]));
   },[]);
-  const refresh=useCallback(async()=>{lastSync.current=Date.now();const data=await apiSend<Snapshot>('/api/paper/sync','POST',{});receive(data);setError('');},[receive]);
+  const refresh=useCallback(()=>{
+    if (syncRequest.current) return syncRequest.current;
+    lastSync.current=Date.now();
+    const request=apiSend<Snapshot>('/api/paper/sync','POST',{}).then(data=>{receive(data);setError('');return data;});
+    syncRequest.current=request;
+    void request.finally(()=>{if(syncRequest.current===request)syncRequest.current=null;}).catch(()=>{});
+    return request;
+  },[receive]);
   const refreshQuote=useCallback(async()=>{
     const id=++quoteRequest.current;if(!symbol){setQuote(null);return;}
     try{const data=await apiGet<Quote>(`/api/paper/quote?symbol=${encodeURIComponent(symbol)}`);if(id===quoteRequest.current){setQuote(data);setQuoteError('');}}
     catch(e){if(id===quoteRequest.current){setQuote(null);setQuoteError(e instanceof Error?e.message:'Quote unavailable');}}
   },[symbol]);
   useEffect(()=>{
+    if (!loadCatalog) return;
     let active=true;
     try{const cached=JSON.parse(sessionStorage.getItem('prime-trading-catalog-v2')||'null');if(cached&&Date.now()-cached.at<300000)setCatalog(cached.items);}catch{/* storage is optional */}
     apiGet<{items:CatalogMarket[]}>('/api/paper/catalog').then(data=>{if(active){setCatalog(data.items);try{sessionStorage.setItem('prime-trading-catalog-v2',JSON.stringify({at:Date.now(),items:data.items}));}catch{/* quota */}}}).catch(e=>setError(e.message));
     return()=>{active=false;};
-  },[]);
+  },[loadCatalog]);
   useEffect(()=>{
     setQuote(null);const stop=startVisibleInterval(refreshQuote,15000);return()=>{stop();quoteRequest.current++;};
   },[refreshQuote]);
@@ -60,13 +71,76 @@ export function useTerminal(symbol?:string) {
       }catch{live.current=false;setConnection('Polling fallback');if(!stopped)retry=setTimeout(connect,30000);}finally{connecting=false;}
     };
     const visible=()=>{if(document.visibilityState==='visible'){void refresh().catch(e=>setError(e.message));if(!socket||socket.readyState>1)void connect();}else socket?.close();};
-    void connect();const stop=startVisibleInterval(()=>{if(!live.current||Date.now()-lastSync.current>=60000)return refresh().catch(e=>setError(e.message));},10000);
+    void connect();const stop=startVisibleInterval(async()=>{if(!live.current||Date.now()-lastSync.current>=60000){try{await refresh();}catch(e){setError(e instanceof Error?e.message:'Account sync failed');}}},5000);
     const heartbeat=setInterval(()=>{if(socket?.readyState===1){if(Date.now()-lastMessage>65000)socket.close();else{pingStarted=performance.now();socket.send('ping');}}},30000);
     document.addEventListener('visibilitychange',visible);
     return()=>{stopped=true;stop();clearInterval(heartbeat);if(retry)clearTimeout(retry);socket?.close();document.removeEventListener('visibilitychange',visible);};
   },[receive,refresh]);
   const enableNotifications=async()=>{if('Notification'in window){const permission=await Notification.requestPermission();notifications.current=permission==='granted';setMessage(permission==='granted'?'Browser notifications enabled.':'Browser notifications are not enabled.');}};
-  return {catalog,snapshot,quote,error,quoteError,setError,message,setMessage,connection,latency,serverOffset,refresh,refreshQuote,enableNotifications};
+  const livePositions = useLivePositionMarks(snapshot, serverOffset);
+  return {catalog,snapshot:livePositions.snapshot,liveMarks:livePositions.live,quote,error,quoteError,setError,message,setMessage,connection,latency,serverOffset,refresh,refreshQuote,enableNotifications};
+}
+
+type PositionTick = { price: number; at: string };
+
+function useLivePositionMarks(snapshot: Snapshot | null, serverOffset: number) {
+  const [ticks, setTicks] = useState<Record<string, PositionTick>>({});
+  const [now, setNow] = useState(Date.now);
+  const offset = useRef(serverOffset);
+  useEffect(() => { offset.current = serverOffset; }, [serverOffset]);
+  const products = [...new Set((snapshot?.positions || [])
+    .filter(position => getInstrument(position.symbol)?.asset_class === 'crypto' && position.quote_currency === 'USD')
+    .map(position => position.symbol))].sort().join(',');
+
+  useEffect(() => {
+    if (!products) return;
+    const symbols = new Set(products.split(','));
+    let stopped = false;
+    let socket: WebSocket | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const connect = () => {
+      if (stopped || document.visibilityState !== 'visible' || socket && socket.readyState <= 1) return;
+      const current = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      socket = current;
+      current.onopen = () => current.send(JSON.stringify({ type: 'subscribe',
+        product_ids: [...symbols].map(symbol => symbol.replace(/USD$/, '-USD')), channels: ['ticker', 'heartbeat'] }));
+      current.onmessage = event => {
+        if (socket !== current) return;
+        try {
+          const data = JSON.parse(event.data);
+          const symbol = String(data.product_id || '').replace('-USD', 'USD');
+          const price = Number(data.price), at = Date.parse(data.time), currentTime = Date.now() + offset.current;
+          if (data.type !== 'ticker' || !symbols.has(symbol) || !Number.isFinite(price) || price <= 0
+            || !Number.isFinite(at) || currentTime - at > 15000 || at > currentTime + 1000) return;
+          setTicks(previous => at < Date.parse(previous[symbol]?.at) ? previous : { ...previous, [symbol]: { price, at: data.time } });
+        } catch { /* Ignore malformed provider events. */ }
+      };
+      current.onclose = () => {
+        if (socket !== current) return;
+        setTicks({});
+        if (!stopped) retry = setTimeout(connect, 3000);
+      };
+      current.onerror = () => current.close();
+    };
+    const visible = () => {
+      setTicks({});
+      if (document.visibilityState === 'visible') connect();
+      else socket?.close();
+    };
+    connect();
+    const expiry = window.setInterval(() => setNow(Date.now()), 1000);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      stopped = true;
+      if (retry) clearTimeout(retry);
+      window.clearInterval(expiry);
+      document.removeEventListener('visibilitychange', visible);
+      if (socket) { socket.onclose = null; socket.onmessage = null; socket.close(); }
+    };
+  }, [products]);
+
+  const marked = markLivePositions(snapshot, ticks, now + serverOffset) as Snapshot | null;
+  return { snapshot: marked, live: marked !== snapshot };
 }
 
 export function useCryptoStream(symbol:string|undefined,enabled:boolean,serverOffset=0) {

@@ -8,16 +8,18 @@ import { marketSession } from '../../shared/trading-sessions.js';
 import { apiGet, apiList, asList } from '../lib/api';
 import { formatMoney, formatPct, formatPrice } from '../lib/format';
 import { startVisibleInterval } from '../lib/visible-interval';
-import type { Snapshot, TerminalPosition } from '../components/trading/types';
-import type { Investment, Market, PaperAccount, Profile, Txn } from '../types';
+import type { TerminalPosition } from '../components/trading/types';
+import { useTerminal } from '../components/trading/useTerminal';
+import type { Investment, Market, Profile, Txn } from '../types';
 
 export default function Dashboard() {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const trading = useTerminal(undefined, { loadCatalog: false });
+  const { snapshot, refresh: refreshTrading } = trading;
+  const paperAccount = snapshot?.account || null;
+  const positions = snapshot?.positions || [];
   const [closing, setClosing] = useState<TerminalPosition | null>(null);
   const [notice, setNotice] = useState('');
-  const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [positions, setPositions] = useState<TerminalPosition[]>([]);
   const [markets, setMarkets] = useState<Market[]>([]);
   const [txns, setTxns] = useState<Txn[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
@@ -32,17 +34,14 @@ export default function Dashboard() {
     if (loadInFlight.current) return;
     loadInFlight.current = true;
     try {
-      const [profileData, trading, mkt, tx, inv] = await Promise.all([
+      const [profileData, , mkt, tx, inv] = await Promise.all([
         apiGet<{ profile?: Profile }>('/api/profile').catch(() => null),
-        apiGet<Snapshot>('/api/paper/snapshot'),
+        refreshTrading(),
         apiList<Market>('/api/markets?featured=1&limit=12'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
       ]);
       if (profileData?.profile) setProfile(profileData.profile);
-      setSnapshot(trading);
-      setPaperAccount(trading.account);
-      setPositions(asList(trading.positions));
       setMarkets(asList(mkt));
       setTxns(asList<Txn>(tx).slice(0, 6));
       setInvestments(asList(inv));
@@ -53,7 +52,7 @@ export default function Dashboard() {
       setLoading(false);
       loadInFlight.current = false;
     }
-  }, []);
+  }, [refreshTrading]);
 
   useEffect(() => {
     const stopPolling = startVisibleInterval(load, 30000);
@@ -92,7 +91,7 @@ export default function Dashboard() {
           ))}
         </div>
       )}
-      {error && <div className="mt-6 rounded-sm border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</div>}
+      {error && <div className="mt-6 rounded-sm border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error || trading.error}</div>}
 
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-stone-500"><span>{snapshot?`Account snapshot: ${new Date(snapshot.server_time).toLocaleString()}`:'Loading account snapshot...'}</span><button type="button" className="terminal-button" onClick={()=>void load()}>Refresh overview</button>{notice&&<span role="status" className="text-emerald-300">{notice}</span>}{positions.some(position=>position.quote_stale)&&<span className="text-amber-300">Some marks are stale. P&amp;L uses the last available mark.</span>}</div>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -114,7 +113,7 @@ export default function Dashboard() {
         <div className="min-w-0 lg:col-span-2 rounded-md border border-white/5">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
             <div>
-              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">Positions | server-calculated unrealized P&amp;L | refreshes every 30 seconds</p>
+              <h2 className="text-sm uppercase tracking-[0.16em] text-stone-400">Open positions</h2><p className="mt-1 text-[10px] text-stone-500">{trading.liveMarks ? 'Live crypto marks and indicative P&L' : `Account marks ? ${trading.connection}`} ? balances reconcile with the server</p>
             </div>
             <Link to="/app/trade" className="text-xs text-amber-300">Desk →</Link>
           </div>
@@ -201,7 +200,7 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
-      {closing&&<OverviewCloseDialog position={closing} commissionBps={Number(snapshot?.preferences.commission_bps||0)} onDismiss={()=>setClosing(null)} onDone={async()=>{setNotice('Position close confirmed.');try{const trading=await apiGet<Snapshot>('/api/paper/snapshot');setSnapshot(trading);setPaperAccount(trading.account);setPositions(trading.positions);}catch{setError('Close succeeded; refresh the overview to update account values.');}}}/>}
+      {closing&&<OverviewCloseDialog position={closing} commissionBps={Number(snapshot?.preferences.commission_bps||0)} onDismiss={()=>setClosing(null)} onDone={async()=>{setNotice('Position close confirmed.');try{await refreshTrading();}catch{setError('Close succeeded; refresh the overview to update account values.');}}}/>}
     </AppShell>
   );
 }
