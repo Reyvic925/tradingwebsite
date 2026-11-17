@@ -114,3 +114,44 @@ const resumed = simulateTick({ traderId: 7, tickId: 71, timestamp: nextDay, conf
 assert.equal(resumed.state.dailyLossPaused, false);
 assert.equal(resumed.state.dailyOpeningEquity, pausedState.equity);
 console.log('SIGNAL_COST_AND_DAILY_LOSS_CONTROLS_PASSED');
+
+// Existing saved configs gain larger future market entries without resizing open trades.
+const sizingConfig = { strategyType: 'conservative', assets: ['BTC-USD'], session: 'crypto',
+  startingEquity: 1000, minimumSignalBps: 0, spreadBps: 0, slippageBps: 0, feeBps: 0,
+  dailyLossLimitPercent: 100 };
+let entryTick;
+let standardEntry;
+let largerEntry;
+for (let tick = 1; tick <= 100 && !largerEntry; tick++) {
+  const args = { traderId: 7, tickId: tick, timestamp: quoteTime,
+    state: { equity: 1000, prices: {}, peakEquity: 1000 }, marketQuotes: { 'BTC-USD': quote } };
+  const larger = simulateTick({ ...args, config: sizingConfig });
+  if (larger.openedTrade) {
+    entryTick = tick;
+    largerEntry = larger;
+    standardEntry = simulateTick({ ...args, config: { ...sizingConfig, marketPositionSizeMultiplier: 1 } });
+  }
+}
+assert(largerEntry && standardEntry.openedTrade);
+assert(Math.abs(largerEntry.openedTrade.notional - 300) < 1e-8);
+assert.equal(largerEntry.openedTrade.quantity, standardEntry.openedTrade.quantity * 2);
+const held = simulateTick({ traderId: 7, tickId: entryTick + 1, timestamp: quoteTime, config: sizingConfig,
+  state: standardEntry.state, marketQuotes: { 'BTC-USD': quote } });
+assert.equal(held.state.position.quantity, standardEntry.openedTrade.quantity);
+for (const move of [1.01, 0.99]) {
+  const close = entry => simulateTick({ traderId: 7, tickId: entryTick + 4, timestamp: quoteTime,
+    config: sizingConfig, state: { ...entry.state, position: { ...entry.state.position, age: 3 } },
+    marketQuotes: { 'BTC-USD': { ...quote, price: quote.price * move } } });
+  const standardClose = close(standardEntry);
+  const largerClose = close(largerEntry);
+  assert.equal(largerClose.trade.pnl, standardClose.trade.pnl * 2, 'Market gains and losses must both scale with quantity');
+  const metrics = deriveMetrics({ startingEquity: 1000, equity: largerClose.state.equity,
+    trades: [largerClose.trade], history: [{ equity: 1000 }, { equity: largerClose.state.equity }] });
+  assert.equal(metrics.totalReturn, move > 1 ? 0.3 : -0.3);
+  assert.equal(metrics.winRate, move > 1 ? 100 : 0);
+}
+const cappedEntry = simulateTick({ traderId: 7, tickId: entryTick, timestamp: quoteTime,
+  config: { ...sizingConfig, maxExposureFraction: 5, riskFraction: 1, marketPositionSizeMultiplier: 4 },
+  state: { equity: 1000, prices: {}, peakEquity: 1000 }, marketQuotes: { 'BTC-USD': quote } });
+assert(Math.abs(cappedEntry.openedTrade.notional - 1000) < 1e-8, 'Lead market exposure cannot exceed account equity');
+console.log('MARKET_POSITION_SIZING_TESTS_PASSED');

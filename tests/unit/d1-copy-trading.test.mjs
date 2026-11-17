@@ -49,10 +49,20 @@ sqlite.prepare('UPDATE copy_follows SET followed_at=? WHERE id=?').run('2026-01-
 const date = new Date('2026-11-13T15:00:00Z');
 await runCopyTradingTick(env, date);
 const count = sqlite.prepare('SELECT count(*) n FROM trader_trades').get().n;
+// Simulate configs persisted by deployments before market sizing was added.
+for (const saved of sqlite.prepare('SELECT trader_id,config FROM copy_simulation_state').all()) {
+  const config = JSON.parse(saved.config);
+  delete config.marketPositionSizeMultiplier;
+  sqlite.prepare('UPDATE copy_simulation_state SET config=? WHERE trader_id=?').run(JSON.stringify(config), saved.trader_id);
+}
 await runCopyTradingTick(env, date);
 assert.equal(sqlite.prepare('SELECT count(*) n FROM trader_trades').get().n, count);
 for (let i = 1; i < 30 && !sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id); i++) await runCopyTradingTick(env, new Date(+date + i * 300000));
 assert(sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id), 'copy opens an actual position');
+const copiedPosition = sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id);
+const leadPosition = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=4').get().state).position;
+assert(Math.abs(leadPosition.notional / leadPosition.equity_at_entry - 0.3) < 1e-8, 'Existing conservative configs must open with doubled 30% exposure');
+assert(Math.abs(copiedPosition.quantity * copiedPosition.entry_price - 300) < 1e-6, 'Follower quantity must inherit larger market exposure');
 assert.equal((await call('PUT', { status: 'paused' }, `?id=${id}`)).status, 200);
 const paused = sqlite.prepare('SELECT * FROM copy_follows WHERE id=?').get(id);
 for (let i = 30; i < 40; i++) await runCopyTradingTick(env, new Date(+date + i * 300000));
