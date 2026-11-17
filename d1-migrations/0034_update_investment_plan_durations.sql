@@ -1,0 +1,8 @@
+UPDATE plans
+SET duration_days = CASE id
+  WHEN 1 THEN 6
+  WHEN 2 THEN 9
+  WHEN 3 THEN 14
+  WHEN 4 THEN 21
+END
+WHERE id IN (1, 2, 3, 4);
