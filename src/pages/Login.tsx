@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Eye, EyeOff, LoaderCircle, LockKeyhole } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,55 +6,115 @@ import { resendVerificationEmail, signIn, signUp, verifyEmailCode } from '../lib
 import { apiSend, clearReferral, takeReferral } from '../lib/api';
 import Logo from '../components/Logo';
 
+const PENDING_VERIFICATION_KEY = 'apex-pending-verification';
+type PendingVerification = { email: string; expiresAt: number; resendAt: number };
+
+function readPendingVerification(): PendingVerification | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(PENDING_VERIFICATION_KEY) || 'null');
+    if (typeof value?.email === 'string' && Number.isFinite(value.expiresAt) && value.expiresAt > Date.now() && Number.isFinite(value.resendAt)) return value;
+    localStorage.removeItem(PENDING_VERIFICATION_KEY);
+  } catch { /* Registration remains available when browser storage is blocked. */ }
+  return null;
+}
+
+function savePendingVerification(value: PendingVerification | null) {
+  try {
+    if (value) localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(value));
+    else localStorage.removeItem(PENDING_VERIFICATION_KEY);
+  } catch { /* The current verification flow can continue without storage. */ }
+}
+
 export default function Login() {
   const { user, loading } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [pending, setPending] = useState(readPendingVerification);
+  const [email, setEmail] = useState(() => params.get('email') || pending?.email || '');
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
-  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationActive, setVerificationActive] = useState(Boolean(pending));
   const [verificationCode, setVerificationCode] = useState('');
   const [verificationNotice, setVerificationNotice] = useState('');
   const [resendingVerification, setResendingVerification] = useState(false);
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const requestInFlight = useRef(false);
+  const [now, setNow] = useState(Date.now);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const mode = params.get('mode') === 'signup' ? 'signup' : params.get('mode') === 'reset' ? 'reset' : 'login';
   const resetToken = params.get('token') || '';
   const emailVerified = params.get('email_verified') === '1';
   const emailVerificationFailed = params.get('email_verified') === '0';
 
+  const verificationPending = mode === 'signup' && verificationActive && !emailVerified;
+  const verificationEmail = pending?.email || email;
+  const resendSeconds = Math.max(0, Math.ceil(((pending?.resendAt || 0) - now) / 1000));
+  const emailError = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 320 ? 'Enter a valid email address.' : '';
+  const nameError = !fullName.trim() ? 'Enter your full name.' : '';
+  const passwordError = password.length < 8 || password.length > 128 ? 'Use 8 to 128 characters.' : '';
+
+  useEffect(() => {
+    if (!verificationPending || !resendSeconds) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationPending, resendSeconds]);
+
+  useEffect(() => {
+    if (emailVerified) {
+      savePendingVerification(null);
+    }
+  }, [emailVerified]);
+
+  const beginVerification = (address = email, cooldown = 60_000) => {
+    const next = { email: address.trim().toLowerCase(), expiresAt: Date.now() + 24 * 60 * 60 * 1000, resendAt: Date.now() + cooldown };
+    setEmail(next.email);
+    setPending(next);
+    savePendingVerification(next);
+    setVerificationActive(true);
+    setVerificationCode('');
+    setNow(Date.now());
+  };
+
+  const changeEmail = () => {
+    savePendingVerification(null);
+    setPending(null);
+    setVerificationActive(false);
+    setVerificationCode('');
+    setVerificationNotice('Enter the correct email and create your account to receive a new code.');
+    setError('');
+  };
+
+  const navigateAuth = (url: string) => {
+    setError('');
+    setVerificationNotice('');
+    setTouched({});
+    setResetSent(false);
+    setResetComplete(false);
+    navigate(url);
+  };
+
   if (!loading && user) return <Navigate to="/app" replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy) return;
+    if (requestInFlight.current) return;
     setError('');
-    if (mode === 'reset') {
-      if (resetComplete) return;
-      if (resetToken) {
-        if (password.length < 8) return setError('Password must be at least 8 characters.');
-        if (password !== confirmPassword) return setError('Passwords do not match.');
-      } else if (!email.includes('@')) {
-        return setError('Enter a valid email address.');
-      }
+    if (verificationPending) {
+      if (!/^\d{8}$/.test(verificationCode)) return setError('Enter the 8-digit code from your email.');
     } else {
-      if (!email.includes('@')) return setError('Enter a valid email address.');
-      if (password.length < 8) return setError('Password must be at least 8 characters.');
+      setTouched({ email: true, name: true, password: true });
+      if (!(mode === 'reset' && resetToken) && emailError) return;
+      if ((mode !== 'reset' || resetToken) && passwordError) return;
+      if (mode === 'signup' && nameError) return;
+      if (mode === 'reset' && resetToken && password !== confirmPassword) return setError('Passwords do not match.');
+      if (resetComplete) return;
     }
-    if (verificationPending && !/^\d{8}$/.test(verificationCode)) return setError('Enter the 8-digit code from your email.');
-    if (mode === 'signup') {
-      if (!fullName.trim()) return setError('Enter your full name.');
-      if (!phone.trim()) return setError('Enter your phone number.');
-      if (!location.trim()) return setError('Enter your location.');
-      if (password !== confirmPassword) return setError('Passwords do not match.');
-    }
+    requestInFlight.current = true;
     setBusy(true);
     try {
       if (mode === 'reset' && resetToken) {
@@ -66,21 +126,27 @@ export default function Login() {
         setResetSent(true);
         return;
       } else if (mode === 'signup' && verificationPending) {
-        await verifyEmailCode(email, verificationCode);
-        setVerificationPending(false);
-        setVerificationNotice('Email confirmed. Signing you in…');
-        await signIn(email, password);
-        window.location.href = '/app';
+        await verifyEmailCode(verificationEmail, verificationCode);
+        setEmail(verificationEmail);
+        savePendingVerification(null);
+        setPending(null);
+        setVerificationActive(false);
+        setPassword('');
+        setTouched({});
+        setVerificationNotice('Email confirmed. Sign in with your password to continue.');
+        navigate(`/login?email=${encodeURIComponent(verificationEmail)}`, { replace: true });
+        if (password) {
+          await signIn(verificationEmail, password);
+          window.location.href = '/app';
+        }
         return;
       } else if (mode === 'signup') {
         const result = await signUp(email, password, {
           full_name: fullName.trim(),
-          phone: phone.trim(),
-          country: location.trim(),
           referred_by: takeReferral(),
         });
         clearReferral();
-        setVerificationPending(true);
+        beginVerification();
         setVerificationNotice(result.throttled
           ? 'A verification email was sent recently. Check your inbox, including spam.'
           : result.email_sent
@@ -94,33 +160,44 @@ export default function Login() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
       const networkIssue = /failed to fetch|network|timed out|timeout/i.test(message);
+      if (mode === 'login' && /Confirm your email before signing in/i.test(message)) {
+        beginVerification(email, 0);
+        setVerificationNotice('Enter the code from your email, or request a fresh code below.');
+        navigate('/login?mode=signup', { replace: true });
+        return;
+      }
       setError(networkIssue
         ? 'Unable to reach the authentication service. Check your internet connection, disable any VPN or ad blocker, and try again.'
         : message || (mode === 'signup' ? 'Unable to create this account.' : 'Authentication failed'));
     } finally {
+      requestInFlight.current = false;
       setBusy(false);
     }
   };
 
   const headerText = verificationPending ? 'Check your email' : mode === 'signup' ? 'Create your account' : mode === 'reset' ? resetToken ? 'Choose a new password' : 'Reset your password' : 'Welcome back';
   const helperText = verificationPending
-    ? 'Check your inbox and enter the 8-digit code, or use the confirmation link in the email.'
+    ? `Enter the 8-digit code sent to ${verificationEmail}. Codes expire after 10 minutes. You can also use the confirmation link.`
     : mode === 'reset'
     ? resetComplete ? 'Your password has been updated.' : resetSent ? 'If the address is registered, a reset link is on its way.' : resetToken ? 'Choose a new password for your account.' : 'We will send a password reset link if this address has an account.'
     : mode === 'signup' ? 'Your next chapter starts here. Set up your trading account.' : 'Sign in to access your account and portfolio.';
   const actionText = verificationPending ? 'Verify email' : mode === 'signup' ? 'Create account' : mode === 'reset' ? resetToken ? 'Reset password' : 'Send reset link' : 'Sign in';
 
   const resendVerification = async () => {
+    if (requestInFlight.current || resendSeconds > 0) return;
+    requestInFlight.current = true;
     setResendingVerification(true);
     setError('');
     try {
-      const result = await resendVerificationEmail(email);
+      const result = await resendVerificationEmail(verificationEmail);
+      beginVerification(verificationEmail);
       setVerificationNotice(result.throttled
         ? 'A verification email was sent recently. Check your inbox, including spam.'
         : 'If your account is awaiting confirmation, a fresh verification email is on its way.');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to resend the verification email.');
     } finally {
+      requestInFlight.current = false;
       setResendingVerification(false);
     }
   };
@@ -141,23 +218,37 @@ export default function Login() {
           {resetSent && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">If the address is registered, a password reset link is on its way.</div>}
           {resetComplete && <div role="status" className="mt-4 border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm text-emerald-200">Password reset successfully. Sign in with your new password.</div>}
 
-          {!resetComplete && !(mode === 'reset' && resetSent) && <form onSubmit={submit} className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2" aria-busy={busy}>
+          {!resetComplete && !(mode === 'reset' && resetSent) && <form onSubmit={submit} className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2" aria-busy={busy} noValidate>
             {!verificationPending && !(mode === 'reset' && resetToken) && <label className="block text-xs font-medium text-stone-300 sm:col-span-2">Email address
-<input
+                <input
                 required
+                id="registration-email"
+                name="email"
                 type="email"
+                disabled={busy}
+                onBlur={() => setTouched((value) => ({ ...value, email: true }))}
+                aria-invalid={Boolean(touched.email && emailError)}
+                aria-describedby={touched.email && emailError ? 'email-error' : undefined}
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email Address"
+                placeholder="you@example.com"
                 className="mt-2 min-h-12 w-full rounded-lg border border-white/15 bg-[#090c11] px-3.5 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-600 hover:border-white/25 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/10"
               />
-</label>}
+              </label>
+              }
+            {touched.email && emailError && !verificationPending && !(mode === 'reset' && resetToken) && <p id="email-error" className="sm:col-span-2 -mt-2 text-xs text-rose-300">{emailError}</p>}
             {mode === 'signup' && !verificationPending && (
               <>
                 <label className="block text-xs font-medium text-stone-300 sm:col-span-2">Full name
-<input
+                <input
                   required
+                  name="name"
+                  maxLength={160}
+                  disabled={busy}
+                  onBlur={() => setTouched((value) => ({ ...value, name: true }))}
+                  aria-invalid={Boolean(touched.name && nameError)}
+                  aria-describedby={touched.name && nameError ? 'name-error' : undefined}
                   type="text"
                   autoComplete="name"
                   value={fullName}
@@ -165,33 +256,13 @@ export default function Login() {
                   placeholder="Full Name"
                   className="mt-2 min-h-12 w-full rounded-lg border border-white/15 bg-[#090c11] px-3.5 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-600 hover:border-white/25 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/10"
                 />
-</label>
-                <label className="block text-xs font-medium text-stone-300 ">Phone number
-<input
-                  required
-                  type="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 555 000 0000"
-                  className="mt-2 min-h-12 w-full rounded-lg border border-white/15 bg-[#090c11] px-3.5 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-600 hover:border-white/25 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/10"
-                />
-</label>
-                <label className="block text-xs font-medium text-stone-300 ">Country of residence
-<input
-                  required
-                  type="text"
-                  autoComplete="country-name"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. United States"
-                  className="mt-2 min-h-12 w-full rounded-lg border border-white/15 bg-[#090c11] px-3.5 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-600 hover:border-white/25 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/10"
-                />
-</label>
+              </label>
+                {touched.name && nameError && <p id="name-error" className="sm:col-span-2 -mt-2 text-xs text-rose-300">{nameError}</p>}
               </>
             )}
             {verificationPending && <input
               required
+              disabled={busy || resendingVerification}
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -204,13 +275,18 @@ export default function Login() {
               className="sm:col-span-2 w-full rounded-lg border border-white/15 bg-[#090c11] px-3 py-3 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-amber-400/50"
             />}
             {!verificationPending && (mode !== 'reset' || Boolean(resetToken)) && (
-              <div className={mode === 'login' ? 'sm:col-span-2' : ''}>
+              <div className="sm:col-span-2">
                 <label htmlFor="account-password" className="block text-xs font-medium text-stone-300">Password</label>
                   <div className="relative"><input
                 id="account-password"
                 required
+                name="password"
+                disabled={busy}
+                maxLength={128}
+                onBlur={() => setTouched((value) => ({ ...value, password: true }))}
+                aria-invalid={Boolean(touched.password && passwordError)}
                 minLength={8}
-                aria-describedby={mode === 'signup' || mode === 'reset' ? 'password-guidance' : undefined}
+                aria-describedby={touched.password && passwordError ? 'password-error' : mode !== 'login' ? 'password-guidance' : undefined}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'signup' || mode === 'reset' ? 'new-password' : 'current-password'}
                 value={password}
@@ -222,15 +298,17 @@ export default function Login() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                {mode !== 'login' && <p id="password-guidance" className={`mt-2 flex items-center gap-1.5 text-xs ${password.length >= 8 ? 'text-emerald-300' : 'text-stone-400'}`}>
-                  {password.length >= 8 && <Check size={13} aria-hidden="true" />}At least 8 characters
+                {touched.password && passwordError && <p id="password-error" className="mt-2 text-xs text-rose-300">{passwordError}</p>}
+                {mode !== 'login' && !(touched.password && passwordError) && <p id="password-guidance" className={`mt-2 flex items-center gap-1.5 text-xs ${password.length >= 8 && password.length <= 128 ? 'text-emerald-300' : 'text-stone-400'}`}>
+                  {password.length >= 8 && password.length <= 128 && <Check size={13} aria-hidden="true" />}8 to 128 characters
                 </p>}
               </div>
             )}
-            {!verificationPending && (mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (
+            {!verificationPending && (mode === 'reset' && Boolean(resetToken)) && (
               <label className="block text-xs font-medium text-stone-300 ">Confirm password
-<input
+                <input
                 required
+                disabled={busy}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={confirmPassword}
@@ -238,10 +316,10 @@ export default function Login() {
                 placeholder="Confirm Password"
                 className="mt-2 min-h-12 w-full rounded-lg border border-white/15 bg-[#090c11] px-3.5 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-600 hover:border-white/25 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/10"
               />
-</label>
+              </label>
             )}
             {error && <div role="alert" className="sm:col-span-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
-            <button disabled={busy} className="sm:col-span-2 mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-amber-300 px-4 py-3 text-sm font-semibold text-[#1a1304] transition hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 disabled:cursor-wait disabled:opacity-60">
+            <button disabled={busy || resendingVerification} className="sm:col-span-2 mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-amber-300 px-4 py-3 text-sm font-semibold text-[#1a1304] transition hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 disabled:cursor-wait disabled:opacity-60">
               {busy && <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />}
               {busy ? 'Please wait...' : actionText}
               {!busy && <ArrowRight size={17} aria-hidden="true" />}
@@ -250,33 +328,46 @@ export default function Login() {
 
           {verificationPending && <button
             type="button"
-            disabled={resendingVerification}
+            disabled={busy || resendingVerification || resendSeconds > 0}
             onClick={resendVerification}
             className="mt-3 w-full text-center text-xs font-semibold text-amber-200 underline disabled:opacity-50"
           >
-            {resendingVerification ? 'Sending…' : 'Resend verification email'}
+            {resendingVerification ? 'Sending...' : resendSeconds > 0 ? `Resend available in ${resendSeconds}s` : 'Resend verification email'}
           </button>}
+
+          {verificationPending && <button type="button" disabled={busy || resendingVerification} onClick={changeEmail} className="mt-4 w-full text-sm text-stone-400 underline hover:text-amber-200 disabled:opacity-50">Use a different email</button>}
+          {mode === 'login' && pending && !emailVerified && <button type="button" disabled={busy} onClick={() => {
+            setEmail(pending.email);
+            setVerificationActive(true);
+            setError('');
+            setVerificationNotice('');
+            navigate('/login?mode=signup');
+          }} className="mt-4 w-full text-sm text-amber-200 underline">Resume email verification</button>}
+          {error.includes('already exists') && <div className="mt-3 flex justify-center gap-4 text-sm text-amber-200">
+            <button type="button" onClick={() => navigateAuth(`/login?email=${encodeURIComponent(email)}`)}>Sign in</button>
+            <button type="button" onClick={() => navigateAuth(`/login?mode=reset&email=${encodeURIComponent(email)}`)}>Reset password</button>
+          </div>}
 
           <div className="mt-6 border-t border-white/10 pt-5 text-center text-sm text-stone-400">
             {mode === 'reset' ? (
-              <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login')}>
+              <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigateAuth('/login')}>
                 Back to sign in
               </button>
             ) : mode === 'signup' ? (
               <>
                 Already have an account?{' '}
-                <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login')}>
+                <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigateAuth('/login')}>
                   Sign in
                 </button>
               </>
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <span>Need an account?{' '}
-                  <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigate('/login?mode=signup')}>
+                  <button type="button" className="font-semibold text-amber-300 underline" onClick={() => navigateAuth('/login?mode=signup')}>
                     Create one
                   </button>
                 </span>
-                <button type="button" className="font-semibold text-stone-400 underline hover:text-amber-200" onClick={() => navigate('/login?mode=reset')}>
+                <button type="button" className="font-semibold text-stone-400 underline hover:text-amber-200" onClick={() => navigateAuth('/login?mode=reset')}>
                   Forgot password?
                 </button>
               </div>
