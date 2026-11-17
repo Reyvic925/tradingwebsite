@@ -1,3 +1,4 @@
+import ProfileMetric from '../components/ProfileMetric';
 import TraderAnalytics from '../components/TraderAnalytics';
 import TraderLivePrices from '../components/TraderLivePrices';
 import TraderResearch from '../components/TraderResearch';
@@ -55,7 +56,7 @@ export default function TraderProfile() {
   const { trades, loading: tradesLoading, error: tradesError } = useTraderTrades(traderId as string);
   const history = useTraderHistory(traderId as string);
   const { followTrader } = useCopyTrading();
-  const animatedReturn = usePnlAnimation(Number(trader?.total_return ?? 0), 1000, 2);
+  const animatedReturn = usePnlAnimation(Number(trader?.profile_metrics?.total_return ?? trader?.total_return ?? 0), 1000, 2);
 
   // Load trader details
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function TraderProfile() {
     );
   }
 
-  const isProfit = Number(trader.total_return) >= 0;
+  const isProfit = Number(trader.profile_metrics?.total_return ?? trader.total_return) >= 0;
   const marketStatus = getMarketStatus(trader.session_type);
   const sessionOpen = marketStatus.status === 'Live';
   const equityCurve = [...history].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date)).map((snapshot) => ({
@@ -150,7 +151,7 @@ export default function TraderProfile() {
                   </span>
                 </span>
                 <span className="text-gray-500">
-                  Risk: <span className="text-white">{trader.risk_score}/10</span>
+                  Risk: <span className="text-white"><ProfileMetric trader={trader} metricKey="risk_score" format={value => `${value}/10`}>{trader.risk_score}/10</ProfileMetric></span>
                 </span>
               </div>
             </div>
@@ -175,33 +176,33 @@ export default function TraderProfile() {
       <div className="mb-8 grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
                   <div className="text-xs text-gray-400 mb-1">Trader Equity</div>
-                  <div className="text-2xl font-bold text-white">{formatMoney(trader.current_equity ?? 0)}</div>
-          <div className="text-xs text-gray-500 mt-1">Equity at each recorded snapshot</div>
+                  <div className="text-2xl font-bold text-white"><ProfileMetric trader={trader} metricKey="current_equity" format={formatMoney}>{formatMoney(trader.current_equity ?? 0)}</ProfileMetric></div>
+          <div className="text-xs text-gray-500 mt-1">Latest equity value</div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Total Return</div>
           <div className={`text-2xl font-bold flex items-center gap-2 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-            {isProfit ? '+' : ''}{animatedReturn.toFixed(2)}%
+            <ProfileMetric trader={trader} metricKey="total_return" format={value => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`}>{isProfit ? '+' : ''}{animatedReturn.toFixed(2)}%</ProfileMetric>
             {isProfit ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Win Rate</div>
-          <div className="text-2xl font-bold text-white">{trader.total_trades > 0 ? `${Number(trader.win_rate_trades ?? 0).toFixed(1)}%` : 'No closed trades'}</div>
-          <div className="text-xs text-gray-500 mt-1">{trader.total_trades || 0} total trades</div>
+          <div className="text-2xl font-bold text-white"><ProfileMetric trader={trader} metricKey="win_rate_trades" format={value => `${value.toFixed(1)}%`}>{trader.total_trades > 0 ? `${Number(trader.win_rate_trades ?? 0).toFixed(1)}%` : 'No closed trades'}</ProfileMetric></div>
+          <div className="text-xs text-gray-500 mt-1"><ProfileMetric trader={trader} metricKey="total_trades">{trader.total_trades || 0}</ProfileMetric> total trades</div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Max Drawdown</div>
-          <div className="text-2xl font-bold text-red-400">{Number(trader.max_drawdown || 0).toFixed(2)}%</div>
+          <div className="text-2xl font-bold text-red-400"><ProfileMetric trader={trader} metricKey="max_drawdown" format={value => `${value.toFixed(2)}%`}>{Number(trader.max_drawdown || 0).toFixed(2)}%</ProfileMetric></div>
           <div className="text-xs text-gray-500 mt-1">Peak-to-trough loss</div>
         </div>
 
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="text-xs text-gray-400 mb-1">Copiers</div>
-          <div className="text-2xl font-bold text-white">{trader.copiers_current ?? 0}</div>
+          <div className="text-2xl font-bold text-white"><ProfileMetric trader={trader} metricKey="copiers_current">{trader.copiers_current ?? 0}</ProfileMetric></div>
           <div className="text-xs text-gray-500 mt-1">Currently copying</div>
         </div>
       </div>

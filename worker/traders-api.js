@@ -4,6 +4,7 @@ import { compareHistory } from '../shared/trader-comparison.js';
 import { calculateTraderAnalytics, calculateTraderExposure } from '../shared/trader-analytics.js';
 import { getAuthenticatedUser } from './auth.js';
 import { loadCopyQuotes } from './copy-quotes.js';
+import { normalizeProfileMetrics, readProfileMetrics } from '../shared/trader-profile-metrics.js';
 
 const TRADER_FIELDS = [
   'name', 'country', 'avatar_url', 'bio', 'specialty', 'asset_focus',
@@ -12,6 +13,7 @@ const TRADER_FIELDS = [
   'volatility', 'drift', 'risk_score', 'risk_level', 'badge',
   'profit_for_copiers', 'profit_sharing_fee', 'is_active', 'session_start',
   'session_end',
+  'profile_metrics',
 ];
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -31,6 +33,7 @@ function parseTrader(row) {
   }
   return {
     ...row,
+    ...(row.profile_metrics !== undefined ? { profile_metrics: readProfileMetrics(row.profile_metrics) } : {}),
     ...(row.performance_started_at ? {
       monthly_return: row.performance_started_at.slice(0, 10) > `${new Date().toISOString().slice(0, 7)}-01` ? null : row.monthly_return,
     } : {}),
@@ -74,6 +77,11 @@ function normalizeWrite(input, existing = {}) {
     if (Object.hasOwn(input, field)) changes[field] = input[field];
   }
   if (Object.hasOwn(input, 'avatar_data')) changes.avatar_url = resolveAvatar(input, existing.avatar_url);
+  if (Object.hasOwn(changes, 'profile_metrics')) changes.profile_metrics = JSON.stringify(normalizeProfileMetrics(changes.profile_metrics));
+  if (Object.hasOwn(changes, 'profit_sharing_fee') && (typeof changes.profit_sharing_fee !== 'number'
+    || !Number.isFinite(changes.profit_sharing_fee) || changes.profit_sharing_fee < 0 || changes.profit_sharing_fee > 100)) {
+    throw new Error('Performance fee must be between 0 and 100.');
+  }
   if (Object.hasOwn(changes, 'asset_focus')) {
     changes.asset_focus = normalizeAssetFocus(changes.asset_focus);
   }
@@ -150,7 +158,9 @@ async function createTrader(request, env) {
       VALUES (${fields.map(() => '?').join(', ')})
       RETURNING *
     `).bind(...fields.map((field) => values[field])).first();
-    return json(parseTrader(result), 201);
+    const saved = values.profile_metrics && values.profile_metrics !== '{}'
+      ? await env.DB.prepare('SELECT * FROM traders WHERE id = ?').bind(result.id).first() : result;
+    return json(parseTrader(saved), 201);
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || error))) {
       if (/avatar_url/i.test(String(error?.message || error))) {
@@ -182,7 +192,9 @@ async function updateTrader(request, env, id) {
       WHERE id = ?
       RETURNING *
     `).bind(...fields.map((field) => updates[field]), id).first();
-    return json(parseTrader(updated));
+    const saved = fields.includes('profile_metrics')
+      ? await env.DB.prepare('SELECT * FROM traders WHERE id = ?').bind(id).first() : updated;
+    return json(parseTrader(saved));
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || error))) {
       if (/avatar_url/i.test(String(error?.message || error))) {

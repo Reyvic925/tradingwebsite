@@ -170,6 +170,8 @@ export type Trader = {
   monthly_return?: number | null;
   recorded_starting_equity?: number;
   performance_started_at?: string;
+  profile_metrics?: Record<string, number>;
+  profile_metrics_updated_at?: string | null;
   bio: string;
   risk_level?: string;
   specialty?: string;

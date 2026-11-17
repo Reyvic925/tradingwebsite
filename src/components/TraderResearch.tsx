@@ -1,3 +1,4 @@
+import ProfileMetric from './ProfileMetric';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../lib/api';
 import { startVisibleInterval } from '../lib/visible-interval';
@@ -51,23 +52,26 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
     {!data && !error && <p className="text-sm text-gray-400">Loading recorded strategy data...</p>}
     {data && <>
       <dl className="grid grid-cols-2 gap-4 border-y border-white/10 py-5 sm:grid-cols-4">
-        {[['Sharpe ratio', ratio(data.sharpe)], ['Sortino ratio', ratio(data.sortino)],
-          ['USD gross exposure', data.exposure.gross_notional === null ? 'Unavailable' : formatMoney(data.exposure.gross_notional)],
-          ['Effective leverage', data.exposure.effective_leverage === null ? 'Unavailable' : `${data.exposure.effective_leverage.toFixed(2)}x`]].map(([label, value]) =>
-          <div key={label}><dt className="text-xs text-gray-400">{label}</dt><dd className="mt-2 text-xl tabular-nums text-white">{value}</dd></div>)}
+        {[['Sharpe ratio', 'sharpe', ratio(data.sharpe)], ['Sortino ratio', 'sortino', ratio(data.sortino)],
+          ['USD gross exposure', 'gross_notional', data.exposure.gross_notional === null ? 'Unavailable' : formatMoney(data.exposure.gross_notional)],
+          ['Effective leverage', 'effective_leverage', data.exposure.effective_leverage === null ? 'Unavailable' : `${data.exposure.effective_leverage.toFixed(2)}x`]].map(([label, key, value]) =>
+          <div key={label}><dt className="text-xs text-gray-400">{label}</dt><dd className="mt-2 text-xl tabular-nums text-white"><ProfileMetric trader={trader} metricKey={key} format={number => key === 'gross_notional' ? formatMoney(number) : key === 'effective_leverage' ? `${number.toFixed(2)}x` : number.toFixed(2)}>{value}</ProfileMetric></dd></div>)}
       </dl>
-      <p className="text-xs leading-relaxed text-gray-400">Ratios use {data.return_observations} recorded session returns, annualized over {data.annualization} sessions with a 0% risk-free rate and downside target. At least 30 observations are required. Zero variance or zero downside leaves the corresponding ratio unavailable. Figures describe model strategy equity. These profiles represent algorithmic strategies.</p>
+      <p className="text-xs leading-relaxed text-gray-400">Calculated ratios use <ProfileMetric trader={trader} metricKey="return_observations">{data.return_observations}</ProfileMetric> session returns, annualized over <ProfileMetric trader={trader} metricKey="annualization">{data.annualization}</ProfileMetric> sessions with a 0% risk-free rate and downside target. At least 30 observations are required. Zero variance or zero downside leaves the corresponding ratio unavailable. Figures describe model strategy equity. These profiles represent algorithmic strategies.</p>
       <div>
         <h3 className="mb-3 text-sm font-medium text-white">Monthly performance</h3>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {data.months.map(month => <div key={month.month}
+          {data.months.map(month => {
+            const key = `month_${month.month.replace('-', '_')}`;
+            const shownReturn = trader.profile_metrics?.[key] ?? month.return;
+            return <div key={month.month}
             title={`${month.from || 'No baseline'} to ${month.to || 'No observation'} | ${month.observations} snapshots${month.partial ? ' | Month to date' : ''}`}
-            className={`rounded-lg border p-3 ${month.return === null ? 'border-white/10 bg-white/[0.02] text-gray-500' : month.return >= 0 ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200' : 'border-rose-300/20 bg-rose-400/10 text-rose-200'}`}>
+            className={`rounded-lg border p-3 ${shownReturn === null ? 'border-white/10 bg-white/[0.02] text-gray-500' : shownReturn >= 0 ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200' : 'border-rose-300/20 bg-rose-400/10 text-rose-200'}`}>
             <div className="text-[11px]">{month.month}{month.partial ? ' MTD' : ''}</div>
-            <div className="mt-2 text-sm font-medium tabular-nums">{month.return === null ? 'Unavailable' : `${month.return > 0 ? '+' : ''}${month.return.toFixed(2)}%`}</div>
-          </div>)}
+            <div className="mt-2 text-sm font-medium tabular-nums"><ProfileMetric trader={trader} metricKey={key} format={number => `${number > 0 ? '+' : ''}${number.toFixed(2)}%`}>{month.return === null ? 'Unavailable' : `${month.return > 0 ? '+' : ''}${month.return.toFixed(2)}%`}</ProfileMetric></div>
+          </div>; })}
         </div>
-        <p className="mt-2 text-xs text-gray-500">Each return uses recorded month boundaries. Missing boundary data stays unavailable. MTD indicates the current partial month.</p>
+        <p className="mt-2 text-xs text-gray-500">Calculated returns use recorded month boundaries. Missing boundary data stays unavailable. MTD indicates the current partial month.</p>
       </div>
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -82,11 +86,11 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
             <td className="pr-4">{position.notional === null ? 'Unavailable' : `${formatPrice(position.notional)} ${position.currency}`}</td>
             <td>{position.weight === null ? 'Unavailable' : `${position.weight.toFixed(1)}%`}</td>
           </tr>)}</tbody></table></div> : <p className="text-sm text-gray-400">No recorded open positions.</p>}
-        <p className="mt-3 text-xs text-gray-500">Net USD exposure {data.exposure.net_notional === null ? 'unavailable' : formatMoney(data.exposure.net_notional)}. Leverage is gross USD notional divided by strategy equity. Totals require a recorded USD conversion mark for every open asset.</p>
+        <p className="mt-3 text-xs text-gray-500">Net USD exposure <ProfileMetric trader={trader} metricKey="net_notional" format={formatMoney}>{data.exposure.net_notional === null ? 'unavailable' : formatMoney(data.exposure.net_notional)}</ProfileMetric>. Calculated leverage is gross USD notional divided by strategy equity. Totals require a recorded USD conversion mark for every open asset.</p>
       </div>
       <div className="border-t border-white/10 pt-4 text-xs leading-relaxed text-gray-400">
         <p>First recorded trade {recordedTime(data.records.first_trade)}. Latest activity {recordedTime(data.records.latest_trade)}.</p>
-        <p className="mt-1">{data.records.market_trades || 0} market-priced trades of {data.records.total || 0} recorded trades. Profile updated {recordedTime(data.updated_at)}.</p>
+        <p className="mt-1"><ProfileMetric trader={trader} metricKey="market_trades">{data.records.market_trades || 0}</ProfileMetric> market-priced trades of <ProfileMetric trader={trader} metricKey="recorded_trades">{data.records.total || 0}</ProfileMetric> recorded trades. Profile updated {recordedTime(data.updated_at)}.</p>
       </div>
     </>}
   </section>;

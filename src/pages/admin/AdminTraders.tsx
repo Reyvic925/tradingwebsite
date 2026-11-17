@@ -5,13 +5,14 @@ import { Plus, Edit2, Save, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { formatMoney, formatPct } from '../../lib/format';
 import { authHeaders } from '../../lib/api';
 import type { Trader } from '../../types';
+import { PROFILE_METRICS } from '../../../shared/trader-profile-metrics.js';
 
 function createEmptyFormData() {
   return {
     name: '', bio: '', country: '', avatar_url: '', specialty: '', badge: 'Gold',
     asset_focus: ['BTC-USD', 'ETH-USD'], session_type: 'nyc', risk_level: 'Medium',
     current_equity: 10000, total_return: 0, total_trades: 0, win_rate_trades: 50,
-    max_drawdown: 0, risk_score: 5
+    max_drawdown: 0, risk_score: 5, profit_sharing_fee: 20
   };
 }
 
@@ -22,6 +23,8 @@ export default function AdminTraders() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [avatarData, setAvatarData] = useState('');
+  const [metricValues, setMetricValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData());
 
   const fetchTraders = async () => {
@@ -51,11 +54,18 @@ export default function AdminTraders() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
     try {
       const endpoint = editingId ? `/api/traders?id=${editingId}` : '/api/traders';
       const method = editingId ? 'PUT' : 'POST';
+      const recordedFields = new Set(['current_equity', 'total_return', 'total_trades', 'win_rate_trades', 'max_drawdown']);
+      const profileFields = Object.fromEntries(Object.entries(formData).filter(([key]) => !editingId || !recordedFields.has(key)));
       const payload = {
-        ...formData,
+        ...profileFields,
+        profile_metrics: Object.fromEntries(Object.entries(metricValues)
+          .filter(([, value]) => value.trim() !== '')
+          .map(([key, value]) => [key, Number(value)])),
         avatar_data: avatarData || undefined
       };
       
@@ -72,12 +82,15 @@ export default function AdminTraders() {
 
       await fetchTraders();
       setFormData(createEmptyFormData());
+      setMetricValues({});
       setAvatarData('');
       setShowForm(false);
       setEditingId(null);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -124,6 +137,7 @@ export default function AdminTraders() {
   };
 
   const handleEdit = (trader: Trader) => {
+    setMetricValues(Object.fromEntries(Object.entries(trader.profile_metrics || {}).map(([key, value]) => [key, String(value)])));
     setFormData({
       name: trader.name,
       bio: trader.bio || '',
@@ -140,6 +154,7 @@ export default function AdminTraders() {
       win_rate_trades: trader.win_rate_trades,
       max_drawdown: trader.max_drawdown || 0,
       risk_score: trader.risk_score || 5,
+      profit_sharing_fee: trader.profit_sharing_fee ?? 20,
     });
     setAvatarData('');
     setEditingId(trader.id);
@@ -184,6 +199,7 @@ export default function AdminTraders() {
             setShowForm(true);
             setEditingId(null);
             setFormData(createEmptyFormData());
+            setMetricValues({});
             setAvatarData('');
           }}
           className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600 transition"
@@ -278,16 +294,7 @@ export default function AdminTraders() {
                   <option value="crypto">Crypto 24/7</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Total Return (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.total_return}
-                  onChange={(e) => setFormData({ ...formData, total_return: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-                />
-              </div>
+
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Badge</label>
                 <select value={formData.badge} onChange={(e) => setFormData({ ...formData, badge: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm">
@@ -300,23 +307,12 @@ export default function AdminTraders() {
                   <option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option>
                 </select>
               </div>
+
+              {!editingId && <div><label className="block text-sm text-gray-300 mb-1">Starting Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>}
+
+
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Win Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={formData.win_rate_trades}
-                  onChange={(e) => setFormData({ ...formData, win_rate_trades: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-                />
-              </div>
-              <div><label className="block text-sm text-gray-300 mb-1">Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Total Trades</label><input type="number" min="0" step="1" value={formData.total_trades} onChange={(e) => setFormData({ ...formData, total_trades: parseInt(e.target.value, 10) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div><label className="block text-sm text-gray-300 mb-1">Max Drawdown (%)</label><input type="number" min="0" step="0.01" value={formData.max_drawdown} onChange={(e) => setFormData({ ...formData, max_drawdown: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Risk Score (1-10)</label>
+                <label className="block text-sm text-gray-300 mb-1">Strategy Risk Score (1-10)</label>
                 <input
                   type="number"
                   min="1"
@@ -341,13 +337,48 @@ export default function AdminTraders() {
               </div>
             </div>
 
+            <section className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-4">
+              <h3 className="font-semibold text-white">Admin-reported profile metrics</h3>
+              <p className="mt-2 text-sm text-gray-400">Entered values appear on the trader profile with an Admin-reported label. Leave a field blank to use its calculated value. Saved values persist across trading updates.</p>
+              <button type="button" onClick={() => setMetricValues({})} className="mt-3 text-xs text-amber-200 underline">Use calculated values for all metrics</button>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {PROFILE_METRICS.map(metric => <label key={metric.key} className="block text-xs text-gray-300">
+                  {metric.label}
+                  <input type="number" step={metric.integer ? 1 : 'any'} min={metric.min} max={metric.max}
+                    value={metricValues[metric.key] ?? ''} placeholder="Calculated value"
+                    onChange={event => setMetricValues(values => ({ ...values, [metric.key]: event.target.value }))}
+                    className="mt-2 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white" />
+                  <span className="mt-1 block font-mono text-[10px] text-gray-500">{metric.key}</span>
+                </label>)}
+                {Array.from({ length: 12 }, (_, index) => {
+                  const date = new Date();
+                  const month = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - index, 1)).toISOString().slice(0, 7);
+                  const key = `month_${month.replace('-', '_')}`;
+                  return <label key={key} className="block text-xs text-gray-300">{month} return (%)
+                    <input type="number" step="any" min={-100} value={metricValues[key] ?? ''} placeholder="Calculated value"
+                      onChange={event => setMetricValues(values => ({ ...values, [key]: event.target.value }))}
+                      className="mt-2 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white" />
+                    <span className="mt-1 block font-mono text-[10px] text-gray-500">{key}</span>
+                  </label>;
+                })}
+              </div>
+              <p className="mt-4 text-xs text-gray-400">D1 column <code>traders.profile_metrics</code> stores a JSON object using these field names. Remove a key to restore its calculated value. Changes are recorded in <code>trader_profile_metric_audit</code>.</p>
+            </section>
+            <label className="block text-sm text-gray-300">Performance fee (%)
+              <input type="number" min={0} max={100} step="0.01" value={formData.profit_sharing_fee}
+                onChange={event => setFormData({ ...formData, profit_sharing_fee: Number(event.target.value) })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white" />
+              <span className="mt-1 block text-xs text-gray-400">This setting controls the actual performance fee charged to copiers.</span>
+            </label>
+
             <div className="flex gap-2 pt-4">
               <button
                 type="submit"
+                disabled={saving}
                 className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600 transition text-sm"
               >
                 <Save size={16} />
-                {editingId ? 'Update' : 'Create'}
+                {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </button>
               <button
                 type="button"
