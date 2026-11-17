@@ -90,7 +90,6 @@ export function normalizeSyntheticConfig(config = {}) {
     dailyLossLimitPercent: Math.min(100, Math.max(0.1, Number(config.dailyLossLimitPercent ?? 1))),
     riskFraction: Math.max(0.001, Number(config.riskFraction) || profile.riskFraction * targetScale),
     maxExposureFraction: Math.max(0.05, Number(config.maxExposureFraction) || profile.maxExposureFraction),
-    marketPositionSizeMultiplier: Math.min(4, Math.max(1, Number(config.marketPositionSizeMultiplier) || 2)),
     metricBaseline: config.metricBaseline,
   };
 }
@@ -226,10 +225,8 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     const riskBase = normalizedConfig.compounding ? equity : normalizedConfig.startingEquity;
     const baseExposure = Math.min(normalizedConfig.maxExposureFraction,
       normalizedConfig.riskFraction * martingale / getAssetSpec(asset).volatility);
-    const exposure = marketBacked
-      ? Math.min(1, baseExposure * normalizedConfig.marketPositionSizeMultiplier)
-      : baseExposure;
-    const quantity = Math.min(equity, riskBase) * exposure / entry;
+    const capital = marketBacked ? equity : Math.min(equity, riskBase) * baseExposure;
+    const quantity = capital / entry;
     const entryFee = entry * quantity * feeBps / 10000;
     position = { price_basis: marketBacked ? 'market' : 'synthetic', entry_price_source: marketQuotes?.[asset]?.price_source, entry_quote_at: marketQuotes?.[asset]?.quote_updated_at, event_id: `${traderId}:${tickId}`, trader_id: traderId, symbol: asset, side,
       quantity, entry_price: entry, entry_fee: entryFee, equity_at_entry: equity,

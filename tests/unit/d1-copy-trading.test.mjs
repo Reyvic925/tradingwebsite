@@ -70,8 +70,8 @@ for (let i = 1; i < 30 && !sqlite.prepare('SELECT * FROM copy_positions WHERE fo
 assert(sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id), 'copy opens an actual position');
 const copiedPosition = sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id);
 const leadPosition = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=4').get().state).position;
-assert(Math.abs(leadPosition.notional / leadPosition.equity_at_entry - 0.3) < 1e-8, 'Existing conservative configs must open with doubled 30% exposure');
-assert(Math.abs(copiedPosition.quantity * copiedPosition.entry_price - 300) < 1e-6, 'Follower quantity must inherit larger market exposure');
+assert(Math.abs(leadPosition.notional / leadPosition.equity_at_entry - 1) < 1e-8, 'Existing conservative configs must open with full equity exposure');
+assert(Math.abs(copiedPosition.quantity * copiedPosition.entry_price - 1000) < 1e-6, 'Follower quantity must inherit larger market exposure');
 assert.equal((await call('PUT', { status: 'paused' }, `?id=${id}`)).status, 200);
 const paused = sqlite.prepare('SELECT * FROM copy_follows WHERE id=?').get(id);
 for (let i = 30; i < 40; i++) await runCopyTradingTick(env, new Date(+date + i * 300000));
