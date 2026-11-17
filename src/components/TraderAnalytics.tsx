@@ -26,7 +26,6 @@ export default function TraderAnalytics({ trader, trades, loading, error }: {
     ['Capital following', metric(trader.under_management, formatMoney)],
     ['Copier profit', metric(trader.profit_for_copiers, formatMoney)],
     ['Performance fee', metric(trader.profit_sharing_fee, percent)],
-    ['Lifetime copiers', metric(trader.copiers_all_time, count)],
     ['Risk score', metric(trader.risk_score, value => `${value} / 10`)],
   ];
   const sampleStats = [
@@ -43,7 +42,7 @@ export default function TraderAnalytics({ trader, trades, loading, error }: {
         <h2 className="mt-2 text-xl font-medium text-white">Capital, performance & risk</h2>
         {trader.specialty && <p className="mt-2 text-sm text-gray-400">{trader.specialty}</p>}
       </div>
-      <dl className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-3">
         {stats.map(([label, value]) => (
           <div key={label} className="bg-[#11161e] px-5 py-5">
             <dt className="text-xs text-gray-400">{label}</dt>
@@ -51,7 +50,7 @@ export default function TraderAnalytics({ trader, trades, loading, error }: {
           </div>
         ))}
       </dl>
-      <p className="px-5 pt-4 text-xs text-gray-400 sm:px-6">Current copiers counts users with active or paused allocations. Lifetime copiers counts each recorded user once, including stopped copies.</p>
+      <p className="px-5 pt-4 text-xs text-gray-400 sm:px-6">Current copiers are users with active or paused allocations.</p>
       <div className="px-5 py-5 sm:px-6">
         <h3 className="text-sm font-medium text-white">Recent trade analytics</h3>
         <p className="mt-1 text-xs text-gray-400">Calculated from the loaded closed trades. P&L uses the recorded trade values.</p>
