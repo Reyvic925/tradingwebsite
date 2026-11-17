@@ -17,7 +17,8 @@ export async function runCronJob(job, env, now = new Date()) {
   const runner = jobs[job];
   if (!runner) throw new Error('Unknown cron job');
   const db = env.DB;
-  const tick = Math.floor(now.getTime() / 300000);
+  const cadenceMs = job === 'copy-trading' ? 60000 : 300000;
+  const tick = Math.floor(now.getTime() / cadenceMs);
   const at = now.toISOString();
   await db.prepare('INSERT OR IGNORE INTO cron_job_state (job) VALUES (?)').bind(job).run();
   const token = crypto.randomUUID();
@@ -49,7 +50,8 @@ export async function handleCronRequest(request, env) {
   try {
     if (job === 'status' || url.searchParams.get('dry_run') === '1') {
       const { results } = await env.DB.prepare('SELECT job,last_started_at,last_finished_at,last_status,last_tick,last_result FROM cron_job_state ORDER BY job').all();
-      return json({ ok: true, jobs: results || [], cadence_minutes: 5 });
+      return json({ ok: true, jobs: (results || []).map(row => ({ ...row,
+        cadence_minutes: row.job === 'copy-trading' ? 1 : 5 })), cadence_minutes: job === 'copy-trading' ? 1 : 5 });
     }
     return json(await runCronJob(job, env));
   } catch {

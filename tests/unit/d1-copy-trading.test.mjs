@@ -49,6 +49,11 @@ sqlite.prepare('UPDATE copy_follows SET followed_at=? WHERE id=?').run('2026-01-
 const date = new Date('2026-11-13T15:00:00Z');
 await runCopyTradingTick(env, date);
 const count = sqlite.prepare('SELECT count(*) n FROM trader_trades').get().n;
+const scheduled = sqlite.prepare('SELECT trader_id,state FROM copy_simulation_state').all()
+  .map(row => ({ id: row.trader_id, next: JSON.parse(row.state).nextExecutionAt }));
+assert(scheduled.length > 1);
+assert(scheduled.every(row => Date.parse(row.next) >= +date + 60000 && Date.parse(row.next) < +date + 300000));
+assert(new Set(scheduled.map(row => row.next)).size > 1, 'Traders must receive independent execution times');
 // Simulate configs persisted by deployments before market sizing was added.
 for (const saved of sqlite.prepare('SELECT trader_id,config FROM copy_simulation_state').all()) {
   const config = JSON.parse(saved.config);
@@ -57,6 +62,10 @@ for (const saved of sqlite.prepare('SELECT trader_id,config FROM copy_simulation
 }
 await runCopyTradingTick(env, date);
 assert.equal(sqlite.prepare('SELECT count(*) n FROM trader_trades').get().n, count);
+assert.deepEqual(sqlite.prepare('SELECT trader_id,state FROM copy_simulation_state').all()
+  .map(row => ({ id: row.trader_id, next: JSON.parse(row.state).nextExecutionAt })), scheduled, 'Retry must preserve the committed execution schedule');
+const earlyTick = await runCopyTradingTick(env, new Date(+date + 60000));
+assert.equal(earlyTick.updated, 0, 'A minute wake-up must skip traders whose individual time has not arrived');
 for (let i = 1; i < 30 && !sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id); i++) await runCopyTradingTick(env, new Date(+date + i * 300000));
 assert(sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id), 'copy opens an actual position');
 const copiedPosition = sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(id);
@@ -151,5 +160,53 @@ sqlite.prepare('UPDATE copy_simulation_state SET state=? WHERE trader_id=21').ru
 await runCopyTradingTick(env, new Date(+date + 101 * 300000));
 assert.equal(sqlite.prepare("SELECT * FROM trader_trades WHERE event_id='legacy-open'").get(), undefined, 'unrepaired legacy positions must never generate new invented executions');
 assert.equal(JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=21').get().state).position.entry_price, 43200);
+const jitterStart = +date + 102 * 300000;
+const timedState = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=4').get().state);
+timedState.nextExecutionAt = new Date(jitterStart + 125000).toISOString();
+sqlite.prepare('UPDATE copy_simulation_state SET state=? WHERE trader_id=4').run(JSON.stringify(timedState));
+const beforeDueTick = sqlite.prepare('SELECT last_tick FROM copy_simulation_state WHERE trader_id=4').get().last_tick;
+await runCopyTradingTick(env, new Date(jitterStart + 120000));
+const beforeDueState = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=4').get().state);
+assert.equal(beforeDueState.nextExecutionAt, timedState.nextExecutionAt, 'Valuations must not reset the randomized decision time');
+if (timedState.position) assert.equal(beforeDueState.position?.age, timedState.position.age, 'Minute risk checks must not advance the strategy holding period');
+else assert.equal(sqlite.prepare('SELECT last_tick FROM copy_simulation_state WHERE trader_id=4').get().last_tick, beforeDueTick);
+const actualExecution = new Date(jitterStart + 180000);
+await runCopyTradingTick(env, actualExecution);
+const executedState = JSON.parse(sqlite.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=4').get().state);
+assert.equal(executedState.lastProcessedAt, actualExecution.toISOString(), 'Execution records the actual due cron wake-up, never the randomized due timestamp');
+assert(Date.parse(executedState.nextExecutionAt) > +actualExecution);
+// Per-trade dollar stops are evaluated on minute marks before the next strategy decision.
+const riskCopyResponse = await call('POST', settings);
+assert.equal(riskCopyResponse.status, 201);
+const riskCopyId = (await riskCopyResponse.json()).id;
+sqlite.prepare('UPDATE copy_follows SET followed_at=? WHERE id=?').run('2026-01-01', riskCopyId);
+for (const [index, side, mark, shouldStop] of [[1, 'BUY', 99, true], [2, 'SELL', 101, true], [3, 'BUY', 103, false]]) {
+  const checkAt = new Date(jitterStart + 600000 + index * 60000);
+  const eventId = `dollar-stop-${index}`;
+  const state = { equity: 100000, peakEquity: 100000, dailyOpeningEquity: 100000,
+    tradingDay: checkAt.toISOString().slice(0, 10), priceBasis: 'market', prices: { 'BTC-USD': 100 },
+    nextExecutionAt: new Date(+checkAt + 1800000).toISOString(),
+    position: { ...leadPosition, event_id: eventId, symbol: 'BTC-USD', side, entry_price: 100,
+      quantity: 1, entry_fee: 0, age: 0, equity_at_entry: 100000, notional: 100, margin: 100 } };
+  sqlite.prepare('UPDATE copy_simulation_state SET state=? WHERE trader_id=4').run(JSON.stringify(state));
+  sqlite.prepare(`INSERT OR REPLACE INTO copy_positions
+    (follow_id,event_id,symbol,side,quantity,entry_price,mark_price,total_fees) VALUES (?,?,'BTC-USD',?,10,100,100,0.05)`)
+    .run(riskCopyId, eventId, side);
+  await runMarketTick(env, checkAt, { executionClock: () => checkAt,
+    quoteProvider: async market => ({ price: market.symbol === 'BTCUSD' ? mark : 200,
+      price_source: 'Fixture feed', quote_updated_at: checkAt.toISOString(), quote_stale: false }) });
+  const position = sqlite.prepare('SELECT * FROM copy_positions WHERE follow_id=?').get(riskCopyId);
+  const activity = sqlite.prepare('SELECT * FROM copy_activity WHERE follow_id=? ORDER BY rowid DESC LIMIT 1').get(riskCopyId);
+  if (shouldStop) {
+    assert.equal(position, undefined);
+    assert.equal(activity.reason, 'trade_stop_loss');
+    assert.equal(activity.kind, 'closed');
+    assert(activity.trade_pnl < -5, 'The ledger must retain the actual loss and slippage without clamping it to $5');
+  } else {
+    assert(position, 'Profits above $20 must remain open until a normal strategy or risk exit');
+    assert(activity.net_pnl > 20);
+  }
+  assert.equal(sqlite.prepare('SELECT status FROM copy_follows WHERE id=?').get(riskCopyId).status, 'active');
+}
 sqlite.close();
 console.log('D1_COPY_TRADING_TESTS_PASSED');

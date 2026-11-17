@@ -1,7 +1,7 @@
 import { loadCopyQuotes } from './copy-quotes.js';
 import { getAuthenticatedUser } from './auth.js';
 import { validateCopyRisk, valueCopy } from '../shared/copy-risk.js';
-import { normalizeSyntheticConfig, simulateTick } from '../api-handlers/synthetic-simulation.js';
+import { normalizeSyntheticConfig, seededRandom, simulateTick } from '../api-handlers/synthetic-simulation.js';
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const rowToFollow = row => ({ ...row, is_copying: row.status !== 'stopped',
@@ -9,6 +9,8 @@ const rowToFollow = row => ({ ...row, is_copying: row.status !== 'stopped',
   pnl_percent: (row.current_value / row.allocated_amount - 1) * 100,
   drawdown_percent: row.peak_value > 0 ? (row.peak_value - row.current_value) / row.peak_value * 100 : 0 });
 const statement = (db, sql, ...args) => db.prepare(sql).bind(...args);
+const MARK_HERGOTT_TRADER_ID = 4;
+const MARK_COPY_TRADE_STOP_LOSS_USD = 5;
 
 // Optimistic revision + unique event IDs make retries and overlapping ticks safe.
 export async function applyCopyEvent(db, follow, result, event, position = undefined) {
@@ -137,7 +139,7 @@ export async function handleCopyRequest(request, env) {
 
 export async function runCopyTradingTick(env, now = new Date(), { quoteProvider, executionClock = () => new Date() } = {}) {
   const db = env.DB;
-  const tick = Math.floor(now.getTime() / 300000);
+  const tick = Math.floor(now.getTime() / 60000);
   const at = now.toISOString();
   const summary = { traders: 0, updated: 0, follower_events: 0, quote_unavailable: 0, timestamp: at };
   const { results: traders } = await db.prepare("SELECT * FROM traders WHERE is_active=1 OR EXISTS (SELECT 1 FROM copy_follows WHERE trader_id=traders.id AND status<>'stopped')").all();
@@ -152,6 +154,8 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
     const simulation = await statement(db, 'SELECT * FROM copy_simulation_state WHERE trader_id=?', trader.id).first();
     if (simulation.last_tick < tick) {
       const before = JSON.parse(simulation.state);
+      const decisionDue = !(Date.parse(before.nextExecutionAt) > now.getTime());
+      if (!decisionDue && !before.position) continue;
       const config = JSON.parse(simulation.config);
       // Historical positions require an audited price repair before market valuation.
       const legacyPosition = before.position && before.priceBasis !== 'market';
@@ -171,12 +175,19 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
       const executionAt = executionClock().toISOString();
       let result;
       try {
-        result = simulateTick({ marketQuotes, traderId: trader.id, tickId: tick, timestamp: executionAt, config: { ...config, tradingEnabled: Boolean(trader.is_active) }, state: before });
+        result = simulateTick({ marketQuotes, traderId: trader.id, tickId: tick, timestamp: executionAt,
+          config: { ...config, tradingEnabled: Boolean(trader.is_active) && decisionDue, advancePositionAge: decisionDue }, state: before });
       } catch (error) {
         if (!/execution quote|position quote/.test(error.message)) throw error;
         summary.quote_unavailable++;
         continue;
       }
+      // Persist each trader's own due time with the tick transaction so retries
+      // retain the same schedule. Execution uses the actual fresh-quote time.
+      const delayMs = 60000 + Math.floor(seededRandom(`schedule:${trader.id}:${tick}`)() * 240000);
+      result.state.nextExecutionAt = decisionDue
+        ? new Date(Date.parse(executionAt) + delayMs).toISOString()
+        : before.nextExecutionAt;
       const change = before.equity > 0 ? (result.state.equity - before.equity) / before.equity : 0;
       const guard = 'EXISTS (SELECT 1 FROM copy_simulation_state WHERE trader_id=? AND last_tick=?)';
       const guardArgs = [trader.id, simulation.last_tick];
@@ -226,9 +237,15 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
         const price = detail.state.prices[position.symbol];
         if (!Number.isFinite(price)) continue;
         const leadTrade = await statement(db, 'SELECT status,exit_price,close_reason FROM trader_trades WHERE event_id=?', position.event_id).first();
-        const closing = leadTrade?.status === 'CLOSED';
-        const mark = closing ? leadTrade.exit_price : price;
-        if (closing) closeReason = leadTrade.close_reason;
+        const leadClosed = leadTrade?.status === 'CLOSED';
+        let mark = leadClosed ? leadTrade.exit_price : price;
+        const direction = position.side === 'BUY' ? 1 : -1;
+        const netTradePnl = direction * (mark - position.entry_price) * position.quantity
+          - Number(position.total_fees || 0) - mark * position.quantity * 0.0001;
+        const tradeStopReached = trader.id === MARK_HERGOTT_TRADER_ID && netTradePnl <= -MARK_COPY_TRADE_STOP_LOSS_USD;
+        const closing = leadClosed || tradeStopReached;
+        if (tradeStopReached && !leadClosed) mark *= 1 - direction * 0.0002;
+        if (closing) closeReason = tradeStopReached ? 'trade_stop_loss' : leadTrade.close_reason;
         delta = (position.side === 'BUY' ? 1 : -1) * (mark - position.mark_price) * position.quantity;
         executionFees = closing ? mark * position.quantity * 0.0001 : 0;
         trade = { ...position, exit_price: mark };
@@ -275,6 +292,6 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
       under_management=coalesce((SELECT sum(current_value) FROM copy_follows WHERE trader_id=? AND status<>'stopped'),0) WHERE id=?`,
       trader.id, trader.id, trader.id, trader.id, trader.id).run();
   }
-  await statement(db, 'DELETE FROM copy_simulation_ticks WHERE tick < ?', tick - 576).run();
+  await statement(db, 'DELETE FROM copy_simulation_ticks WHERE tick < ?', tick - 2880).run();
   return summary;
 }

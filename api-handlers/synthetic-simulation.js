@@ -197,9 +197,9 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     const direction = position.side === 'BUY' ? 1 : -1;
     equity += direction * (price - mark) * position.quantity;
     dailyLossReached = marketBacked && equity <= dailyFloor;
-    if (assetOpen(position.symbol)) position.age += 1;
+    if (assetOpen(position.symbol) && config.advancePositionAge !== false) position.age += 1;
     const tradeLoss = direction * (price - position.entry_price) / position.entry_price;
-    if (assetOpen(position.symbol) && (dailyLossReached || position.age >= profile.holdingTicks || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
+    if (assetOpen(position.symbol) && (dailyLossReached || (config.advancePositionAge !== false && position.age >= profile.holdingTicks) || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
       const exit = price * (1 - direction * friction);
       const exitFee = exit * position.quantity * feeBps / 10000;
       equity += direction * (exit - price) * position.quantity - exitFee;
