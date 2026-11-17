@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { resendVerificationEmail, signIn, signUp, verifyEmailCode } from '../lib/auth';
 import { apiSend, clearReferral, takeReferral } from '../lib/api';
 import Logo from '../components/Logo';
+import { BRAND } from '../lib/brand';
 
 const PENDING_VERIFICATION_KEY = 'apex-pending-verification';
 type PendingVerification = { email: string; expiresAt: number; resendAt: number };
@@ -56,6 +57,7 @@ export default function Login() {
   const resendSeconds = Math.max(0, Math.ceil(((pending?.resendAt || 0) - now) / 1000));
   const emailError = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 320 ? 'Enter a valid email address.' : '';
   const nameError = !fullName.trim() ? 'Enter your full name.' : '';
+  const confirmationError = !confirmPassword ? 'Confirm your password.' : password !== confirmPassword ? 'Passwords do not match.' : '';
   const passwordError = password.length < 8 || password.length > 128 ? 'Use 8 to 128 characters.' : '';
 
   useEffect(() => {
@@ -107,11 +109,11 @@ export default function Login() {
     if (verificationPending) {
       if (!/^\d{8}$/.test(verificationCode)) return setError('Enter the 8-digit code from your email.');
     } else {
-      setTouched({ email: true, name: true, password: true });
+      setTouched({ email: true, name: true, password: true, confirmation: true });
       if (!(mode === 'reset' && resetToken) && emailError) return;
       if ((mode !== 'reset' || resetToken) && passwordError) return;
       if (mode === 'signup' && nameError) return;
-      if (mode === 'reset' && resetToken && password !== confirmPassword) return setError('Passwords do not match.');
+      if ((mode === 'signup' || (mode === 'reset' && resetToken)) && confirmationError) return;
       if (resetComplete) return;
     }
     requestInFlight.current = true;
@@ -208,7 +210,7 @@ export default function Login() {
       <div className="relative mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-4 py-8 sm:px-6 sm:py-12">
         <div className="mb-7 flex justify-center"><Logo /></div>
         <div className="rounded-2xl border border-white/10 bg-[#101319]/95 p-5 shadow-2xl shadow-black/30 sm:p-9">
-          <div className="mb-5 flex items-center gap-2 text-xs font-medium text-amber-200"><LockKeyhole size={14} aria-hidden="true" />{verificationPending ? 'Confirm your email' : mode === 'signup' ? 'Get started with Apex Prime' : 'Your Apex Prime account'}</div>
+          <div className="mb-5 flex items-center gap-2 text-xs font-medium text-amber-200"><LockKeyhole size={14} aria-hidden="true" />{verificationPending ? 'Confirm your email' : mode === 'signup' ? `Get started with ${BRAND.name}` : `Your ${BRAND.name} account`}</div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{headerText}</h1>
           <p className="mt-3 text-sm leading-relaxed text-stone-400">{helperText}</p>
 
@@ -304,13 +306,18 @@ export default function Login() {
                 </p>}
               </div>
             )}
-            {!verificationPending && (mode === 'reset' && Boolean(resetToken)) && (
-              <label className="block text-xs font-medium text-stone-300 ">Confirm password
+            {!verificationPending && (mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (
+              <label className="block text-xs font-medium text-stone-300 sm:col-span-2">Confirm password
                 <input
                 required
                 disabled={busy}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
+                name="confirmPassword"
+                maxLength={128}
+                onBlur={() => setTouched((value) => ({ ...value, confirmation: true }))}
+                aria-invalid={Boolean((touched.confirmation || confirmPassword) && confirmationError)}
+                aria-describedby={(touched.confirmation || confirmPassword) && confirmationError ? 'confirmation-error' : undefined}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm Password"
@@ -318,6 +325,7 @@ export default function Login() {
               />
               </label>
             )}
+            {!verificationPending && (mode === 'signup' || (mode === 'reset' && Boolean(resetToken))) && (touched.confirmation || confirmPassword) && confirmationError && <p id="confirmation-error" className="sm:col-span-2 -mt-2 text-xs text-rose-300">{confirmationError}</p>}
             {error && <div role="alert" className="sm:col-span-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
             <button disabled={busy || resendingVerification} className="sm:col-span-2 mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-amber-300 px-4 py-3 text-sm font-semibold text-[#1a1304] transition hover:bg-amber-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 disabled:cursor-wait disabled:opacity-60">
               {busy && <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />}
