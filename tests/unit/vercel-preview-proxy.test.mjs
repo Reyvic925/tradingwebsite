@@ -74,6 +74,22 @@ const fallbackCookieResponse = {
 await handler({ url: '/api/auth/login', method: 'POST', headers: {}, body: {} }, fallbackCookieResponse);
 assert.deepEqual(fallbackCookieResponseHeaders.get('set-cookie'), ['apex_session=fallback-session; Path=/; HttpOnly; SameSite=Lax']);
 
+const sharedSessionCookie = 'apex_session=new-session; Path=/; HttpOnly; SameSite=Lax; Domain=.theprimemarkets.com; Secure';
+globalThis.fetch = async () => new Response('{}', {
+  headers: { 'set-cookie': sharedSessionCookie },
+});
+for (const path of ['/api/auth/login', '/api/auth/logout']) {
+  const migrationHeaders = new Map();
+  await handler({ url: path, method: 'POST', headers: {}, body: {} }, {
+    setHeader(name, value) { migrationHeaders.set(name.toLowerCase(), value); },
+    end() {},
+  });
+  assert.deepEqual(migrationHeaders.get('set-cookie'), [
+    sharedSessionCookie,
+    'apex_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure',
+  ], 'Production authentication must clear the legacy host-only cookie while retaining the shared-domain session');
+}
+
 globalThis.fetch = async (url, init) => {
   capturedRequest = { url: String(url), init };
   return new Response(new Uint8Array([1, 2, 3]), {

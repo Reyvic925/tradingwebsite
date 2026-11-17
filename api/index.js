@@ -51,6 +51,14 @@ async function proxyToWorker(req, res, urlPath) {
         const cookie = upstream.headers.get('set-cookie');
         return cookie ? [cookie] : [];
       })();
+    // Older deployments issued a host-only cookie. It can coexist with the
+    // shared-domain cookie and be sent first, hiding a successful new login.
+    const updatesSession = ['/api/auth/login', '/api/auth/logout'].includes(urlPath);
+    const hasSharedSessionCookie = cookies.some((cookie) =>
+      /^apex_session=/i.test(cookie) && /;\s*Domain=\.?theprimemarkets\.com(?:;|$)/i.test(cookie));
+    if (updatesSession && hasSharedSessionCookie) {
+      cookies.push('apex_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax; Secure');
+    }
     if (cookies.length) res.setHeader('set-cookie', cookies);
     res.end(Buffer.from(await upstream.arrayBuffer()));
   } catch (error) {
