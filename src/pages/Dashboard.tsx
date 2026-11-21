@@ -34,9 +34,8 @@ export default function Dashboard() {
     if (loadInFlight.current) return;
     loadInFlight.current = true;
     try {
-      const [profileData, , mkt, tx, inv] = await Promise.all([
+      const [profileData, mkt, tx, inv] = await Promise.all([
         apiGet<{ profile?: Profile }>('/api/profile').catch(() => null),
-        refreshTrading(),
         apiList<Market>('/api/markets?featured=1&limit=12'),
         apiList<Txn>('/api/transactions'),
         apiList<Investment>('/api/investments'),
@@ -93,7 +92,7 @@ export default function Dashboard() {
       )}
       {error && <div className="mt-6 rounded-sm border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{error || trading.error}</div>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-stone-500"><span>{snapshot?`Account snapshot: ${new Date(snapshot.server_time).toLocaleString()}`:'Loading account snapshot...'}</span><button type="button" className="terminal-button" onClick={()=>void load()}>Refresh overview</button>{notice&&<span role="status" className="text-emerald-300">{notice}</span>}{positions.some(position=>position.quote_stale)&&<span className="text-amber-300">Some marks are stale. P&amp;L uses the last available mark.</span>}</div>
+    <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-stone-500"><span>{snapshot?`Account snapshot: ${new Date(snapshot.server_time).toLocaleString()}`:'Loading account snapshot...'}</span><button type="button" className="terminal-button" onClick={()=>{void load();void refreshTrading();}}>Refresh overview</button>{notice&&<span role="status" className="text-emerald-300">{notice}</span>}{positions.some(position=>position.quote_stale)&&<span className="text-amber-300">Some marks are stale. P&amp;L uses the last available mark.</span>}</div>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Desk equity', value: formatMoney(Number(paperAccount?.equity ?? paperAccount?.initial_cash ?? 0)) },

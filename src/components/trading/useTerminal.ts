@@ -71,7 +71,9 @@ export function useTerminal(symbol?:string, { loadCatalog = true } = {}) {
       }catch{live.current=false;setConnection('Polling fallback');if(!stopped)retry=setTimeout(connect,30000);}finally{connecting=false;}
     };
     const visible=()=>{if(document.visibilityState==='visible'){void refresh().catch(e=>setError(e.message));if(!socket||socket.readyState>1)void connect();}else socket?.close();};
-    void connect();const stop=startVisibleInterval(async()=>{if(!live.current||Date.now()-lastSync.current>=60000){try{await refresh();}catch(e){setError(e instanceof Error?e.message:'Account sync failed');}}},5000);
+    // Coinbase ticks update visible prices locally. Account data only needs a
+    // slower fallback sync when the trading-engine WebSocket is unavailable.
+    void connect();const stop=startVisibleInterval(async()=>{if(!live.current||Date.now()-lastSync.current>=60000){try{await refresh();}catch(e){setError(e instanceof Error?e.message:'Account sync failed');}}},30000);
     const heartbeat=setInterval(()=>{if(socket?.readyState===1){if(Date.now()-lastMessage>65000)socket.close();else{pingStarted=performance.now();socket.send('ping');}}},30000);
     document.addEventListener('visibilitychange',visible);
     return()=>{stopped=true;stop();clearInterval(heartbeat);if(retry)clearTimeout(retry);socket?.close();document.removeEventListener('visibilitychange',visible);};
