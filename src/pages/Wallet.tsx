@@ -314,12 +314,35 @@ export default function Wallet() {
                  <strong>KYC Required:</strong> Complete identity verification before withdrawing. Go to <a href="/app/kyc" className="underline">KYC section</a>.
                </div>
              )}
-             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Amount</label>
+             <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Withdrawal amount (USD)</label>
              <input
+               type="number"
+               min="0.01"
+               max={Number(wallet?.available || 0)}
+               step="0.01"
                value={amount}
                onChange={(e) => setAmount(e.target.value)}
                className="mt-1 w-full rounded-sm border border-white/10 bg-black/40 px-3 py-2 font-mono outline-none"
              />
+             <div className="mt-2 flex items-center justify-between gap-3">
+               <span className="text-[11px] text-stone-500">
+                 Available: {formatMoney(Number(wallet?.available || 0))}
+               </span>
+               <div className="flex gap-2" aria-label="Select percentage of available balance">
+                 {[10, 50, 100].map((percent) => (
+                   <button
+                     key={percent}
+                     type="button"
+                     onClick={() => setAmount((Number(wallet?.available || 0) * percent / 100).toFixed(2))}
+                     disabled={!Number(wallet?.available || 0)}
+                     className="rounded-sm border border-white/10 px-2.5 py-1 text-xs text-stone-300 transition hover:border-amber-400/60 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+                     aria-label={`Use ${percent}% of available balance`}
+                   >
+                     {percent}%
+                   </button>
+                 ))}
+               </div>
+             </div>
 
              <label className="mt-4 block text-[10px] uppercase tracking-widest text-stone-500">Currency</label>
              <select
