@@ -292,6 +292,10 @@ export async function runCopyTradingTick(env, now = new Date(), { quoteProvider,
       under_management=coalesce((SELECT sum(current_value) FROM copy_follows WHERE trader_id=? AND status<>'stopped'),0) WHERE id=?`,
       trader.id, trader.id, trader.id, trader.id, trader.id).run();
   }
-  await statement(db, 'DELETE FROM copy_simulation_ticks WHERE tick < ?', tick - 2880).run();
+  // Tick rows remain available for two days; hourly pruning is enough and
+  // avoids running the retention scan on every minute of the trading tick.
+  if (now.getUTCMinutes() === 0) {
+    await statement(db, 'DELETE FROM copy_simulation_ticks WHERE tick < ?', tick - 2880).run();
+  }
   return summary;
 }

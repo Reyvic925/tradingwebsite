@@ -2,7 +2,18 @@ import { Buffer } from 'node:buffer';
 
 // Only the fixed public provider archives needed by unresolved historical records are fetched.
 export async function capturePendingHistoricalData(env) {
-  const row = await env.DB.prepare("SELECT symbol,date(traded_at) day FROM trader_trades WHERE price_review_status='awaiting_history' AND symbol IN ('BRENT','WTI','XAU-USD') ORDER BY traded_at LIMIT 1").first();
+  const row = await env.DB.prepare(`SELECT t.symbol,date(t.traded_at) AS day
+    FROM trader_trades t
+    LEFT JOIN trade_price_audit a ON a.entity='provider_capture'
+      AND a.record_id=t.symbol||':'||date(t.traded_at)
+    WHERE t.price_review_status='awaiting_history'
+      AND t.symbol IN ('BRENT','WTI','XAU-USD')
+      AND (a.record_id IS NULL OR (
+        coalesce(json_extract(a.repair_json,'$.status'),0)<>200
+        AND coalesce(json_extract(a.repair_json,'$.attempts'),0)<3
+        AND coalesce(json_extract(a.repair_json,'$.retry_at'),0)<=?
+      ))
+    ORDER BY t.traded_at LIMIT 1`).bind(Date.now()).first();
   if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(row.day)) return;
   const id = `${row.symbol}:${row.day}`;
   const prior = await env.DB.prepare("SELECT repair_json FROM trade_price_audit WHERE entity='provider_capture' AND record_id=?").bind(id).first();

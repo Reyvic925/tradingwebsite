@@ -164,7 +164,8 @@ async function markets(url, db) {
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const order = featured ? 'volume DESC, symbol ASC' : 'symbol ASC';
   const countQuery = db.prepare(`SELECT COUNT(*) AS total FROM markets ${where}`).bind(...values);
-  const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM markets ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
+  const marketSource = featured ? 'markets INDEXED BY idx_markets_featured_volume_symbol' : 'markets';
+  const dataQuery = db.prepare(`SELECT id, symbol, name, asset_class, price, change_24h, volume, high_24h, low_24h FROM ${marketSource} ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...values, limit, offset);
   const [countResult, dataResult] = await Promise.all([countQuery.first(), dataQuery.all()]);
   const items = (dataResult.results || []).map((item) => ({ ...item, name: getCatalogMarket(item.symbol)?.name || item.name }));
   const marketItems = await quoteMarkets(items);

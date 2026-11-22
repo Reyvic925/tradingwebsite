@@ -30,9 +30,13 @@ const pendingMarketResponses = new Map();
 
 export default {
   async scheduled(controller, env, context) {
-    context.waitUntil(capturePendingHistoricalData(env).catch(error => console.warn('[historical-capture]', error.message)));
-    context.waitUntil(runPaperTradingTick(env));
     const now = new Date(controller.scheduledTime || Date.now());
+    // Historical provider archives are repair work, not live pricing. Checking
+    // the capture queue hourly avoids scanning it on every cron invocation.
+    if (now.getUTCMinutes() === 0) {
+      context.waitUntil(capturePendingHistoricalData(env).catch(error => console.warn('[historical-capture]', error.message)));
+    }
+    context.waitUntil(runPaperTradingTick(env));
     context.waitUntil(runCronJob('copy-trading', env, now));
     context.waitUntil(runCronJob('roi', env, now));
   },
