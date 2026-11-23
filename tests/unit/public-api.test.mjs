@@ -95,6 +95,13 @@ const emptyDb = {
     return { bind() { return this; }, async first() { return { total: 0 }; }, async all() { return { results: [] }; } };
   },
 };
+const emptyLanding = await handlePublicRequest(request('/api/landing'), { DB: emptyDb });
+assert.deepEqual((await emptyLanding.json()).stats.slice(0, 3).map(({ label, value, prefix, suffix }) => ({ label, value, prefix, suffix })), [
+  { label: 'Active clients', value: 12000, prefix: undefined, suffix: '+' },
+  { label: 'Client deposits', value: 36000000, prefix: '$', suffix: '+' },
+  { label: 'Daily trades', value: 18000, prefix: undefined, suffix: '+' },
+], 'empty public stats use the calibrated landing-page figures');
+
 const emptySearch = await handlePublicRequest(request('/api/markets?q=NO_SUCH_SYMBOL&offset=12'), { DB: emptyDb });
 assert.deepEqual(await emptySearch.json(), { items: [], total: 0, limit: 12, offset: 12 },
   'empty search or page must not be replaced with unrelated seeded markets');

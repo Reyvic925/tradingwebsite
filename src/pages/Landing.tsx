@@ -315,9 +315,9 @@ export default function Landing() {
           {(stats.length
             ? stats
             : [
-                { id: 1, label: 'Active clients', value: 50000, prefix: '', suffix: '+' },
-                { id: 2, label: 'Client deposits', value: 50000000, prefix: '$', suffix: '+' },
-                { id: 3, label: 'Daily trades', value: 12500, prefix: '', suffix: '+' },
+                { id: 1, label: 'Active clients', value: 12000, prefix: '', suffix: '+' },
+                { id: 2, label: 'Client deposits', value: 36000000, prefix: '$', suffix: '+' },
+                { id: 3, label: 'Daily trades', value: 18000, prefix: '', suffix: '+' },
                 { id: 4, label: 'Platform uptime', value: 99.99, prefix: '', suffix: '%' },
               ]
           ).map((s) => (

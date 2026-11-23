@@ -40,9 +40,9 @@ const PARTNER_ROWS = [
 ];
 
 const PLATFORM_STATS = [
-  { id: 1, label: 'Active clients', value: 120000, prefix: '', suffix: '+' },
-  { id: 2, label: 'Client deposits', value: 420, prefix: '$', suffix: 'M+' },
-  { id: 3, label: 'Daily trades', value: 24, prefix: '', suffix: 'K+' },
+  { id: 1, label: 'Active clients', value: 12000, prefix: '', suffix: '+' },
+  { id: 2, label: 'Client deposits', value: 36000000, prefix: '$', suffix: '+' },
+  { id: 3, label: 'Daily trades', value: 18000, prefix: '', suffix: '+' },
   { id: 4, label: 'Platform uptime', value: 99.9, prefix: '', suffix: '%' },
 ];
 
