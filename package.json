@@ -38,6 +38,7 @@
     "backfill:wallets": "node scripts/backfill-wallets.js",
     "seed:kyc": "node scripts/seed-kyc-table.js",
     "seed:public:data": "node scripts/seed-public-data.mjs",
+    "seed:copy:sandbox": "node scripts/seed-local-copy-sandbox.mjs",
     "audit:traders": "node scripts/audit-traders-reconcile.mjs",
     "traders:migrate": "node scripts/migrate-traders-to-simulation.mjs",
     "traders:rebuild-metrics": "node scripts/rebuild-trader-metrics.mjs",
