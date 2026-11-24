@@ -26,6 +26,7 @@ export default function AdminTraders() {
   const [editingId, setEditingId] = useState<string | number | null>(null);
   const [avatarData, setAvatarData] = useState('');
   const [metricValues, setMetricValues] = useState<Record<string, string>>({});
+  const [metricPlaceholders, setMetricPlaceholders] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData());
 
@@ -84,6 +85,7 @@ export default function AdminTraders() {
       await fetchTraders();
       setFormData(createEmptyFormData());
       setMetricValues({});
+      setMetricPlaceholders({});
       setAvatarData('');
       setShowForm(false);
       setEditingId(null);
@@ -139,6 +141,28 @@ export default function AdminTraders() {
 
   const handleEdit = (trader: Trader) => {
     setMetricValues(Object.fromEntries(Object.entries(trader.profile_metrics || {}).map(([key, value]) => [key, String(value)])));
+    const calculated: Record<string, number | null | undefined> = {
+      current_equity: trader.current_equity,
+      total_return: trader.total_return,
+      win_rate_trades: trader.win_rate_trades,
+      total_trades: trader.total_trades,
+      max_drawdown: trader.max_drawdown,
+      copiers_current: trader.copiers_current,
+      daily_return: trader.daily_return,
+      monthly_return: trader.monthly_return,
+      under_management: trader.under_management,
+      profit_for_copiers: trader.profit_for_copiers,
+      risk_score: trader.risk_score,
+      closed_trades_analysed: trader.total_trades,
+      recorded_trades: trader.total_trades,
+    };
+    setMetricPlaceholders(Object.fromEntries([
+      ...Object.entries(calculated)
+        .filter(([, value]) => value !== null && value !== undefined)
+        .map(([key, value]) => [key, String(value)] as [string, string]),
+      ...Object.entries(trader.profile_metrics || {})
+        .map(([key, value]) => [key, String(value)] as [string, string]),
+    ]));
     setFormData({
       name: trader.name,
       bio: trader.bio || '',
@@ -207,6 +231,7 @@ export default function AdminTraders() {
             setEditingId(null);
             setFormData(createEmptyFormData());
             setMetricValues({});
+            setMetricPlaceholders({});
             setAvatarData('');
           }}
           className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600 transition"
@@ -361,7 +386,7 @@ export default function AdminTraders() {
                 {PROFILE_METRICS.map(metric => <label key={metric.key} className="block text-xs text-gray-300">
                   {metric.label}
                   <input type="number" step={metric.integer ? 1 : 'any'} min={metric.min} max={metric.max}
-                    value={metricValues[metric.key] ?? ''} placeholder="Calculated value"
+                    value={metricValues[metric.key] ?? ''} placeholder={metricPlaceholders[metric.key] || 'Calculated value'}
                     onChange={event => setMetricValues(values => ({ ...values, [metric.key]: event.target.value }))}
                     className="mt-2 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white" />
                   <span className="mt-1 block font-mono text-[10px] text-gray-500">{metric.key}</span>
@@ -371,7 +396,7 @@ export default function AdminTraders() {
                   const month = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - index, 1)).toISOString().slice(0, 7);
                   const key = `month_${month.replace('-', '_')}`;
                   return <label key={key} className="block text-xs text-gray-300">{month} return (%)
-                    <input type="number" step="any" min={-100} value={metricValues[key] ?? ''} placeholder="Calculated value"
+                    <input type="number" step="any" min={-100} value={metricValues[key] ?? ''} placeholder={metricPlaceholders[key] || 'Calculated value'}
                       onChange={event => setMetricValues(values => ({ ...values, [key]: event.target.value }))}
                       className="mt-2 w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white" />
                     <span className="mt-1 block font-mono text-[10px] text-gray-500">{key}</span>
