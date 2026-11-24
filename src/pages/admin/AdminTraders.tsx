@@ -11,8 +11,10 @@ function createEmptyFormData() {
   return {
     name: '', bio: '', country: '', avatar_url: '', specialty: '', badge: 'Gold',
     asset_focus: ['BTC-USD', 'ETH-USD'], session_type: 'nyc', risk_level: 'Medium',
-    current_equity: 10000, total_return: 0, total_trades: 0, win_rate_trades: 50,
-    max_drawdown: 0, risk_score: 5, profit_sharing_fee: 20
+    current_equity: 10000, total_return: 0, daily_return: 0, monthly_return: 0,
+    total_trades: 0, win_rate_trades: 50, max_drawdown: 0, risk_score: 5,
+    under_management: 0, profit_for_copiers: 0, copiers_current: 0, copiers_all_time: 0,
+    profit_sharing_fee: 20
   };
 }
 
@@ -59,8 +61,7 @@ export default function AdminTraders() {
     try {
       const endpoint = editingId ? `/api/traders?id=${editingId}` : '/api/traders';
       const method = editingId ? 'PUT' : 'POST';
-      const recordedFields = new Set(['current_equity', 'total_return', 'total_trades', 'win_rate_trades', 'max_drawdown']);
-      const profileFields = Object.fromEntries(Object.entries(formData).filter(([key]) => !editingId || !recordedFields.has(key)));
+      const profileFields = { ...formData };
       const payload = {
         ...profileFields,
         profile_metrics: Object.fromEntries(Object.entries(metricValues)
@@ -150,10 +151,16 @@ export default function AdminTraders() {
       risk_level: trader.risk_level || 'Medium',
       current_equity: trader.current_equity || 10000,
       total_return: trader.total_return,
+      daily_return: trader.daily_return ?? 0,
+      monthly_return: trader.monthly_return ?? 0,
       total_trades: trader.total_trades || 0,
       win_rate_trades: trader.win_rate_trades,
       max_drawdown: trader.max_drawdown || 0,
       risk_score: trader.risk_score || 5,
+      under_management: trader.under_management ?? 0,
+      profit_for_copiers: trader.profit_for_copiers ?? 0,
+      copiers_current: trader.copiers_current ?? 0,
+      copiers_all_time: trader.copiers_all_time ?? 0,
       profit_sharing_fee: trader.profit_sharing_fee ?? 20,
     });
     setAvatarData('');
@@ -308,8 +315,17 @@ export default function AdminTraders() {
                 </select>
               </div>
 
-              {!editingId && <div><label className="block text-sm text-gray-300 mb-1">Starting Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>}
-
+              <div><label className="block text-sm text-gray-300 mb-1">Trader Equity ($)</label><input type="number" step="0.01" min="0" value={formData.current_equity} onChange={(e) => setFormData({ ...formData, current_equity: parseFloat(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Total Return (%)</label><input type="number" step="any" value={formData.total_return} onChange={(e) => setFormData({ ...formData, total_return: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Daily Return (%)</label><input type="number" step="any" value={formData.daily_return} onChange={(e) => setFormData({ ...formData, daily_return: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Monthly Return (%)</label><input type="number" step="any" value={formData.monthly_return} onChange={(e) => setFormData({ ...formData, monthly_return: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Total Trades</label><input type="number" min="0" step="1" value={formData.total_trades} onChange={(e) => setFormData({ ...formData, total_trades: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Win Rate (%)</label><input type="number" min="0" max="100" step="0.01" value={formData.win_rate_trades} onChange={(e) => setFormData({ ...formData, win_rate_trades: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Maximum Drawdown (%)</label><input type="number" min="0" max="100" step="0.01" value={formData.max_drawdown} onChange={(e) => setFormData({ ...formData, max_drawdown: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Capital Following ($)</label><input type="number" min="0" step="0.01" value={formData.under_management} onChange={(e) => setFormData({ ...formData, under_management: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Copier Profit ($)</label><input type="number" step="0.01" value={formData.profit_for_copiers} onChange={(e) => setFormData({ ...formData, profit_for_copiers: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">Current Copiers</label><input type="number" min="0" step="1" value={formData.copiers_current} onChange={(e) => setFormData({ ...formData, copiers_current: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
+              <div><label className="block text-sm text-gray-300 mb-1">All-Time Copiers</label><input type="number" min="0" step="1" value={formData.copiers_all_time} onChange={(e) => setFormData({ ...formData, copiers_all_time: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm" /></div>
 
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Strategy Risk Score (1-10)</label>
