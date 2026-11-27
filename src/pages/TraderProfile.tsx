@@ -265,7 +265,7 @@ export default function TraderProfile() {
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-white">Trading activity</h2>
-            <p className="mt-1 text-xs text-gray-500">BUY and SELL activity for {trader.name}'s configured assets</p>
+            <p className="mt-1 text-xs text-gray-500">BUY and SELL activity for {trader.name}'s configured assets{trades.some(trade => trade.modelled === 1) ? '. Modelled strategy prices, not exchange-confirmed fills.' : ''}</p>
           </div>
           <div className="text-right text-xs text-gray-500">{trades.length} recent trades</div>
         </div>

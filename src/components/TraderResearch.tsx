@@ -8,7 +8,8 @@ import type { Trader } from '../types';
 type Position = { symbol: string; side: string; quantity: number; currency: string; mark: number | null; notional: number | null; usd_notional: number | null; weight: number | null };
 type Performance = {
   closedTrades: number; winRate: number | null; profitFactor: number | null; expectancy: number | null;
-  averageWin: number | null; averageLoss: number | null; longestWinStreak: number; longestLossStreak: number;
+  averageWin: number | null; averageLoss: number | null; breakevenWinRate: number | null;
+  longestWinStreak: number; longestLossStreak: number;
   maxDrawdown: number; modelledTrades: number; monthsActive: number; firstTrade: string | null;
   latestTrade: string | null; finalEquity: number | null; totalReturn: number | null;
 };
@@ -45,6 +46,10 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
   }, [trader.id]);
 
   const ratio = (value: number | null) => value === null ? 'Unavailable' : value.toFixed(2);
+  const performance = data?.performance ?? null;
+  const winRateMargin = performance?.winRate !== null && performance?.winRate !== undefined && performance.breakevenWinRate !== null
+    ? performance.winRate - performance.breakevenWinRate : null;
+  const tradesPerMonth = performance && performance.monthsActive > 0 ? performance.closedTrades / performance.monthsActive : null;
   return <section className="mb-8 space-y-6 rounded-2xl border border-amber-200/15 bg-[#10151d] p-5 sm:p-6">
     <div>
       <div className="flex flex-wrap items-center gap-3">
@@ -61,6 +66,21 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
     {error && <p role="alert" className="text-sm text-amber-200">{error}</p>}
     {!data && !error && <p className="text-sm text-gray-400">Loading recorded strategy data...</p>}
     {data && <>
+      <div role="note" className="rounded-xl border border-amber-300/25 bg-amber-300/[0.06] p-4">
+        <h3 className="text-sm font-medium text-amber-100">How to read these figures</h3>
+        <p className="mt-2 text-xs leading-relaxed text-amber-100/80">
+          This is modelled, in-sample strategy history — not a live or audited track record. The deterministic model assumes a favourable historical drift and applies no fees, slippage, or exchange fills. Sharpe ratios above 3 and win rates above 70% are common in backtests and are widely treated as warning signs of overfitting or lookahead bias, not proof of trader skill.
+        </p>
+        {performance && <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-amber-100/75">
+          <li>Small sample: {performance.closedTrades.toLocaleString()} closed trades over {performance.monthsActive} months{tradesPerMonth === null ? '' : ` (~${tradesPerMonth.toFixed(1)} per month)`}.</li>
+          {performance.breakevenWinRate !== null && <li>
+            Breakeven win rate at the observed average win and loss is ~{performance.breakevenWinRate.toFixed(1)}%{winRateMargin !== null && performance.winRate !== null
+              ? `; the reported ${performance.winRate.toFixed(2)}% leaves ~${winRateMargin.toFixed(1)} points of margin` : ''}. A modest decline would erase the edge.
+          </li>}
+          {performance.longestWinStreak > 0 && <li>Longest win streak {performance.longestWinStreak} trades against a worst loss streak of {performance.longestLossStreak}, consistent with a favourable historical window.</li>}
+        </ul>}
+        <p className="mt-3 text-xs font-medium text-amber-100">Treat these figures as a hypothesis to test out-of-sample with realistic costs, not as verified live performance.</p>
+      </div>
       <dl className="grid grid-cols-2 gap-4 border-y border-white/10 py-5 sm:grid-cols-4">
         {[['Sharpe ratio', 'sharpe', ratio(data.sharpe)], ['Sortino ratio', 'sortino', ratio(data.sortino)],
           ['USD gross exposure', 'gross_notional', data.exposure.gross_notional === null ? 'Unavailable' : formatMoney(data.exposure.gross_notional)],

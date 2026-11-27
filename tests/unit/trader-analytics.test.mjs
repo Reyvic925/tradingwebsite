@@ -5,6 +5,14 @@ import { createHash } from 'node:crypto';
 import { calculateTraderAnalytics, calculateTraderExposure } from '../../shared/trader-analytics.js';
 import { handleTraderRequest } from '../../worker/traders-api.js';
 import { valueCopy } from '../../shared/copy-risk.js';
+import { calculateTradePerformance } from '../../shared/trader-performance.js';
+
+const fragile = calculateTradePerformance({ trades: [
+  { status: 'CLOSED', pnl: 1172.51, closed_at: '2026-01-02', modelled: 1 },
+  { status: 'CLOSED', pnl: -3233.19, closed_at: '2026-01-03', modelled: 1 },
+] });
+assert(Math.abs(fragile.breakevenWinRate - 73.39) < 0.01);
+assert.equal(calculateTradePerformance({ trades: [{ status: 'CLOSED', pnl: 10 }] }).breakevenWinRate, null);
 
 const trader = { session_type: 'crypto', current_equity: 10000 };
 let equity = 10000;

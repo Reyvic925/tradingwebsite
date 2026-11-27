@@ -46,14 +46,22 @@ export function calculateTradePerformance({ trades = [], history = [], startingE
   }
   const finalEquity = snapshots.at(-1)?.equity ?? null;
   const monthsActive = new Set(snapshots.map((row) => row.date.slice(0, 7))).size;
+  const averageWin = wins ? grossWin / wins : null;
+  const averageLoss = wins < closed.length ? grossLoss / (closed.length - wins) : null;
+  // The hit rate at which expectancy reaches zero. With small wins and large
+  // losses this can be far below the observed win rate, which is the point of
+  // showing it alongside the headline figures.
+  const breakevenWinRate = averageWin !== null && averageLoss !== null && averageWin + averageLoss > 0
+    ? Number((averageLoss / (averageWin + averageLoss) * 100).toFixed(2)) : null;
 
   return {
     closedTrades: closed.length,
     winRate: closed.length ? Number((wins / closed.length * 100).toFixed(2)) : null,
     profitFactor: grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(2)) : null,
     expectancy: closed.length ? Number(((grossWin - grossLoss) / closed.length).toFixed(2)) : null,
-    averageWin: wins ? Number((grossWin / wins).toFixed(2)) : null,
-    averageLoss: wins < closed.length ? Number((grossLoss / (closed.length - wins)).toFixed(2)) : null,
+    averageWin: averageWin === null ? null : Number(averageWin.toFixed(2)),
+    averageLoss: averageLoss === null ? null : Number(averageLoss.toFixed(2)),
+    breakevenWinRate,
     longestWinStreak,
     longestLossStreak,
     maxDrawdown: Number(maxDrawdown.toFixed(2)),
