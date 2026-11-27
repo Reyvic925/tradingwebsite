@@ -13,12 +13,18 @@ type Performance = {
   maxDrawdown: number; modelledTrades: number; monthsActive: number; firstTrade: string | null;
   latestTrade: string | null; finalEquity: number | null; totalReturn: number | null;
 };
+type LivePaper = {
+  closedTrades: number; openTrades: number; winRate: number | null; realizedPnl: number;
+  averagePnl: number | null; quoteBackedTrades: number; firstTrade: string | null;
+  latestTrade: string | null; paperEquity: number | null;
+};
 type Research = {
   sharpe: number | null; sortino: number | null; annualization: number; return_observations: number;
   first_snapshot: string | null; latest_snapshot: string | null; updated_at: string | null;
   months: { month: string; return: number | null; partial: boolean; observations: number; from: string | null; to: string | null }[];
   records: { first_trade: string | null; latest_trade: string | null; total: number; market_trades: number };
   performance: Performance | null;
+  live: LivePaper | null;
   exposure: { positions: Position[]; allocations: Position[]; gross_notional: number | null; net_notional: number | null; effective_leverage: number | null; updated_at: string | null };
 };
 
@@ -81,6 +87,27 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
         </ul>}
         <p className="mt-3 text-xs font-medium text-amber-100">Treat these figures as a hypothesis to test out-of-sample with realistic costs, not as verified live performance.</p>
       </div>
+      {data.live && <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/[0.05] p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-sm font-medium text-emerald-100">Live paper trading</h3>
+          <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-200">No real funds</span>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-emerald-100/80">Quote-backed paper ticks from the running strategy, counted separately from the modelled history above. These are simulated trades, not exchange-confirmed fills or a live client track record. Projected paper equity includes the modelled starting baseline and is not an account balance.</p>
+        <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ['Closed paper trades', data.live.closedTrades.toLocaleString()],
+            ['Open paper trades', data.live.openTrades.toLocaleString()],
+            ['Paper win rate', data.live.winRate === null ? 'Unavailable' : `${data.live.winRate.toFixed(2)}%`],
+            ['Realized paper PnL', formatMoney(data.live.realizedPnl)],
+            ['Average paper PnL', data.live.averagePnl === null ? 'Unavailable' : formatMoney(data.live.averagePnl)],
+            ['Quote-backed trades', data.live.quoteBackedTrades.toLocaleString()],
+            ['First paper trade', recordedTime(data.live.firstTrade)],
+            ['Latest paper trade', recordedTime(data.live.latestTrade)],
+            ['Projected paper equity', data.live.paperEquity === null ? 'Unavailable' : formatMoney(data.live.paperEquity)],
+          ].map(([label, value]) => <div key={label}><dt className="text-xs text-emerald-100/60">{label}</dt><dd className="mt-1 text-sm tabular-nums text-emerald-50">{value}</dd></div>)}
+        </dl>
+        {data.live.closedTrades === 0 && data.live.openTrades === 0 && <p className="mt-3 text-xs text-emerald-100/70">No live paper trades recorded yet. The strategy ticks every minute; figures appear as trades open and close.</p>}
+      </div>}
       <dl className="grid grid-cols-2 gap-4 border-y border-white/10 py-5 sm:grid-cols-4">
         {[['Sharpe ratio', 'sharpe', ratio(data.sharpe)], ['Sortino ratio', 'sortino', ratio(data.sortino)],
           ['USD gross exposure', 'gross_notional', data.exposure.gross_notional === null ? 'Unavailable' : formatMoney(data.exposure.gross_notional)],

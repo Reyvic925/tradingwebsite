@@ -2,7 +2,7 @@ import { getD1Admin } from './admin-auth.js';
 import { normalizeAssetFocus, validateTraderRecord } from '../api-handlers/trader-validation.js';
 import { compareHistory } from '../shared/trader-comparison.js';
 import { calculateTraderAnalytics, calculateTraderExposure } from '../shared/trader-analytics.js';
-import { calculateTradePerformance } from '../shared/trader-performance.js';
+import { calculateTradePerformance, calculateLivePaperPerformance } from '../shared/trader-performance.js';
 import { getAuthenticatedUser } from './auth.js';
 import { loadCopyQuotes } from './copy-quotes.js';
 import { normalizeProfileMetrics, readProfileMetrics } from '../shared/trader-profile-metrics.js';
@@ -288,6 +288,8 @@ export async function handleTraderRequest(request, env) {
         exposure: calculateTraderExposure(trader, openTrades.results || [], JSON.parse(simulation?.state || '{}')),
         performance: calculateTradePerformance({ trades: closedTrades.results || [],
           history: history.results || [], startingEquity: trader.recorded_starting_equity || trader.current_equity }),
+        live: calculateLivePaperPerformance({ trades: closedTrades.results || [],
+          openTrades: openTrades.results || [], equity: trader.current_equity }),
         records, updated_at: trader.updated_at, strategy: trader.bio, specialty: trader.specialty,
         generated_at: new Date().toISOString() });
     }

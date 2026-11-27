@@ -74,3 +74,26 @@ export function calculateTradePerformance({ trades = [], history = [], startingE
       ? Number(((finalEquity / Number(startingEquity) - 1) * 100).toFixed(2)) : null,
   };
 }
+
+// Live ticks are quote-backed paper trades, not modelled history and not real
+// exchange fills. Kept separate so the two provenance classes never mix.
+export function calculateLivePaperPerformance({ trades = [], openTrades = [], equity = null } = {}) {
+  const isLive = (trade) => Number(trade.modelled) !== 1 && trade.price_basis !== 'synthetic';
+  const closed = trades.filter((trade) => isLive(trade)
+    && String(trade.status).toUpperCase() === 'CLOSED' && finite(trade.pnl) !== null);
+  const wins = closed.filter((trade) => Number(trade.pnl) > 0).length;
+  const realized = closed.reduce((sum, trade) => sum + Number(trade.pnl), 0);
+  const dates = closed.map((trade) => String(trade.closed_at || trade.traded_at || '')).filter(Boolean).sort();
+
+  return {
+    closedTrades: closed.length,
+    openTrades: openTrades.filter(isLive).length,
+    winRate: closed.length ? Number((wins / closed.length * 100).toFixed(2)) : null,
+    realizedPnl: closed.length ? Number(realized.toFixed(2)) : 0,
+    averagePnl: closed.length ? Number((realized / closed.length).toFixed(2)) : null,
+    quoteBackedTrades: closed.filter((trade) => trade.price_basis === 'market').length,
+    firstTrade: dates[0] || null,
+    latestTrade: dates.at(-1) || null,
+    paperEquity: finite(equity),
+  };
+}
