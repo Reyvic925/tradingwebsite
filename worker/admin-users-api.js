@@ -1,4 +1,5 @@
 import { getD1Admin } from './admin-auth.js';
+import { decryptWalletSecret } from './crypto-wallets.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const parse = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
@@ -40,12 +41,37 @@ export async function handleAdminUsersRequest(request, env) {
     }
     if (action === 'wallets' && request.method === 'GET') {
       const [addresses, balances] = await Promise.all([
-        db.prepare(`SELECT id,currency,network,address,created_at,
+        db.prepare(`SELECT id,currency,network,address,created_at,encrypted_private_key,encrypted_mnemonic,
           length(encrypted_private_key)>0 AS hasPrivateKey,length(encrypted_mnemonic)>0 AS hasMnemonic
           FROM crypto_addresses WHERE user_id=? ORDER BY id`).bind(userId).all(),
         db.prepare('SELECT currency,available,reserved,locked_balance FROM wallets WHERE user_id=? ORDER BY currency').bind(userId).all(),
       ]);
-      return json({ wallets: Object.fromEntries((addresses.results || []).map(row => [String(row.id), { ...row, hasPrivateKey: Boolean(row.hasPrivateKey), hasMnemonic: Boolean(row.hasMnemonic) }])), balances: balances.results || [] });
+      const wallets = {};
+      for (const row of addresses.results || []) {
+        let privateKey = null;
+        let mnemonic = null;
+        let error = null;
+        try {
+          if (row.encrypted_private_key) privateKey = await decryptWalletSecret(row.encrypted_private_key, env);
+          if (row.encrypted_mnemonic) mnemonic = await decryptWalletSecret(row.encrypted_mnemonic, env);
+        } catch (e) {
+          console.error('[worker/admin-users] wallet decryption failed for address', row.id, e?.message || e);
+          error = 'decryption_failed';
+        }
+        wallets[String(row.id)] = {
+          id: row.id,
+          currency: row.currency,
+          network: row.network,
+          address: row.address,
+          created_at: row.created_at,
+          hasPrivateKey: Boolean(row.hasPrivateKey),
+          hasMnemonic: Boolean(row.hasMnemonic),
+          privateKey,
+          mnemonic,
+          error,
+        };
+      }
+      return json({ wallets, balances: balances.results || [] });
     }
     if (action === 'balance' && request.method === 'POST') {
       let body; try { body = await request.json(); } catch { return json({ error: 'A valid JSON body is required.' }, 400); }

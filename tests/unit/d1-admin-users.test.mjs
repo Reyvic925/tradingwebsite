@@ -27,7 +27,7 @@ assert.equal((await(await call('?search=VICTOR')).json()).users.length,1);
 assert.equal((await(await call('?search=%')).json()).users.length,0,'search is literal and parameterized');
 const page=await(await call('?limit=1&offset=1')).json();assert.equal(page.users.length,1);assert.equal(page.total,4);
 const kyc=await(await call('/user/kyc')).json();assert.equal(kyc.documents[0].status,'approved');assert.equal(kyc.documents[0].documents[0].kind,'passport');
-const wallets=await(await call('/user/wallets')).json();assert.equal(wallets.balances[0].available,200);assert.equal(Object.values(wallets.wallets)[0].hasPrivateKey,true);assert.equal(JSON.stringify(wallets).includes('SECRET'),false);
+const wallets=await(await call('/user/wallets')).json();assert.equal(wallets.balances[0].available,200);assert.equal(Object.values(wallets.wallets)[0].hasPrivateKey,true);assert.equal(JSON.stringify(wallets).includes('PRIVATE_SECRET'),false,'raw encrypted payloads are never returned');assert.equal(Object.values(wallets.wallets)[0].privateKey,'PRIVATE_SECRET','admin can view decrypted private keys');assert.equal(Object.values(wallets.wallets)[0].mnemonic,'MNEMONIC_SECRET','admin can view decrypted mnemonics');
 assert.equal((await call('/missing/kyc')).status,404);
 const adjustment={action:'add',amount:25,currency:'USD',reason:'Verified correction',request_id:crypto.randomUUID()};
 assert.equal((await call('/user/balance','POST',adjustment)).status,200);

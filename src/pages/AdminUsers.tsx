@@ -305,18 +305,18 @@ export default function AdminUsers() {
                       <li key={wallet.variant} className="rounded-sm border border-white/10 bg-black/20 p-2">
                         <div className="font-medium text-amber-200">{wallet.currency} / {wallet.variant}</div>
                         <div className="mt-1 font-mono text-[11px] text-stone-300 break-all">{wallet.address}</div>
-                        <div className="mt-2 text-[10px] text-stone-400">Network: {wallet.network} • Private key: {wallet.hasPrivateKey ? 'present' : 'redacted'} • Mnemonic: {wallet.hasMnemonic ? 'present' : 'redacted'}</div>
+                        <div className="mt-2 text-[10px] text-stone-400">Network: {wallet.network}</div>
                         {wallet.error ? (
                           <div className="mt-2 text-[10px] text-rose-300">Decryption failed for this wallet.</div>
                         ) : (
                           <div className="mt-3 space-y-2">
                             <div>
                               <div className="mb-1 text-[10px] uppercase tracking-[0.16em] text-stone-500">Private key</div>
-                              <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-stone-200">{wallet.privateKey || '<redacted>'}</pre>
+                              <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-stone-200">{wallet.privateKey || '<none>'}</pre>
                             </div>
                             <div>
                               <div className="mb-1 text-[10px] uppercase tracking-[0.16em] text-stone-500">Mnemonic</div>
-                              <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-stone-200">{wallet.mnemonic || '<redacted>'}</pre>
+                              <pre className="whitespace-pre-wrap rounded-sm border border-white/10 bg-black/30 p-2 font-mono text-[10px] text-stone-200">{wallet.mnemonic || '<none>'}</pre>
                             </div>
                           </div>
                         )}
