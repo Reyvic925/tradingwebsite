@@ -226,6 +226,7 @@ export type UserFollow = {
 };
 
 export type TradeLog = {
+  modelled?: number;
   price_basis?: 'market' | 'synthetic' | 'historical_reference';
   price_review_status?: 'verified' | 'reconstructed' | 'awaiting_history' | 'pending';
   entry_price_source?: string;
