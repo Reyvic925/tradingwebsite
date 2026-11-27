@@ -2,6 +2,7 @@ import { getD1Admin } from './admin-auth.js';
 import { normalizeAssetFocus, validateTraderRecord } from '../api-handlers/trader-validation.js';
 import { compareHistory } from '../shared/trader-comparison.js';
 import { calculateTraderAnalytics, calculateTraderExposure } from '../shared/trader-analytics.js';
+import { calculateTradePerformance } from '../shared/trader-performance.js';
 import { getAuthenticatedUser } from './auth.js';
 import { loadCopyQuotes } from './copy-quotes.js';
 import { normalizeProfileMetrics, readProfileMetrics } from '../shared/trader-profile-metrics.js';
@@ -273,14 +274,17 @@ export async function handleTraderRequest(request, env) {
       if (!id) return json({ error: 'A valid trader ID is required.' }, 400);
       const trader = await env.DB.prepare('SELECT * FROM traders WHERE id=? AND is_active=1').bind(id).first();
       if (!trader) return json({ error: 'Strategy is unavailable.' }, 404);
-      const [history, openTrades, simulation, records] = await Promise.all([
+      const [history, openTrades, simulation, records, closedTrades] = await Promise.all([
         env.DB.prepare('SELECT snapshot_date,equity FROM trader_history WHERE trader_id=? ORDER BY snapshot_date').bind(id).all(),
         env.DB.prepare("SELECT * FROM trader_trades WHERE trader_id=? AND status='OPEN'").bind(id).all(),
         env.DB.prepare('SELECT state FROM copy_simulation_state WHERE trader_id=?').bind(id).first(),
         env.DB.prepare("SELECT min(traded_at) first_trade,max(COALESCE(closed_at,traded_at)) latest_trade,count(*) total,sum(price_basis='market') market_trades FROM trader_trades WHERE trader_id=?").bind(id).first(),
+        env.DB.prepare("SELECT status,closed_at,traded_at,pnl,price_basis,modelled FROM trader_trades WHERE trader_id=? AND status='CLOSED'").bind(id).all(),
       ]);
       return json({ ...calculateTraderAnalytics(trader, history.results || []),
         exposure: calculateTraderExposure(trader, openTrades.results || [], JSON.parse(simulation?.state || '{}')),
+        performance: calculateTradePerformance({ trades: closedTrades.results || [],
+          history: history.results || [], startingEquity: trader.recorded_starting_equity || trader.current_equity }),
         records, updated_at: trader.updated_at, strategy: trader.bio, specialty: trader.specialty,
         generated_at: new Date().toISOString() });
     }

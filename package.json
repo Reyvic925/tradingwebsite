@@ -45,6 +45,8 @@
     "traders:24h-test": "node scripts/test-trader-simulation-24h.mjs",
     "traders:migration-report": "node scripts/report-trader-migration.mjs",
     "traders:backfill-profiles": "node scripts/backfill-trader-profiles.mjs",
+    "traders:set-performance-targets": "node scripts/apply-trader-performance-targets.mjs",
+    "traders:build-modelled-history": "node scripts/build-modelled-trader-history.mjs",
     "traders:reconcile-status": "node scripts/reconcile-trader-status.mjs",
     "traders:backfill-history": "node scripts/backfill-trader-history.mjs",
     "traders:bootstrap-history": "node scripts/bootstrap-trader-history.mjs",

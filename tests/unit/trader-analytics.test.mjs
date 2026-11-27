@@ -49,7 +49,7 @@ assert.equal(preview.fee, 40);
 assert.equal(preview.value, 1160);
 
 const sqlite = new DatabaseSync(':memory:');
-for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql','0029_recorded_performance_baselines.sql', '0026_trader_watchlists.sql']) {
+for (const file of ['0001_d1_foundation.sql', '0018_traders.sql', '0020_copy_trading.sql', '0025_copy_trade_quote_provenance.sql','0027_trade_price_audit.sql','0029_recorded_performance_baselines.sql', '0026_trader_watchlists.sql','0041_modelled_trader_history.sql']) {
   sqlite.exec(readFileSync(`d1-migrations/${file}`, 'utf8'));
 }
 class Statement {
@@ -78,12 +78,17 @@ assert.equal((await request('/api/trader-watchlist?traderId=9999', 'PUT')).statu
 assert.equal((await request('/api/trader-watchlist?traderId=invalid', 'PUT')).status, 400);
 await request('/api/trader-watchlist?traderId=1', 'DELETE');
 assert.deepEqual((await (await request('/api/trader-watchlist')).json()).trader_ids, []);
+sqlite.prepare("INSERT INTO trader_trades (trader_id,symbol,side,quantity,entry_price,exit_price,pnl,pnl_percent,status,traded_at,closed_at,price_basis,modelled) VALUES (1,'BTC-USD','BUY',1,100,110,10,10,'CLOSED','2026-11-01T00:00:00Z','2026-11-02T00:00:00Z','synthetic',1)").run();
 const response = await request('/api/trader-analytics?traderId=1');
 assert.equal(response.status, 200);
-const empty = await response.json();
-assert.equal(empty.sharpe, null);
-assert.equal(empty.months.length, 12);
-assert.equal(empty.exposure.gross_notional, 0);
+const withTrade = await response.json();
+assert.equal(withTrade.performance.closedTrades, 1);
+assert.equal(withTrade.performance.winRate, 100);
+assert.equal(withTrade.performance.profitFactor, null);
+assert.equal(withTrade.performance.modelledTrades, 1);
+assert.equal(withTrade.sharpe, null);
+assert.equal(withTrade.months.length, 12);
+assert.equal(withTrade.exposure.gross_notional, 0);
 assert.equal((await request('/api/trader-analytics?traderId=9999')).status, 404);
 assert.equal((await request('/api/trader-comparison?ids=&period=30')).status, 400);
 const comparison = await (await request('/api/trader-comparison?ids=1,2&period=30')).json();

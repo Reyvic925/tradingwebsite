@@ -152,3 +152,61 @@ for (const move of [1.01, 0.99]) {
   assert.equal(metrics.winRate, move > 1 ? 100 : 0);
 }
 console.log('FULL_EQUITY_MARKET_POSITION_TESTS_PASSED');
+
+// Opt-in target-win policy: modelled profiles hit the configured rate while
+// still recording real losing trades and positive live equity growth.
+const targetConfig = normalizeSyntheticConfig({
+  ...config,
+  enforceTargetWinRate: true,
+  targetWinRate: 0.9,
+  directionBias: 0.9,
+  takeProfitVolatilityRatio: 1.5,
+  stopLossVolatilityRatio: 6,
+  maxHoldingTicks: 96,
+});
+assert.equal(targetConfig.enforceTargetWinRate, true);
+assert.equal(targetConfig.directionBias, 0.9);
+
+let targetWins = 0;
+let targetClosed = 0;
+let targetReturns = 0;
+const targetReasons = new Set();
+for (const traderId of [7, 42, 99]) {
+  let running = initialState;
+  for (let tick = 1; tick <= 1500; tick += 1) {
+    const result = simulateTick({ traderId, tickId: tick,
+      timestamp: new Date(tick * 300000).toISOString(), config: targetConfig, state: running });
+    running = result.state;
+    if (result.trade) {
+      targetClosed += 1;
+      targetWins += result.trade.pnl > 0 ? 1 : 0;
+      targetReasons.add(result.trade.close_reason);
+    }
+  }
+  targetReturns += ((running.equity - 100000) / 100000) * 100;
+}
+const targetWinRate = (targetWins / targetClosed) * 100;
+assert(targetWinRate >= 85 && targetWinRate <= 95, `target win rate out of range: ${targetWinRate}`);
+assert(targetWins < targetClosed, 'target policy must keep losing trades');
+assert(targetReasons.has('take_profit') && targetReasons.has('stop_loss'));
+assert(targetReturns > 0, 'target policy must improve live returns');
+console.log('TARGET_WIN_RATE_SIMULATION_TESTS_PASSED');
+
+// Quote-backed execution must still execute at provider prices under the target policy.
+const marketTargetConfig = { ...targetConfig, minimumSignalBps: 0, session: 'crypto',
+  spreadBps: 0, slippageBps: 0, feeBps: 0, maxHoldingTicks: 1 };
+let marketTargetState = { ...initialState, prices: { 'BTC-USD': quote.price }, signals: { 'BTC-USD': 0 } };
+let marketTargetEntry = null;
+for (let tick = 1; tick <= 20 && !marketTargetEntry; tick += 1) {
+  const result = simulateTick({ traderId: 7, tickId: tick, timestamp: quoteTime,
+    config: marketTargetConfig, state: marketTargetState, marketQuotes: { 'BTC-USD': quote } });
+  marketTargetState = result.state;
+  marketTargetEntry = result.openedTrade;
+}
+assert(marketTargetEntry, 'target policy must still open market-backed positions');
+const marketTargetClose = simulateTick({ traderId: 7, tickId: 21, timestamp: quoteTime,
+  config: marketTargetConfig, state: marketTargetState, marketQuotes: { 'BTC-USD': closeQuote } });
+assert(marketTargetClose.trade, 'target policy must close market-backed positions on the holding limit');
+assert.equal(marketTargetClose.trade.exit_price, closeQuote.price);
+assert.equal(marketTargetClose.trade.close_reason, 'max_holding_ticks');
+console.log('TARGET_POLICY_MARKET_EXECUTION_TESTS_PASSED');

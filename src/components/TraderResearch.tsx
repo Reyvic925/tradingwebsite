@@ -6,11 +6,18 @@ import { formatMoney, formatPrice } from '../lib/format';
 import type { Trader } from '../types';
 
 type Position = { symbol: string; side: string; quantity: number; currency: string; mark: number | null; notional: number | null; usd_notional: number | null; weight: number | null };
+type Performance = {
+  closedTrades: number; winRate: number | null; profitFactor: number | null; expectancy: number | null;
+  averageWin: number | null; averageLoss: number | null; longestWinStreak: number; longestLossStreak: number;
+  maxDrawdown: number; modelledTrades: number; monthsActive: number; firstTrade: string | null;
+  latestTrade: string | null; finalEquity: number | null; totalReturn: number | null;
+};
 type Research = {
   sharpe: number | null; sortino: number | null; annualization: number; return_observations: number;
   first_snapshot: string | null; latest_snapshot: string | null; updated_at: string | null;
   months: { month: string; return: number | null; partial: boolean; observations: number; from: string | null; to: string | null }[];
   records: { first_trade: string | null; latest_trade: string | null; total: number; market_trades: number };
+  performance: Performance | null;
   exposure: { positions: Position[]; allocations: Position[]; gross_notional: number | null; net_notional: number | null; effective_leverage: number | null; updated_at: string | null };
 };
 
@@ -40,7 +47,10 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
   const ratio = (value: number | null) => value === null ? 'Unavailable' : value.toFixed(2);
   return <section className="mb-8 space-y-6 rounded-2xl border border-amber-200/15 bg-[#10151d] p-5 sm:p-6">
     <div>
-      <h2 className="text-xl font-medium text-amber-50">Strategy research</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-xl font-medium text-amber-50">Strategy research</h2>
+        <span className="rounded-full border border-amber-200/25 bg-amber-200/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200">Modelled strategy history</span>
+      </div>
       <p className="mt-2 text-sm text-gray-300">{trader.bio || 'Strategy description pending.'}</p>
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-400">
         <span>Session {trader.session_type.toUpperCase()}</span>
@@ -57,6 +67,25 @@ export default function TraderResearch({ trader }: { trader: Trader }) {
           ['Effective leverage', 'effective_leverage', data.exposure.effective_leverage === null ? 'Unavailable' : `${data.exposure.effective_leverage.toFixed(2)}x`]].map(([label, key, value]) =>
           <div key={label}><dt className="text-xs text-gray-400">{label}</dt><dd className="mt-2 text-xl tabular-nums text-white"><ProfileMetric trader={trader} metricKey={key} format={number => key === 'gross_notional' ? formatMoney(number) : key === 'effective_leverage' ? `${number.toFixed(2)}x` : number.toFixed(2)}>{value}</ProfileMetric></dd></div>)}
       </dl>
+      {data.performance && <>
+        <dl className="grid grid-cols-2 gap-4 border-y border-white/10 py-5 sm:grid-cols-4">
+          {[
+            ['Win rate', data.performance.winRate === null ? 'Unavailable' : `${data.performance.winRate.toFixed(2)}%`],
+            ['Profit factor', data.performance.profitFactor === null ? 'Unavailable' : data.performance.profitFactor.toFixed(2)],
+            ['Expectancy / trade', data.performance.expectancy === null ? 'Unavailable' : formatMoney(data.performance.expectancy)],
+            ['Average win', data.performance.averageWin === null ? 'Unavailable' : formatMoney(data.performance.averageWin)],
+            ['Average loss', data.performance.averageLoss === null ? 'Unavailable' : formatMoney(data.performance.averageLoss)],
+            ['Closed trades', data.performance.closedTrades.toLocaleString()],
+            ['Best win streak', `${data.performance.longestWinStreak} trades`],
+            ['Worst loss streak', `${data.performance.longestLossStreak} trades`],
+            ['Max drawdown', `${data.performance.maxDrawdown.toFixed(2)}%`],
+            ['Months active', `${data.performance.monthsActive}`],
+            ['Modelled trades', data.performance.modelledTrades.toLocaleString()],
+            ['Strategy return', data.performance.totalReturn === null ? 'Unavailable' : `${data.performance.totalReturn > 0 ? '+' : ''}${data.performance.totalReturn.toFixed(2)}%`],
+          ].map(([label, value]) => <div key={label}><dt className="text-xs text-gray-400">{label}</dt><dd className="mt-2 text-xl tabular-nums text-white">{value}</dd></div>)}
+        </dl>
+        <p className="text-xs leading-relaxed text-gray-400">Win rate, profit factor, streaks, and drawdown are calculated from recorded trades and equity snapshots. {data.performance.modelledTrades.toLocaleString()} of {data.performance.closedTrades.toLocaleString()} closed trades are labelled as modelled strategy history.</p>
+      </>}
       <p className="text-xs leading-relaxed text-gray-400">Calculated ratios use <ProfileMetric trader={trader} metricKey="return_observations">{data.return_observations}</ProfileMetric> session returns, annualized over <ProfileMetric trader={trader} metricKey="annualization">{data.annualization}</ProfileMetric> sessions with a 0% risk-free rate and downside target. At least 30 observations are required. Zero variance or zero downside leaves the corresponding ratio unavailable. Figures describe model strategy equity. These profiles represent algorithmic strategies.</p>
       <div>
         <h3 className="mb-3 text-sm font-medium text-white">Monthly performance</h3>

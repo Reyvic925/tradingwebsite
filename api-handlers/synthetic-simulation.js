@@ -79,8 +79,19 @@ export function normalizeSyntheticConfig(config = {}) {
     startingEquity: Math.max(0.01, Number(config.startingEquity) || 100000),
     targetReturnProfile,
     targetWinRate: Math.min(0.99, Math.max(0.01, Number(config.targetWinRate) || 0.575)),
+    // Opt-in: derive exits from the configured win-rate target instead of leaving
+    // win/loss to a one-tick coin flip. Disabled profiles keep the legacy behaviour.
+    enforceTargetWinRate: config.enforceTargetWinRate === true,
+    takeProfitVolatilityRatio: Math.max(0.01, Number(config.takeProfitVolatilityRatio) || 0.18),
+    stopLossVolatilityRatio: Math.max(0.01, Number(config.stopLossVolatilityRatio) || 0.18 * 9),
+    maxHoldingTicks: Math.max(1, Math.trunc(Number(config.maxHoldingTicks) || 96)),
+    directionBias: Math.min(0.99, Math.max(0.01, Number(config.directionBias) || profile.directionBias)),
     averageWinR: Math.max(0.01, Number(config.averageWinR) || 1.2),
     averageLossR: Math.max(0.01, Number(config.averageLossR) || 1),
+    // Backfill-only regime assumption: scales the long-run drift while leaving
+    // volatility and all execution logic untouched. Default 1 keeps live ticks
+    // identical to previous behaviour.
+    driftMultiplier: Math.max(0, Number(config.driftMultiplier ?? 1)),
     volatilityProfile: Math.max(0.01, Number(config.volatilityProfile) || 1),
     maxLeverage: Math.max(1, Number(config.maxLeverage) || 3),
     tradeFrequency: config.tradeFrequency || strategyType,
@@ -166,7 +177,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     }
     const factor = seededRandom(`market:${tickId}:${spec.correlation}`)() * 2 - 1;
     const noise = seededRandom(`asset:${tickId}:${asset}`)() * 2 - 1;
-    const move = assetOpen(asset) ? spec.drift + (factor * 0.7 + noise * 0.3) * spec.volatility * stress : 0;
+    const move = assetOpen(asset) ? spec.drift * normalizedConfig.driftMultiplier + (factor * 0.7 + noise * 0.3) * spec.volatility * stress : 0;
     nextPrices[asset] = Number(((Number(previousPrices[asset]) || spec.basePrice) * Math.max(0.01, 1 + move)).toFixed(8));
     marketMoves[asset] = move;
   }
@@ -198,7 +209,21 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     dailyLossReached = marketBacked && equity <= dailyFloor;
     if (assetOpen(position.symbol) && config.advancePositionAge !== false) position.age += 1;
     const tradeLoss = direction * (price - position.entry_price) / position.entry_price;
-    if (assetOpen(position.symbol) && (dailyLossReached || (config.advancePositionAge !== false && position.age >= profile.holdingTicks) || tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 || equity <= 0)) {
+    const spec = getAssetSpec(position.symbol);
+    const targetExits = normalizedConfig.enforceTargetWinRate;
+    let targetExit = null;
+    if (targetExits) {
+      const takeProfitPrice = position.entry_price * (1 + direction * normalizedConfig.takeProfitVolatilityRatio * spec.volatility);
+      const stopLossPrice = position.entry_price * (1 - direction * normalizedConfig.stopLossVolatilityRatio * spec.volatility);
+      if (direction > 0 ? price >= takeProfitPrice : price <= takeProfitPrice) targetExit = { reason: 'take_profit' };
+      else if (direction > 0 ? price <= stopLossPrice : price >= stopLossPrice) targetExit = { reason: 'stop_loss' };
+    }
+    const holdingTicks = targetExits ? Math.max(profile.holdingTicks, normalizedConfig.maxHoldingTicks) : profile.holdingTicks;
+    const holdingDone = config.advancePositionAge !== false && position.age >= holdingTicks;
+    const legacyStop = tradeLoss <= -spec.volatility * 2 && !targetExits;
+    if (assetOpen(position.symbol) && (dailyLossReached || holdingDone || legacyStop || equity <= 0 || targetExit)) {
+      // The barrier only triggers the close; execution stays at the current
+      // (quote-backed or synthetic) price so audit trails remain valid.
       const exit = price * (1 - direction * friction);
       const exitFee = exit * position.quantity * feeBps / 10000;
       equity += direction * (exit - price) * position.quantity - exitFee;
@@ -206,7 +231,7 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
       const pnl = direction * (exit - position.entry_price) * position.quantity - fees;
       trade = { ...position, exit_price_source: marketQuotes?.[position.symbol]?.price_source, exit_quote_at: marketQuotes?.[position.symbol]?.quote_updated_at, exit_price: exit, fees: Number(fees.toFixed(2)), pnl: Number(pnl.toFixed(2)),
         pnl_percent: pnl / position.equity_at_entry * 100, status: 'CLOSED', closed_at: timestamp,
-        close_reason: dailyLossReached ? 'daily_loss_limit' : tradeLoss <= -getAssetSpec(position.symbol).volatility * 2 ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : 'strategy_exit' };
+        close_reason: targetExit ? targetExit.reason : dailyLossReached ? 'daily_loss_limit' : legacyStop ? 'position_stop' : equity <= 0 ? 'capital_exhausted' : holdingDone ? 'max_holding_ticks' : 'strategy_exit' };
       lossStreak = pnl < 0 ? lossStreak + 1 : 0;
       position = null;
     }
@@ -216,7 +241,8 @@ export function simulateTick({ traderId, tickId, timestamp, config, state, marke
     const signal = Number(state.signals?.[asset] || 0);
     let bullish = signal >= 0;
     if (normalizedConfig.strategyType === 'mean_reversion') bullish = !bullish;
-    if (!marketBacked && (normalizedConfig.strategyType === 'scalper' || Math.abs(signal) < 0.0001)) bullish = random() < profile.directionBias;
+    if (normalizedConfig.enforceTargetWinRate) bullish = random() < normalizedConfig.directionBias;
+    else if (!marketBacked && (normalizedConfig.strategyType === 'scalper' || Math.abs(signal) < 0.0001)) bullish = random() < profile.directionBias;
     const side = bullish ? 'BUY' : 'SELL';
     const direction = bullish ? 1 : -1;
     const mark = nextPrices[asset];
