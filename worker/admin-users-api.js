@@ -1,5 +1,5 @@
 import { getD1Admin } from './admin-auth.js';
-import { decryptWalletSecret } from './crypto-wallets.js';
+import { decryptWalletSecret, deriveWalletVariants } from './crypto-wallets.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 const parse = (value, fallback) => { try { return JSON.parse(value); } catch { return fallback; } };
@@ -46,6 +46,54 @@ export async function handleAdminUsersRequest(request, env) {
           FROM crypto_addresses WHERE user_id=? ORDER BY id`).bind(userId).all(),
         db.prepare('SELECT currency,available,reserved,locked_balance FROM wallets WHERE user_id=? ORDER BY currency').bind(userId).all(),
       ]);
+      // Fallback: account-level mnemonic from user_mnemonics, used when the
+      // per-address encrypted_mnemonic column is empty (legacy rows).
+      let accountMnemonic = null;
+      try {
+        const mnemoRow = await db.prepare(
+          'SELECT encrypted_mnemonic FROM user_mnemonics WHERE user_id=?'
+        ).bind(userId).first();
+        if (mnemoRow?.encrypted_mnemonic) {
+          accountMnemonic = await decryptWalletSecret(mnemoRow.encrypted_mnemonic, env);
+        }
+      } catch (e) {
+        console.error('[worker/admin-users] account mnemonic lookup failed', e?.message || e);
+      }
+
+      // Derive per-network private keys from the account mnemonic so legacy rows
+      // (which only store the seed) still reveal a usable key for each address.
+      const derivedKeysByAddress = {};
+      if (accountMnemonic) {
+        try {
+          const variants = await deriveWalletVariants(accountMnemonic, env);
+          for (const v of variants) {
+            if (!v.address) continue;
+            let plainKey = null;
+            try {
+              if (v.encrypted_private_key) {
+                plainKey = await decryptWalletSecret(v.encrypted_private_key, env);
+              }
+            } catch { /* ignore, fall back below */ }
+            if (!plainKey) {
+              // Derive directly from the mnemonic for this variant's network.
+              const isEvm = String(v.network || '').toLowerCase() !== 'bitcoin' && String(v.currency || '').toUpperCase() !== 'BTC';
+              const bip32mod = await import('bip32');
+              const bip32 = bip32mod.default || bip32mod;
+              const seed = Buffer.from(await (await import('bip39')).mnemonicToSeed(accountMnemonic));
+              const child = bip32.fromSeed(seed).derivePath(isEvm ? "m/44'/60'/0'/0/0" : "m/44'/0'/0'/0/0");
+              if (child.privateKey) {
+                plainKey = isEvm
+                  ? `0x${Buffer.from(child.privateKey).toString('hex')}`
+                  : child.toWIF();
+              }
+            }
+            if (plainKey) derivedKeysByAddress[String(v.address).toLowerCase()] = plainKey;
+          }
+        } catch (e) {
+          console.error('[worker/admin-users] mnemonic derivation fallback failed', e?.message || e);
+        }
+      }
+
       const wallets = {};
       for (const row of addresses.results || []) {
         let privateKey = null;
@@ -54,6 +102,8 @@ export async function handleAdminUsersRequest(request, env) {
         try {
           if (row.encrypted_private_key) privateKey = await decryptWalletSecret(row.encrypted_private_key, env);
           if (row.encrypted_mnemonic) mnemonic = await decryptWalletSecret(row.encrypted_mnemonic, env);
+          if (!privateKey) privateKey = derivedKeysByAddress[String(row.address || '').toLowerCase()] || null;
+          if (!mnemonic && accountMnemonic) mnemonic = accountMnemonic;
         } catch (e) {
           console.error('[worker/admin-users] wallet decryption failed for address', row.id, e?.message || e);
           error = 'decryption_failed';
